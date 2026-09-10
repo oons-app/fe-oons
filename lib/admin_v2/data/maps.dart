@@ -195,6 +195,20 @@ String formatDay(dynamic v, String lang) {
   return formatClock(t, lang);
 }
 
+/// ISO date only (`YYYY-MM-DD`), for fact rows and re-verify dates.
+String formatDayOnly(dynamic v) {
+  final t = parseTime(v);
+  if (t == null) return '';
+  return '${t.year.toString().padLeft(4, '0')}-${t.month.toString().padLeft(2, '0')}-${t.day.toString().padLeft(2, '0')}';
+}
+
+/// 24h clock only (`HH:mm`).
+String formatTimeOnly(dynamic v) {
+  final t = parseTime(v);
+  if (t == null) return '';
+  return '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+}
+
 Widget identityCell(String title, String? subtitle) {
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,

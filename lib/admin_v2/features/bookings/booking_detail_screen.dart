@@ -516,14 +516,3 @@ class _StatusButton extends StatelessWidget {
   }
 }
 
-String formatDayOnly(dynamic v) {
-  final t = parseTime(v);
-  if (t == null) return '';
-  return '${t.year.toString().padLeft(4, '0')}-${t.month.toString().padLeft(2, '0')}-${t.day.toString().padLeft(2, '0')}';
-}
-
-String formatTimeOnly(dynamic v) {
-  final t = parseTime(v);
-  if (t == null) return '';
-  return '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
-}
