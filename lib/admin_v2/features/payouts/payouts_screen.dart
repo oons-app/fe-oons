@@ -1,16 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:oons/admin_v2/data/maps.dart';
-import 'package:oons/admin_v2/data/staff_client.dart';
-import 'package:oons/admin_v2/data/session.dart';
-import 'package:oons/admin_v2/data/permissions.dart';
-import 'package:oons/admin_v2/l10n/copy.dart';
-import 'package:oons/admin_v2/ui/atoms.dart';
 import 'package:oons/admin_v2/chrome/modal.dart';
 import 'package:oons/admin_v2/chrome/toast.dart';
+import 'package:oons/admin_v2/data/maps.dart';
+import 'package:oons/admin_v2/data/permissions.dart';
+import 'package:oons/admin_v2/data/session.dart';
+import 'package:oons/admin_v2/data/staff_client.dart';
+import 'package:oons/admin_v2/data/ui_state.dart';
+import 'package:oons/admin_v2/l10n/copy.dart';
 import 'package:oons/admin_v2/theme/tokens.dart';
-import 'package:oons/data/api.dart';
+import 'package:oons/admin_v2/ui/atoms.dart';
+import 'package:oons/admin_v2/ui/buttons.dart';
+import 'package:oons/admin_v2/ui/grid_table.dart';
+import 'package:oons/admin_v2/ui/list_view.dart';
 import 'package:oons/core/format.dart';
+import 'package:oons/data/api.dart';
 
 class PayoutsScreen extends ConsumerStatefulWidget {
   const PayoutsScreen({super.key});
@@ -23,20 +27,23 @@ class _PayoutsScreenState extends ConsumerState<PayoutsScreen> {
   List<Map<String, dynamic>> payouts = [];
   bool loading = true;
   String? error;
+  String filter = 'All';
+  String q = '';
+
+  static const _filters = ['All', 'Pending', 'Held', 'Paid'];
 
   @override
   void initState() {
     super.initState();
-    _loadPayouts();
+    _load();
   }
 
-  Future<void> _loadPayouts() async {
+  Future<void> _load() async {
     try {
       setState(() {
         loading = true;
         error = null;
       });
-      
       final data = await staffClient.get('/admin/payouts');
       setState(() {
         payouts = asMapList(data['payouts']);
@@ -50,44 +57,45 @@ class _PayoutsScreenState extends ConsumerState<PayoutsScreen> {
     }
   }
 
-  Future<void> _holdPayout(String payoutId) async {
-    final lang = ref.read(localeCodeProvider);
-    final confirmed = await v2Confirm(
-      context,
-      title: lang == 'ar' ? 'تجميد السحب' : 'Hold payout',
-      body: lang == 'ar' ? 'هل تريد تجميد هذا السحب؟' : 'Hold this payout?',
-      confirmLabel: lang == 'ar' ? 'تجميد' : 'Hold',
-    );
-    
-    if (!confirmed) return;
-
-    try {
-      await staffClient.post('/admin/payouts/$payoutId/hold');
-      if (mounted) {
-        v2Toast(context, lang == 'ar' ? 'تم تجميد السحب' : 'Payout held');
-        _loadPayouts();
-      }
-    } on ApiException catch (e) {
-      if (mounted) v2Toast(context, e.message, error: true);
-    }
+  String _status(Map p) {
+    final s = '${p['status'] ?? 'pending'}'.toLowerCase();
+    if (s == 'held') return 'Held';
+    if (s == 'paid' || s == 'released') return 'Paid';
+    return 'Pending';
   }
 
-  Future<void> _releasePayout(String payoutId) async {
-    final lang = ref.read(localeCodeProvider);
-    final confirmed = await v2Confirm(
-      context,
-      title: lang == 'ar' ? 'تحرير السحب' : 'Release payout',
-      body: lang == 'ar' ? 'هل تريد تحرير هذا السحب؟' : 'Release this payout?',
-      confirmLabel: lang == 'ar' ? 'تحرير' : 'Release',
-    );
-    
-    if (!confirmed) return;
+  int _count(String f) => f == 'All' ? payouts.length : payouts.where((p) => _status(p) == f).length;
 
+  List<Map<String, dynamic>> get _rows {
+    var list = payouts;
+    if (filter != 'All') list = list.where((p) => _status(p) == filter).toList();
+    if (q.isNotEmpty) {
+      final n = q.toLowerCase();
+      list = list.where((p) => p.values.join(' ').toLowerCase().contains(n)).toList();
+    }
+    return list;
+  }
+
+  Future<void> _act(Map p, String action, String verb) async {
+    final lang = ref.read(localeCodeProvider);
+    final ok = await v2Confirm(
+      context,
+      title: action == 'release'
+          ? (lang == 'ar' ? 'تحرير السحب؟' : 'Release payout?')
+          : (lang == 'ar' ? 'تجميد السحب؟' : 'Hold payout?'),
+      body: '${money(asInt(p['amount']), lang)} → ${personName(p['providerName'] ?? p, lang, fallbackId: '${p['providerId'] ?? ''}')} · ${p['method'] ?? ''}',
+      confirmLabel: verb,
+      danger: action == 'hold',
+      roleLabel: roleLabel(ref.read(staffSessionProvider).effectiveRole),
+    );
+    if (!ok) return;
     try {
-      await staffClient.post('/admin/payouts/$payoutId/release');
+      await staffClient.post('/admin/payouts/${idOf(p)}/$action');
       if (mounted) {
-        v2Toast(context, lang == 'ar' ? 'تم تحرير السحب' : 'Payout released');
-        _loadPayouts();
+        v2Toast(context, action == 'release'
+            ? (lang == 'ar' ? 'تم التحرير' : 'Payout released')
+            : (lang == 'ar' ? 'تم التجميد' : 'Payout held'));
+        _load();
       }
     } on ApiException catch (e) {
       if (mounted) v2Toast(context, e.message, error: true);
@@ -97,112 +105,53 @@ class _PayoutsScreenState extends ConsumerState<PayoutsScreen> {
   @override
   Widget build(BuildContext context) {
     final lang = ref.watch(localeCodeProvider);
-    final staffState = ref.watch(staffSessionProvider);
+    final role = ref.watch(staffSessionProvider).effectiveRole;
+    if (!staffCan(role, 'payouts.read')) return const V2Gate(allowed: false, child: SizedBox.shrink());
+    final canWrite = staffCan(role, 'payouts.write');
+    ref.listen(v2QueryProvider, (_, n) => setState(() => q = n.trim()));
 
-    if (!staffCan(staffState.effectiveRole, 'payouts.read')) {
-      return const V2Gate(allowed: false, child: SizedBox.shrink());
-    }
-
-    return Scaffold(
-      backgroundColor: Ops.page,
-      body: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(20),
-            child: Text(
-              lang == 'ar' ? 'السحوبات' : 'Payouts',
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: Ops.ink),
-            ),
+    return V2ListView(
+      loading: loading,
+      error: error,
+      onRetry: _load,
+      resultLabel: '${_rows.length} ${lang == 'ar' ? 'نتيجة' : 'results'}',
+      emptyText: lang == 'ar' ? 'لا سحوبات' : 'Nothing here yet',
+      actionsWidth: canWrite ? 150 : 8,
+      filters: [
+        for (final f in _filters)
+          V2FilterChip(label: f, count: _count(f), selected: filter == f, onTap: () => setState(() => filter = f)),
+      ],
+      columns: [
+        V2Col(lang == 'ar' ? 'السحب' : 'Payout', fixed: 110),
+        V2Col(lang == 'ar' ? 'المهنية' : 'Professional', flex: 1),
+        V2Col(lang == 'ar' ? 'الطريقة' : 'Method', fixed: 100),
+        V2Col(lang == 'ar' ? 'الحساب' : 'Account', fixed: 130),
+        V2Col(lang == 'ar' ? 'المبلغ' : 'Amount', fixed: 108),
+        V2Col(lang == 'ar' ? 'الحالة' : 'Status', fixed: 100),
+      ],
+      rows: [
+        for (final p in _rows)
+          V2GridRow(
+            cells: [
+              Text('#${shortId(idOf(p))}',
+                  style: const TextStyle(fontSize: 12.5, fontFamily: Ops.mono, color: Ops.muted)),
+              Text(personName(p['providerName'] ?? p, lang, fallbackId: '${p['providerId'] ?? ''}'),
+                  maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+              Text('${p['method'] ?? ''}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, color: Ops.inkSoft)),
+              Text('${p['account'] ?? p['payoutHandle'] ?? ''}',
+                  maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12.5, fontFamily: Ops.mono)),
+              Text(money(asInt(p['amount']), lang),
+                  style: const TextStyle(fontSize: 13, fontFamily: Ops.mono, fontWeight: FontWeight.w600)),
+              Align(alignment: AlignmentDirectional.centerStart, child: V2StatusPill.forLabel(_status(p))),
+            ],
+            actions: [
+              if (canWrite && _status(p) != 'Paid')
+                V2Btn(label: lang == 'ar' ? 'تحرير' : 'Release', onPressed: () => _act(p, 'release', lang == 'ar' ? 'تحرير' : 'Release'), kind: V2BtnKind.primary, size: V2BtnSize.row),
+              if (canWrite && _status(p) == 'Pending')
+                V2Btn(label: lang == 'ar' ? 'تجميد' : 'Hold', onPressed: () => _act(p, 'hold', lang == 'ar' ? 'تجميد' : 'Hold'), size: V2BtnSize.row),
+            ],
           ),
-          Expanded(
-            child: loading
-                ? const V2Loading()
-                : error != null
-                    ? Center(child: V2ErrorBanner(message: error!, onRetry: _loadPayouts))
-                    : payouts.isEmpty
-                        ? const V2Empty()
-                        : ListView(
-                            padding: const EdgeInsets.symmetric(horizontal: 20),
-                            children: [
-                              V2DataTable(
-                                headers: [
-                                  lang == 'ar' ? 'السحب' : 'Payout',
-                                  lang == 'ar' ? 'المهنية' : 'Provider',
-                                  lang == 'ar' ? 'المبلغ' : 'Amount',
-                                  lang == 'ar' ? 'الحالة' : 'Status',
-                                  lang == 'ar' ? 'التاريخ' : 'Date',
-                                  if (staffCan(staffState.effectiveRole, 'payouts.write')) lang == 'ar' ? 'إجراءات' : 'Actions',
-                                ],
-                                rows: payouts.map((payout) {
-                                  final date = parseTime(payout['createdAt']);
-                                  final amount = asInt(payout['amount']);
-                                  final status = payout['status'] as String? ?? 'pending';
-                                  
-                                  final row = <Widget>[
-                                    Text(
-                                      '#${payout['id']}',
-                                      style: const TextStyle(fontFamily: Ops.mono, fontSize: 12, color: Ops.muted),
-                                    ),
-                                    Text(personName(payout['providerName'] ?? payout, lang, fallbackId: '${payout['providerId'] ?? ''}')),
-                                    Text(money(amount, lang), style: const TextStyle(fontFamily: Ops.mono)),
-                                    V2StatusPill(
-                                      label: status,
-                                      tone: status == 'held' ? V2Tone.bad : V2Tone.ok,
-                                    ),
-                                    Text(
-                                      date != null ? formatDay(payout['createdAt'], lang) : '',
-                                      style: const TextStyle(fontSize: 12, color: Ops.muted),
-                                    ),
-                                  ];
-                                  
-                                  if (staffCan(staffState.effectiveRole, 'payouts.write')) {
-                                    row.add(
-                                      SizedBox(
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            // Hold only pending; never hold paid
-                                            if (status == 'pending')
-                                              ElevatedButton(
-                                                onPressed: () => _holdPayout('${payout['id']}'),
-                                                style: ElevatedButton.styleFrom(
-                                                  backgroundColor: Ops.terracottaInk,
-                                                  minimumSize: const Size(50, 32),
-                                                ),
-                                                child: Text(
-                                                  lang == 'ar' ? 'تجميد' : 'Hold',
-                                                  style: const TextStyle(fontSize: 11),
-                                                ),
-                                              ),
-                                            // Release for pending/ready/held
-                                            if (['pending', 'ready', 'held'].contains(status)) ...[
-                                              const SizedBox(width: 8),
-                                              ElevatedButton(
-                                                onPressed: () => _releasePayout('${payout['id']}'),
-                                                style: ElevatedButton.styleFrom(
-                                                  backgroundColor: Ops.green,
-                                                  minimumSize: const Size(50, 32),
-                                                ),
-                                                child: Text(
-                                                  lang == 'ar' ? 'تحرير' : 'Release',
-                                                  style: const TextStyle(fontSize: 11),
-                                                ),
-                                              ),
-                                            ],
-                                          ],
-                                        ),
-                                      ),
-                                    );
-                                  }
-                                  
-                                  return row;
-                                }).toList(),
-                              ),
-                            ],
-                          ),
-          ),
-        ],
-      ),
+      ],
     );
   }
 }
