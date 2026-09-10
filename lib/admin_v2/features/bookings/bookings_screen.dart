@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:oons/admin_v2/chrome/bulk_pay_bar.dart';
 import 'package:oons/admin_v2/chrome/modal.dart';
 import 'package:oons/admin_v2/chrome/toast.dart';
 import 'package:oons/admin_v2/data/download_stub.dart'
@@ -13,20 +12,24 @@ import 'package:oons/admin_v2/data/paths.dart';
 import 'package:oons/admin_v2/data/permissions.dart';
 import 'package:oons/admin_v2/data/session.dart';
 import 'package:oons/admin_v2/data/staff_client.dart';
+import 'package:oons/admin_v2/data/ui_state.dart';
+import 'package:oons/admin_v2/chrome/bulk_pay_bar.dart';
 import 'package:oons/admin_v2/l10n/copy.dart';
 import 'package:oons/admin_v2/theme/tokens.dart';
 import 'package:oons/admin_v2/ui/atoms.dart';
+import 'package:oons/admin_v2/ui/buttons.dart';
+import 'package:oons/admin_v2/ui/grid_table.dart';
 import 'package:oons/core/format.dart';
 import 'package:oons/data/api.dart';
 
-/// Status chips matching Ops Console v2 Bookings template.
+/// Status chips matching the Ops Console v2 Bookings template.
 const _statusChips = <(String key, String en, String ar)>[
   ('', 'All', 'الكل'),
   ('confirmed', 'Confirmed', 'مؤكد'),
   ('in_progress', 'In progress', 'جارية'),
   ('completed', 'Completed', 'مكتملة'),
   ('pending', 'Pending payment', 'بانتظار الدفع'),
-  ('cancelled', 'Cancelled by client', 'ملغاة من العميلة'),
+  ('cancelled', 'Cancelled by client', 'ملغاة'),
 ];
 
 class BookingsScreen extends ConsumerStatefulWidget {
@@ -46,37 +49,46 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> with WidgetsBin
   String statusFilter = '';
   String queryFilter = '';
   bool unpaidOps = false;
-  final searchCtrl = TextEditingController();
   Set<String> selected = {};
   bool bulkMode = false;
   Timer? _refreshTimer;
+  Timer? _debounce;
   bool _appInBackground = false;
 
   @override
   void initState() {
     super.initState();
-    if (widget.live) {
-      WidgetsBinding.instance.addObserver(this);
-    }
+    WidgetsBinding.instance.addObserver(this);
     statusFilter = widget.queryParams['status'] ?? '';
     queryFilter = widget.queryParams['q'] ?? '';
     unpaidOps = widget.queryParams['unpaidOps'] == '1';
-    searchCtrl.text = queryFilter;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _publishHeader());
     _load();
-    if (widget.live) {
-      _startAutoRefresh();
-    }
+    if (widget.live) _startAutoRefresh();
   }
 
   @override
   void dispose() {
-    if (widget.live) {
-      WidgetsBinding.instance.removeObserver(this);
-      _refreshTimer?.cancel();
-    }
-    searchCtrl.dispose();
+    WidgetsBinding.instance.removeObserver(this);
+    _refreshTimer?.cancel();
+    _debounce?.cancel();
     super.dispose();
   }
+
+  void _publishHeader() {
+    if (!mounted) return;
+    final canWrite = staffCan(ref.read(staffSessionProvider).effectiveRole, 'bookings.write');
+    ref.read(v2HeaderConfigProvider.notifier).state = V2HeaderConfig(
+      newLabel: (canWrite && !widget.live) ? 'Booking' : null,
+      onNewRecord: (canWrite && !widget.live) ? _bookForCustomer : null,
+      liveCount: _liveCount,
+    );
+  }
+
+  int get _liveCount => bookings.where((b) {
+        final s = '${b['status'] ?? ''}'.toLowerCase();
+        return s.contains('progress') || s.contains('on_the_way') || s == 'arrived';
+      }).length;
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -93,7 +105,7 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> with WidgetsBin
   void _startAutoRefresh() {
     if (!widget.live || _appInBackground) return;
     _refreshTimer?.cancel();
-    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+    _refreshTimer = Timer.periodic(Ops.refreshEvery, (_) {
       if (!_appInBackground) _load();
     });
   }
@@ -133,6 +145,7 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> with WidgetsBin
         loading = false;
         if (!bulkMode) selected.clear();
       });
+      _publishHeader();
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -142,27 +155,15 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> with WidgetsBin
     }
   }
 
-  int get _totalAll {
-    if (statusCounts.isEmpty) return bookings.length;
-    return statusCounts.values.fold(0, (a, b) => a + b);
-  }
+  int get _totalAll => statusCounts.isEmpty ? bookings.length : statusCounts.values.fold(0, (a, b) => a + b);
 
   int _countFor(String key) {
     if (key.isEmpty) return _totalAll;
-    if (key == 'confirmed') {
-      return (statusCounts['confirmed'] ?? 0) + (statusCounts['paid'] ?? 0);
-    }
-    if (key == 'pending') {
-      return (statusCounts['pending'] ?? 0) + (statusCounts['pending_payment'] ?? 0);
-    }
-    if (key == 'cancelled') {
-      return (statusCounts['cancelled'] ?? 0) + (statusCounts['canceled'] ?? 0);
-    }
+    if (key == 'confirmed') return (statusCounts['confirmed'] ?? 0) + (statusCounts['paid'] ?? 0);
+    if (key == 'pending') return (statusCounts['pending'] ?? 0) + (statusCounts['pending_payment'] ?? 0);
+    if (key == 'cancelled') return (statusCounts['cancelled'] ?? 0) + (statusCounts['canceled'] ?? 0);
     return statusCounts[key] ?? 0;
   }
-
-  int get _followUp =>
-      _countFor('pending') + _countFor('in_progress') + (statusCounts['on_the_way'] ?? 0);
 
   Future<void> _exportCsv() async {
     final lang = ref.read(localeCodeProvider);
@@ -180,13 +181,66 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> with WidgetsBin
     }
   }
 
+  int _gross() =>
+      bookings.where((b) => selected.contains(idOf(b))).map(providerGrossFromBooking).fold(0, (a, b) => a + b);
+  int _clientTotal() =>
+      bookings.where((b) => selected.contains(idOf(b))).map((b) => asInt(b['total'])).fold(0, (a, b) => a + b);
+
+  Future<void> _bookForCustomer() async {
+    final lang = ref.read(localeCodeProvider);
+    var q = '';
+    List<Map<String, dynamic>> results = [];
+    Map<String, dynamic>? picked;
+    final ok = await v2Form(
+      context,
+      title: lang == 'ar' ? 'حجز لعميلة' : 'Book for a customer',
+      confirmLabel: lang == 'ar' ? 'فتح ملفها' : 'Open their record',
+      bodyBuilder: (ctx, setLocal) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          V2FormField(
+            label: lang == 'ar' ? 'ابحثي بالاسم أو الهاتف' : 'Search by name or phone',
+            child: TextField(
+              autofocus: true,
+              onChanged: (v) async {
+                q = v.trim();
+                if (q.length < 2) return;
+                try {
+                  final data = await staffClient.get('/admin/users', query: {'q': q, 'limit': 8});
+                  setLocal(() => results = asMapList(data['users']));
+                } catch (_) {}
+              },
+              decoration: InputDecoration(hintText: lang == 'ar' ? 'اسم العميلة' : 'Customer name'),
+            ),
+          ),
+          const SizedBox(height: 10),
+          for (final u in results)
+            ListTile(
+              dense: true,
+              selected: picked != null && idOf(picked!) == idOf(u),
+              title: Text(personName(u, lang, fallbackId: idOf(u))),
+              subtitle: Text('${u['phone'] ?? ''}', style: const TextStyle(fontFamily: Ops.mono, fontSize: 11)),
+              onTap: () => setLocal(() => picked = u),
+            ),
+        ],
+      ),
+      onValidate: () {
+        if (picked == null) {
+          v2Toast(context, lang == 'ar' ? 'اختاري عميلة' : 'Pick a customer', error: true);
+          return false;
+        }
+        return true;
+      },
+    );
+    if (ok && picked != null && mounted) context.go(V2Paths.customer(idOf(picked!)));
+  }
+
   Future<void> _bulkSettle() async {
     if (selected.isEmpty) return;
     final lang = ref.read(localeCodeProvider);
     final selectedRows = bookings.where((b) => selected.contains(idOf(b))).toList();
     if (selectedRows.isEmpty) return;
 
-    // Unique providers in selection — ops picks by name, never by hex.
     final providerOptions = <String, String>{}; // id -> display name
     for (final b in selectedRows) {
       final pid = '${b['providerId'] ?? idOf(asMap(b['provider']) ?? {})}';
@@ -204,75 +258,91 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> with WidgetsBin
     XFile? receipt;
     final ok = await v2Form(
       context,
-      title: lang == 'ar' ? 'تسوية وإرسال الإيصال' : 'Settle & send receipt',
-      confirmLabel: t(V2Copy.settle, lang),
-      bodyBuilder: (ctx, setLocal) => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text('${selected.length} ${t(V2Copy.selected, lang)}', style: const TextStyle(fontWeight: FontWeight.w700)),
-          const SizedBox(height: 6),
-          Text(
-            '${t(V2Copy.providerGross, lang)}: ${money(_gross(), lang)}',
-            style: const TextStyle(fontFamily: Ops.mono, fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 14),
-          V2FormField(
-            label: lang == 'ar' ? 'المهنية (بالاسم)' : 'Professional (by name)',
-            child: Autocomplete<String>(
-              initialValue: TextEditingValue(text: providerQuery),
-              optionsBuilder: (text) {
-                final q = text.text.trim().toLowerCase();
-                final names = providerOptions.values.toList()..sort();
-                if (q.isEmpty) return names;
-                return names.where((n) => n.toLowerCase().contains(q));
-              },
-              onSelected: (name) {
-                providerQuery = name;
-                for (final e in providerOptions.entries) {
-                  if (e.value == name) {
-                    providerId = e.key;
-                    break;
+      title: '${lang == 'ar' ? 'تسوية' : 'Settle'} ${selected.length} ${lang == 'ar' ? 'زيارة' : 'visits'}',
+      confirmLabel: lang == 'ar' ? 'تسوية وإرسال' : 'Settle & send',
+      bodyBuilder: (ctx, setLocal) {
+        final gross = _gross();
+        final clientTotal = _clientTotal();
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            V2FormField(
+              label: lang == 'ar' ? 'المهنية (بالاسم)' : 'Provider',
+              child: Autocomplete<String>(
+                initialValue: TextEditingValue(text: providerQuery),
+                optionsBuilder: (text) {
+                  final query = text.text.trim().toLowerCase();
+                  final names = providerOptions.values.toList()..sort();
+                  return query.isEmpty ? names : names.where((n) => n.toLowerCase().contains(query));
+                },
+                onSelected: (name) {
+                  providerQuery = name;
+                  for (final e in providerOptions.entries) {
+                    if (e.value == name) providerId = e.key;
                   }
-                }
-              },
-              fieldViewBuilder: (context, controller, focus, onSubmit) {
-                return TextField(
+                },
+                fieldViewBuilder: (context, controller, focus, onSubmit) => TextField(
                   controller: controller,
                   focusNode: focus,
                   onChanged: (v) {
                     providerQuery = v;
                     for (final e in providerOptions.entries) {
-                      if (e.value.toLowerCase() == v.trim().toLowerCase()) {
-                        providerId = e.key;
-                        break;
-                      }
+                      if (e.value.toLowerCase() == v.trim().toLowerCase()) providerId = e.key;
                     }
                   },
-                  decoration: InputDecoration(
-                    hintText: lang == 'ar' ? 'ابحثي بالاسم' : 'Search by name',
-                  ),
-                );
-              },
+                  decoration: InputDecoration(hintText: lang == 'ar' ? 'ابحثي بالاسم' : 'Search by name'),
+                ),
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
-          V2FormField(label: lang == 'ar' ? 'ملاحظة' : 'Note', child: TextField(onChanged: (v) => note = v, maxLines: 2)),
-          const SizedBox(height: 12),
-          V2FormField(
-            label: lang == 'ar' ? 'إيصال إنستاباي (مطلوب)' : 'InstaPay receipt (required)',
-            child: OutlinedButton.icon(
-              onPressed: () async {
-                final f = await ImagePicker().pickImage(source: ImageSource.gallery);
-                setLocal(() => receipt = f);
-              },
-              icon: const Icon(Icons.attach_file, size: 16),
-              label: Text(receipt == null
-                  ? (lang == 'ar' ? 'اختر ملفاً' : 'Choose file')
-                  : (lang == 'ar' ? 'تم الاختيار' : 'File selected')),
+            const SizedBox(height: 6),
+            Text(lang == 'ar' ? 'يُختار بالاسم — رقم المعرف يُحلّ داخلياً.' : 'Picked by name — the hex ID is resolved for you.',
+                style: const TextStyle(fontSize: 11.5, color: Ops.mutedSoft)),
+            const SizedBox(height: 12),
+            V2FormField(
+              label: lang == 'ar' ? 'إيصال التحويل (مطلوب)' : 'Transfer receipt (required)',
+              child: OutlinedButton.icon(
+                onPressed: () async {
+                  final f = await ImagePicker().pickImage(source: ImageSource.gallery);
+                  setLocal(() => receipt = f);
+                },
+                icon: const Icon(Icons.attach_file, size: 16),
+                label: Text(receipt == null
+                    ? (lang == 'ar' ? 'أرفقي لقطة إنستاباي' : 'Attach the InstaPay screenshot')
+                    : (lang == 'ar' ? 'تم الإرفاق' : 'Attached')),
+              ),
             ),
-          ),
-        ],
-      ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(13),
+              decoration: BoxDecoration(
+                color: Ops.wellSand,
+                borderRadius: BorderRadius.circular(11),
+                border: Border.all(color: Ops.borderSoft),
+              ),
+              child: Column(
+                children: [
+                  _sumRow(lang == 'ar' ? 'زيارات' : 'Visits', '${selected.length}'),
+                  _sumRow(lang == 'ar' ? 'إجمالي العميلة' : 'Client total', money(clientTotal, lang)),
+                  _sumRow(lang == 'ar' ? 'رسوم الأمان مستبعدة' : 'Trust fee excluded', money(clientTotal - gross, lang)),
+                  _sumRow(lang == 'ar' ? 'صافي المهنية' : 'Provider gross', money(gross, lang), strong: true),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              lang == 'ar'
+                  ? 'التسوية تُنشئ دفعة، وتولّد Excel بإجمالي صافٍ من رسوم الأمان، وتضع إيصال واتساب في الطابور.'
+                  : 'Settling writes a batch, generates the ops Excel with client total net of trust fee, and queues the WhatsApp receipt.',
+              style: const TextStyle(fontSize: 12, color: Ops.mutedSoft, height: 1.5),
+            ),
+            const SizedBox(height: 10),
+            V2FormField(
+              label: lang == 'ar' ? 'ملاحظة (اختياري)' : 'Note (optional)',
+              child: TextField(onChanged: (v) => note = v, maxLines: 2),
+            ),
+          ],
+        );
+      },
       onValidate: () {
         final match = providerOptions.entries.where((e) => e.value.toLowerCase() == providerQuery.trim().toLowerCase());
         if (match.isEmpty && !providerOptions.containsKey(providerId)) {
@@ -302,7 +372,7 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> with WidgetsBin
         filename: receipt!.name.isNotEmpty ? receipt!.name : 'receipt.jpg',
       );
       if (mounted) {
-        v2Toast(context, lang == 'ar' ? 'تم التسوية وإرسال الإيصال' : 'Settled — Excel + WhatsApp queued');
+        v2Toast(context, lang == 'ar' ? 'تمت التسوية — Excel وواتساب في الطابور' : 'Settled — Excel + WhatsApp queued');
         setState(() {
           selected.clear();
           bulkMode = false;
@@ -314,24 +384,18 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> with WidgetsBin
     }
   }
 
-  int _gross() => bookings.where((b) => selected.contains(idOf(b))).map(providerGrossFromBooking).fold(0, (a, b) => a + b);
-
-  Widget _twoLine(String top, String bottom, {bool monoTop = false}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          top.isEmpty ? '—' : top,
-          style: TextStyle(
-            fontWeight: FontWeight.w700,
-            fontSize: 13.5,
-            fontFamily: monoTop ? Ops.mono : Ops.sans,
-            color: Ops.ink,
-          ),
-        ),
-        if (bottom.isNotEmpty) Text(bottom, style: const TextStyle(fontSize: 12, color: Ops.muted, height: 1.35)),
-      ],
+  Widget _sumRow(String label, String value, {bool strong = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 13, color: Ops.inkSoft)),
+          Text(value,
+              style: TextStyle(
+                  fontSize: 13, fontFamily: Ops.mono, fontWeight: strong ? FontWeight.w700 : FontWeight.w600)),
+        ],
+      ),
     );
   }
 
@@ -344,215 +408,245 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> with WidgetsBin
   }
 
   String _dateLine(Map b) {
-    final t = parseTime(b['slotStart']);
-    if (t == null) return '';
-    return '${t.year.toString().padLeft(4, '0')}-${t.month.toString().padLeft(2, '0')}-${t.day.toString().padLeft(2, '0')}';
+    final tm = parseTime(b['slotStart']);
+    if (tm == null) return '';
+    return '${tm.year.toString().padLeft(4, '0')}-${tm.month.toString().padLeft(2, '0')}-${tm.day.toString().padLeft(2, '0')}';
   }
 
   String _timeLine(Map b) {
-    final t = parseTime(b['slotStart']);
-    if (t == null) return '';
-    return '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+    final tm = parseTime(b['slotStart']);
+    if (tm == null) return '';
+    return '${tm.hour.toString().padLeft(2, '0')}:${tm.minute.toString().padLeft(2, '0')}';
+  }
+
+  Widget _stacked(String top, String bottom, {bool mono = false, bool strong = true}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(top.isEmpty ? '—' : top,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+                fontWeight: strong ? FontWeight.w600 : FontWeight.w400,
+                fontSize: 13,
+                fontFamily: mono ? Ops.mono : Ops.sans,
+                color: Ops.ink)),
+        if (bottom.isNotEmpty)
+          Text(bottom,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 11, color: Ops.mutedSoft)),
+      ],
+    );
+  }
+
+  void _toggle(String id) => setState(() => selected.contains(id) ? selected.remove(id) : selected.add(id));
+
+  Future<void> _raiseClaim(Map b) async {
+    final lang = ref.read(localeCodeProvider);
+    var kind = 'damage';
+    var note = '';
+    final ok = await v2Form(
+      context,
+      title: lang == 'ar' ? 'فتح مطالبة' : 'Raise a claim',
+      confirmLabel: lang == 'ar' ? 'فتح المطالبة' : 'Raise claim',
+      bodyBuilder: (ctx, setLocal) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            lang == 'ar'
+                ? 'مطالبة على الحجز ${bookingRef(b)} للعميلة ${clientNameOf(b, lang)}.'
+                : 'Opens a claim against booking ${bookingRef(b)} for ${clientNameOf(b, lang)}.',
+            style: const TextStyle(fontSize: 13, height: 1.5),
+          ),
+          const SizedBox(height: 12),
+          V2FormField(
+            label: lang == 'ar' ? 'النوع' : 'Type',
+            child: DropdownButtonFormField<String>(
+              initialValue: kind,
+              items: const [
+                DropdownMenuItem(value: 'damage', child: Text('Damage')),
+                DropdownMenuItem(value: 'theft', child: Text('Theft')),
+                DropdownMenuItem(value: 'payout', child: Text('Payout dispute')),
+              ],
+              onChanged: (v) => kind = v ?? 'damage',
+            ),
+          ),
+          const SizedBox(height: 12),
+          V2FormField(
+            label: lang == 'ar' ? 'ملاحظة (مطلوبة)' : 'Note (required)',
+            child: TextField(onChanged: (v) => note = v, maxLines: 3),
+          ),
+        ],
+      ),
+      onValidate: () {
+        if (note.trim().isEmpty) {
+          v2Toast(context, lang == 'ar' ? 'اكتبي ملاحظة' : 'Add a note', error: true);
+          return false;
+        }
+        return true;
+      },
+    );
+    if (!ok) return;
+    try {
+      await staffClient.post('/admin/bookings/${idOf(b)}/claims', data: {'kind': kind, 'body': note.trim()});
+      if (mounted) v2Toast(context, lang == 'ar' ? 'تم فتح المطالبة' : 'Claim opened');
+    } on ApiException catch (e) {
+      if (mounted) v2Toast(context, e.message, error: true);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final lang = ref.watch(localeCodeProvider);
     final role = ref.watch(staffSessionProvider).effectiveRole;
-    final canWrite = staffCan(role, 'bookings.write');
     final canPay = staffCan(role, 'payouts.write');
-    final title = widget.live ? (lang == 'ar' ? 'زيارات مباشرة' : 'Live visits') : (lang == 'ar' ? 'الحجوزات' : 'Bookings');
-    final sub = widget.live
-        ? (lang == 'ar' ? 'تحديث كل ٣٠ ثانية' : 'Auto-refresh every 30s')
-        : '$_totalAll ${lang == 'ar' ? 'إجمالي' : 'total'} · $_followUp ${lang == 'ar' ? 'تحتاج متابعة' : 'need follow-up'}';
 
-    return V2Gate(
-      allowed: staffCan(role, 'bookings.read'),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsetsDirectional.fromSTEB(22, 8, 22, 0),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(title, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700, color: Ops.ink)),
-                      const SizedBox(height: 4),
-                      Text(sub, style: const TextStyle(fontSize: 13, color: Ops.muted)),
-                    ],
-                  ),
-                ),
-                SizedBox(
-                  width: 240,
-                  child: TextField(
-                    controller: searchCtrl,
-                    decoration: InputDecoration(
-                      hintText: lang == 'ar' ? 'ابحث بالاسم أو الهاتف أو المرجع' : 'Search name, phone, or ref',
-                      isDense: true,
-                      prefixIcon: const Icon(Icons.search, size: 18, color: Ops.muted),
-                    ),
-                    onSubmitted: (v) {
-                      queryFilter = v.trim();
-                      _load();
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (!widget.live)
-            Padding(
-              padding: const EdgeInsetsDirectional.fromSTEB(22, 14, 22, 0),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    for (final chip in _statusChips) ...[
+    ref.listen(v2QueryProvider, (_, next) {
+      _debounce?.cancel();
+      _debounce = Timer(const Duration(milliseconds: 350), () {
+        if (!mounted) return;
+        queryFilter = next.trim();
+        _load();
+      });
+    });
+
+    if (!staffCan(role, 'bookings.read')) {
+      return const V2Gate(allowed: false, child: SizedBox.shrink());
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(Ops.gutter, 20, Ops.gutter, 70),
+            children: [
+              // Toolbar: filters + result label + bulk + export
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  if (!widget.live)
+                    for (final chip in _statusChips)
                       V2FilterChip(
-                        label: '${lang == 'ar' ? chip.$3 : chip.$2} (${_countFor(chip.$1)})',
+                        label: lang == 'ar' ? chip.$3 : chip.$2,
+                        count: _countFor(chip.$1),
                         selected: statusFilter == chip.$1,
                         onTap: () {
                           setState(() => statusFilter = chip.$1);
                           _load();
                         },
                       ),
-                      const SizedBox(width: 8),
-                    ],
+                  if (!widget.live)
                     V2FilterChip(
-                      label: lang == 'ar' ? 'غير مسددة للمهنية' : 'Unpaid ops',
+                      label: lang == 'ar' ? 'غير مسددة' : 'Unpaid only',
                       selected: unpaidOps,
                       onTap: () {
                         setState(() => unpaidOps = !unpaidOps);
                         _load();
                       },
                     ),
-                  ],
-                ),
+                ],
               ),
-            ),
-          Padding(
-            padding: const EdgeInsetsDirectional.fromSTEB(22, 14, 22, 8),
-            child: Row(
-              children: [
-                Text(
-                  '${bookings.length} ${lang == 'ar' ? 'نتيجة' : 'results'}',
-                  style: const TextStyle(fontSize: 12.5, color: Ops.muted, fontWeight: FontWeight.w600),
-                ),
-                const Spacer(),
-                if (canPay && !widget.live)
-                  TextButton(
-                    onPressed: () => setState(() {
-                      bulkMode = !bulkMode;
-                      if (!bulkMode) selected.clear();
-                    }),
-                    child: Text(bulkMode ? t(V2Copy.clear, lang) : t(V2Copy.bulkPay, lang)),
-                  ),
-                TextButton.icon(
-                  onPressed: _exportCsv,
-                  icon: const Icon(Icons.download, size: 16),
-                  label: Text(t(V2Copy.exportCsv, lang)),
-                ),
-              ],
-            ),
-          ),
-          if (loading) const LinearProgressIndicator(minHeight: 2, color: Ops.plum),
-          Expanded(
-            child: error != null
-                ? Padding(
-                    padding: const EdgeInsets.all(22),
-                    child: V2ErrorBanner(message: error!, onRetry: _load),
-                  )
-                : bookings.isEmpty && !loading
-                    ? const V2Empty()
-                    : ListView(
-                        padding: const EdgeInsetsDirectional.fromSTEB(22, 0, 22, 24),
-                        children: [
-                          V2DataTable(
-                            minWidth: 980,
-                            headers: [
-                              if (bulkMode) '',
-                              lang == 'ar' ? 'المرجع' : 'Ref',
-                              lang == 'ar' ? 'العميلة' : 'Customer',
-                              lang == 'ar' ? 'المهنية' : 'Professional',
-                              lang == 'ar' ? 'التاريخ' : 'Date',
-                              lang == 'ar' ? 'الحالة' : 'Status',
-                              lang == 'ar' ? 'الإجمالي' : 'Total',
-                              if (canWrite) (lang == 'ar' ? 'إجراءات' : 'Actions'),
-                            ],
-                            leading: bulkMode
-                                ? (i) => Checkbox(
-                                      value: selected.contains(idOf(bookings[i])),
-                                      onChanged: (_) {
-                                        final id = idOf(bookings[i]);
-                                        setState(() {
-                                          if (selected.contains(id)) {
-                                            selected.remove(id);
-                                          } else {
-                                            selected.add(id);
-                                          }
-                                        });
-                                      },
-                                    )
-                                : null,
-                            rows: [
-                              for (final b in bookings)
-                                [
-                                  _twoLine(bookingRef(b), serviceLabel(b, lang), monoTop: true),
-                                  _twoLine(clientNameOf(b, lang), _areaOf(b, lang)),
-                                  Text(providerNameOf(b, lang), style: const TextStyle(fontWeight: FontWeight.w600)),
-                                  _twoLine(_dateLine(b), _timeLine(b)),
-                                  V2StatusPill(
-                                    label: statusLabel('${b['status']}', lang),
-                                    tone: statusTone('${b['status']}'),
-                                  ),
-                                  Text(
-                                    money(asInt(b['total']), lang),
-                                    style: const TextStyle(fontWeight: FontWeight.w700, fontFamily: Ops.mono),
-                                  ),
-                                  if (canWrite)
-                                    OutlinedButton(
-                                      onPressed: () => context.go(V2Paths.booking(idOf(b))),
-                                      style: OutlinedButton.styleFrom(
-                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                        minimumSize: Size.zero,
-                                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                      ),
-                                      child: Text(lang == 'ar' ? 'فتح' : 'Open', style: const TextStyle(fontSize: 12)),
-                                    ),
-                                ],
-                            ],
-                            onRowTap: (i) {
-                              final id = idOf(bookings[i]);
-                              if (bulkMode) {
-                                setState(() {
-                                  if (selected.contains(id)) {
-                                    selected.remove(id);
-                                  } else {
-                                    selected.add(id);
-                                  }
-                                });
-                              } else {
-                                context.go(V2Paths.booking(id));
-                              }
-                            },
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Text('${bookings.length} ${lang == 'ar' ? 'نتيجة' : 'results'}',
+                      style: const TextStyle(fontSize: 12.5, color: Ops.muted)),
+                  const Spacer(),
+                  if (canPay && !widget.live) ...[
+                    V2Btn(
+                      label: bulkMode
+                          ? (lang == 'ar' ? 'إنهاء الدفع الجماعي' : 'Exit bulk pay')
+                          : (lang == 'ar' ? 'دفع جماعي' : 'Bulk pay'),
+                      onPressed: () => setState(() {
+                        bulkMode = !bulkMode;
+                        if (!bulkMode) selected.clear();
+                      }),
+                      kind: bulkMode ? V2BtnKind.primary : V2BtnKind.ghost,
+                      size: V2BtnSize.sm,
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                  V2Btn.ghost(t(V2Copy.exportCsv, lang), onPressed: _exportCsv, size: V2BtnSize.sm, icon: Icons.download),
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (loading && bookings.isEmpty)
+                const Padding(padding: EdgeInsets.only(top: 60), child: V2Loading())
+              else if (error != null)
+                V2ErrorBanner(message: error!, onRetry: _load)
+              else
+                V2GridTable(
+                  bulkMode: bulkMode,
+                  actionsWidth: widget.live ? 150 : 96,
+                  emptyText: lang == 'ar'
+                      ? 'لا شيء هنا بعد — امسح الفلتر أو البحث'
+                      : 'Nothing here yet — clear the filter or search, or create a new record',
+                  columns: [
+                    V2Col(lang == 'ar' ? 'المرجع' : 'Ref', fixed: 150),
+                    V2Col(lang == 'ar' ? 'العميلة' : 'Customer', flex: 1.05),
+                    V2Col(lang == 'ar' ? 'المهنية' : 'Professional', flex: 0.95),
+                    V2Col(lang == 'ar' ? 'التاريخ' : 'Date', fixed: 110),
+                    V2Col(lang == 'ar' ? 'الحالة' : 'Status', fixed: 132),
+                    V2Col(lang == 'ar' ? 'الإجمالي' : 'Total', fixed: 100),
+                  ],
+                  rows: [
+                    for (final b in bookings)
+                      V2GridRow(
+                        onTap: () => context.go(V2Paths.booking(idOf(b))),
+                        selectable: true,
+                        selected: selected.contains(idOf(b)),
+                        onToggleSelect: () => _toggle(idOf(b)),
+                        cells: [
+                          _stacked(bookingRef(b), serviceLabel(b, lang), mono: true),
+                          _stacked(clientNameOf(b, lang), _areaOf(b, lang)),
+                          Text(providerNameOf(b, lang),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 13, color: Ops.ink)),
+                          _stacked(_dateLine(b), _timeLine(b), mono: true, strong: false),
+                          Align(
+                            alignment: AlignmentDirectional.centerStart,
+                            child: V2StatusPill(
+                                label: statusLabel('${b['status']}', lang), tone: statusTone('${b['status']}')),
                           ),
+                          Text(money(asInt(b['total']), lang),
+                              style: const TextStyle(fontSize: 13, fontFamily: Ops.mono, fontWeight: FontWeight.w600)),
+                        ],
+                        actions: [
+                          V2Btn(
+                            label: lang == 'ar' ? 'فتح' : 'Open',
+                            onPressed: () => context.go(V2Paths.booking(idOf(b))),
+                            size: V2BtnSize.row,
+                          ),
+                          if (widget.live && staffCan(role, 'claims.write'))
+                            V2Btn(
+                              label: lang == 'ar' ? 'مطالبة' : 'Claim',
+                              onPressed: () => _raiseClaim(b),
+                              kind: V2BtnKind.danger,
+                              size: V2BtnSize.row,
+                            ),
                         ],
                       ),
+                  ],
+                ),
+            ],
           ),
-          if (bulkMode && selected.isNotEmpty)
-            V2BulkPayBar(
-              count: selected.length,
-              providerGrossPiastres: _gross(),
-              lang: lang,
-              onClear: () => setState(() => selected.clear()),
-              onSettle: _bulkSettle,
-            ),
-        ],
-      ),
+        ),
+        if (bulkMode && selected.isNotEmpty)
+          V2BulkPayBar(
+            count: selected.length,
+            providerGrossPiastres: _gross(),
+            trustFeeExcludedPiastres: _clientTotal() - _gross(),
+            lang: lang,
+            onClear: () => setState(() => selected.clear()),
+            onSettle: _bulkSettle,
+          ),
+      ],
     );
   }
 }

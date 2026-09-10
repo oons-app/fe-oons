@@ -2,58 +2,52 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:oons/admin_v2/data/maps.dart';
-import 'package:oons/admin_v2/data/staff_client.dart';
-import 'package:oons/admin_v2/data/session.dart';
-import 'package:oons/admin_v2/data/permissions.dart';
-import 'package:oons/admin_v2/data/paths.dart';
-import 'package:oons/admin_v2/l10n/copy.dart';
-import 'package:oons/admin_v2/ui/atoms.dart';
 import 'package:oons/admin_v2/chrome/modal.dart';
 import 'package:oons/admin_v2/chrome/toast.dart';
+import 'package:oons/admin_v2/data/maps.dart';
+import 'package:oons/admin_v2/data/paths.dart';
+import 'package:oons/admin_v2/data/permissions.dart';
+import 'package:oons/admin_v2/data/session.dart';
+import 'package:oons/admin_v2/data/staff_client.dart';
+import 'package:oons/admin_v2/l10n/copy.dart';
 import 'package:oons/admin_v2/theme/tokens.dart';
-import 'package:oons/data/api.dart';
+import 'package:oons/admin_v2/ui/atoms.dart';
+import 'package:oons/admin_v2/ui/buttons.dart';
 import 'package:oons/core/format.dart';
+import 'package:oons/data/api.dart';
+
+const _tabs = ['Overview', 'Documents', 'Services', 'Coverage', 'Portfolio', 'Money'];
 
 class ProviderDetailScreen extends ConsumerStatefulWidget {
-  final String providerId;
-
   const ProviderDetailScreen({super.key, required this.providerId});
+  final String providerId;
 
   @override
   ConsumerState<ProviderDetailScreen> createState() => _ProviderDetailScreenState();
 }
 
-class _ProviderDetailScreenState extends ConsumerState<ProviderDetailScreen>
-    with SingleTickerProviderStateMixin {
-  Map<String, dynamic>? provider;
+class _ProviderDetailScreenState extends ConsumerState<ProviderDetailScreen> {
+  Map<String, dynamic>? p;
   bool loading = true;
   String? error;
-  late TabController tabController;
+  String tab = 'Overview';
+  List<Map<String, dynamic>> areas = [];
 
   @override
   void initState() {
     super.initState();
-    tabController = TabController(length: 6, vsync: this);
-    _loadProvider();
+    _load();
   }
 
-  @override
-  void dispose() {
-    tabController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _loadProvider() async {
+  Future<void> _load() async {
     try {
       setState(() {
         loading = true;
         error = null;
       });
-      
       final data = await staffClient.get('/admin/providers/${widget.providerId}');
       setState(() {
-        provider = unwrapEntity(data, const ['provider']);
+        p = unwrapEntity(data, const ['provider']);
         loading = false;
       });
     } on ApiException catch (e) {
@@ -64,1462 +58,986 @@ class _ProviderDetailScreenState extends ConsumerState<ProviderDetailScreen>
     }
   }
 
-  Future<void> _vetProvider(String action) async {
-    final lang = ref.read(localeCodeProvider);
-    final confirmed = await v2Confirm(
-      context,
-      title: lang == 'ar' ? 'تأكيد الإجراء' : 'Confirm action',
-      body: lang == 'ar' ? 'هل تريد $action هذه المهنية؟' : '$action this provider?',
-      confirmLabel: action,
-    );
-    
-    if (!confirmed) return;
-
+  Future<void> _areasOnce() async {
+    if (areas.isNotEmpty) return;
     try {
-      if (action.toLowerCase() == 'reject') {
-        await staffClient.post('/admin/providers/${widget.providerId}/reject');
-      } else {
-        // Vet: POST body {sexMarkerConfirmed: true}
-        await staffClient.post('/admin/providers/${widget.providerId}/vet', data: {
-          'sexMarkerConfirmed': true,
-        });
-      }
+      final data = await staffClient.get('/admin/areas');
+      setState(() => areas = asMapList(data['areas']));
+    } catch (_) {}
+  }
+
+  String get _role => ref.read(staffSessionProvider).effectiveRole;
+  String get _roleLabel => roleLabel(_role);
+
+  Future<void> _post(String path, {Object? data, required String okMsg}) async {
+    final lang = ref.read(localeCodeProvider);
+    try {
+      await staffClient.post(path, data: data);
       if (mounted) {
-        v2Toast(context, lang == 'ar' ? 'تم تنفيذ الإجراء' : 'Action completed');
-        _loadProvider();
+        v2Toast(context, okMsg);
+        _load();
+      }
+    } on ApiException catch (e) {
+      if (mounted) v2Toast(context, lang == 'ar' ? e.message : e.message, error: true);
+    }
+  }
+
+  Future<void> _patch(String path, Object data, String okMsg) async {
+    try {
+      await staffClient.patch(path, data: data);
+      if (mounted) {
+        v2Toast(context, okMsg);
+        _load();
       }
     } on ApiException catch (e) {
       if (mounted) v2Toast(context, e.message, error: true);
     }
   }
 
-  Future<void> _impersonateProvider() async {
+  Future<void> _confirmThen(String title, String body, String confirm, VoidCallback run, {bool danger = false}) async {
+    final ok = await v2Confirm(context, title: title, body: body, confirmLabel: confirm, danger: danger, roleLabel: _roleLabel);
+    if (ok) run();
+  }
+
+  Future<void> _impersonate() async {
     final lang = ref.read(localeCodeProvider);
     try {
-      final response = await staffClient.post('/admin/providers/${widget.providerId}/impersonate');
-      final token = '${response['accessToken'] ?? response['impersonateToken'] ?? ''}';
-      final name = personName(provider, lang, fallbackId: widget.providerId);
-      
-      if (token.isNotEmpty) {
-        ref.read(staffSessionProvider.notifier).startImpersonation(
-          id: widget.providerId,
-          name: name,
-          token: token,
-          kind: 'provider',
-        );
-        if (mounted) {
-          context.go(V2Paths.impersonateSubject(widget.providerId, kind: 'provider'));
-        }
-      }
+      final r = await staffClient.post('/admin/providers/${widget.providerId}/impersonate');
+      final token = '${r['accessToken'] ?? r['impersonateToken'] ?? ''}';
+      if (token.isEmpty) return;
+      ref.read(staffSessionProvider.notifier).startImpersonation(
+          id: widget.providerId, name: personName(p, lang, fallbackId: widget.providerId), token: token, kind: 'provider');
+      if (mounted) context.go(V2Paths.impersonateSubject(widget.providerId, kind: 'provider'));
     } on ApiException catch (e) {
       if (mounted) v2Toast(context, e.message, error: true);
+    }
+  }
+
+  Future<void> _appendNote(String text) async {
+    final prov = p ?? {};
+    final existing = '${prov['staffNotes'] ?? ''}'.trim();
+    final stamp = DateTime.now().toIso8601String().substring(0, 16).replaceFirst('T', ' ');
+    final line = '$text  — $_roleLabel · $stamp';
+    final next = existing.isEmpty ? line : '$existing\n$line';
+    await _patch('/admin/providers/${widget.providerId}/notes', {'notes': next},
+        ref.read(localeCodeProvider) == 'ar' ? 'تم حفظ الملاحظة' : 'Note saved');
+  }
+
+  Future<void> _editProfile() async {
+    final lang = ref.read(localeCodeProvider);
+    final prov = p ?? {};
+    final first = TextEditingController(text: '${prov['firstName'] ?? ''}');
+    final phone = TextEditingController(text: '${prov['phone'] ?? ''}');
+    final bio = TextEditingController(text: '${prov['bio'] ?? ''}');
+    final ok = await v2Form(
+      context,
+      title: lang == 'ar' ? 'تعديل الملف' : 'Edit profile',
+      bodyBuilder: (ctx, _) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          V2FormField(label: lang == 'ar' ? 'الاسم' : 'Name', child: TextField(controller: first)),
+          const SizedBox(height: 12),
+          V2FormField(label: lang == 'ar' ? 'الهاتف' : 'Phone', child: TextField(controller: phone)),
+          const SizedBox(height: 12),
+          V2FormField(label: lang == 'ar' ? 'نبذة' : 'Bio', child: TextField(controller: bio, maxLines: 3)),
+        ],
+      ),
+    );
+    if (ok) {
+      _patch('/admin/providers/${widget.providerId}',
+          {'firstName': first.text.trim(), 'phone': phone.text.trim(), 'bio': bio.text.trim()},
+          lang == 'ar' ? 'تم تحديث الملف' : 'Profile updated');
+    }
+  }
+
+  Future<void> _suspendOrReinstate(bool suspended) async {
+    final lang = ref.read(localeCodeProvider);
+    if (suspended) {
+      _confirmThen(
+        lang == 'ar' ? 'إعادة التفعيل؟' : 'Reinstate provider?',
+        lang == 'ar' ? 'يعود الملف نشطاً وقابلاً للحجز.' : 'The profile becomes active and bookable again.',
+        lang == 'ar' ? 'إعادة تفعيل' : 'Reinstate',
+        () => _post('/admin/providers/${widget.providerId}/reinstate',
+            okMsg: lang == 'ar' ? 'تمت إعادة التفعيل' : 'Reinstated'),
+      );
+      return;
+    }
+    var reason = '';
+    final ok = await v2Form(
+      context,
+      title: lang == 'ar' ? 'إيقاف المهنية' : 'Suspend provider',
+      confirmLabel: lang == 'ar' ? 'إيقاف' : 'Suspend',
+      danger: true,
+      bodyBuilder: (ctx, _) => V2FormField(
+        label: lang == 'ar' ? 'سبب الإيقاف' : 'Suspension reason',
+        child: TextField(onChanged: (v) => reason = v, maxLines: 3),
+      ),
+      onValidate: () {
+        if (reason.trim().isEmpty) {
+          v2Toast(context, lang == 'ar' ? 'أدخلي سبباً' : 'Enter a reason', error: true);
+          return false;
+        }
+        return true;
+      },
+    );
+    if (ok) {
+      _post('/admin/providers/${widget.providerId}/suspend',
+          data: {'reason': reason.trim()}, okMsg: lang == 'ar' ? 'تم الإيقاف' : 'Suspended');
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final lang = ref.watch(localeCodeProvider);
-    final staffState = ref.watch(staffSessionProvider);
-
-    if (!staffCan(staffState.effectiveRole, 'providers.read')) {
-      return const V2Gate(allowed: false, child: SizedBox.shrink());
+    final role = ref.watch(staffSessionProvider).effectiveRole;
+    if (!staffCan(role, 'providers.read')) return const V2Gate(allowed: false, child: SizedBox.shrink());
+    if (loading) return const Padding(padding: EdgeInsets.only(top: 60), child: V2Loading());
+    if (error != null) {
+      return Padding(padding: const EdgeInsets.all(Ops.gutter), child: V2ErrorBanner(message: error!, onRetry: _load));
     }
+    final prov = p;
+    if (prov == null) return const V2Empty();
+
+    final canVet = staffCan(role, 'providers.vet');
+    final canWrite = staffCan(role, 'providers.write') || canVet;
+    final name = personName(prov, lang, fallbackId: idOf(prov));
+    final vetting = providerVetting(prov, lang);
+    final state = providerState(prov, lang);
+    final suspended = providerState(prov, 'en').toLowerCase() == 'suspended';
+    final reverifyAt = parseTime(prov['reverifyAt']);
+    final blocker = () {
+      if (providerVetting(prov, 'en') == 'Vetted') return lang == 'ar' ? 'كل الفحوصات مكتملة' : 'All checks complete';
+      if (providerVetting(prov, 'en') == 'Awaiting docs') {
+        return lang == 'ar' ? 'مستندات ناقصة — الهوية والفيش' : 'Documents missing — ID and FISH';
+      }
+      return lang == 'ar' ? 'المستندات مرفوعة، بانتظار المراجعة' : 'Docs uploaded, awaiting review';
+    }();
 
     return ColoredBox(
       color: Ops.page,
-      child: Column(
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(Ops.gutter, 20, Ops.gutter, 60),
         children: [
-          Padding(
-            padding: const EdgeInsetsDirectional.fromSTEB(8, 8, 12, 0),
-            child: Row(
-              children: [
-                IconButton(onPressed: () => context.go(V2Paths.providers), icon: const Icon(Icons.arrow_back)),
-                Expanded(child: Text(lang == 'ar' ? 'تفاصيل المهنية' : 'Provider details', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700))),
-                if (staffCan(staffState.effectiveRole, 'providers.impersonate'))
-                  TextButton.icon(
-                    onPressed: _impersonateProvider,
-                    icon: const Icon(Icons.login, size: 16),
-                    label: Text(lang == 'ar' ? 'تسجيل دخول كـ' : 'Impersonate'),
-                  ),
-              ],
-            ),
-          ),
-          TabBar(
-            controller: tabController,
-            isScrollable: true,
-            tabs: [
-              Tab(text: lang == 'ar' ? 'نظرة عامة' : 'Overview'),
-              Tab(text: lang == 'ar' ? 'الوثائق' : 'Documents'),
-              Tab(text: lang == 'ar' ? 'الخدمات' : 'Services'),
-              Tab(text: lang == 'ar' ? 'التغطية' : 'Coverage'),
-              Tab(text: lang == 'ar' ? 'المعرض' : 'Portfolio'),
-              Tab(text: lang == 'ar' ? 'المال' : 'Money'),
-            ],
-          ),
-          Expanded(child: loading
-          ? const V2Loading()
-          : error != null
-              ? Center(
-                  child: V2ErrorBanner(
-                    message: error!,
-                    onRetry: _loadProvider,
-                  ),
-                )
-              : provider == null
-                  ? const V2Empty()
-                  : TabBarView(
-                      controller: tabController,
-                      children: [
-                        _buildOverviewTab(provider!, lang, staffState),
-                        _buildDocumentsTab(provider!, lang, staffState),
-                        _buildServicesTab(provider!, lang, staffState),
-                        _buildCoverageTab(provider!, lang, staffState),
-                        _buildPortfolioTab(provider!, lang, staffState),
-                        _buildMoneyTab(provider!, lang, staffState),
-                      ],
-                    ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _suspendProvider(String reason) async {
-    try {
-      await staffClient.post('/admin/providers/${widget.providerId}/suspend', data: {
-        'reason': reason,
-      });
-      if (mounted) {
-        v2Toast(context, 'Provider suspended');
-        _loadProvider();
-      }
-    } on ApiException catch (e) {
-      if (mounted) v2Toast(context, e.message, error: true);
-    }
-  }
-
-  Future<void> _reinstateProvider() async {
-    try {
-      await staffClient.post('/admin/providers/${widget.providerId}/reinstate');
-      if (mounted) {
-        v2Toast(context, 'Provider reinstated');
-        _loadProvider();
-      }
-    } on ApiException catch (e) {
-      if (mounted) v2Toast(context, e.message, error: true);
-    }
-  }
-
-  Future<void> _reverifyProvider() async {
-    try {
-      await staffClient.post('/admin/providers/${widget.providerId}/reverify');
-      if (mounted) {
-        v2Toast(context, 'Provider sent for reverification');
-        _loadProvider();
-      }
-    } on ApiException catch (e) {
-      if (mounted) v2Toast(context, e.message, error: true);
-    }
-  }
-
-  Future<void> _updateNotes(String notes) async {
-    try {
-      await staffClient.patch('/admin/providers/${widget.providerId}/notes', data: {
-        'notes': notes,
-      });
-      if (mounted) {
-        v2Toast(context, 'Notes updated');
-        _loadProvider();
-      }
-    } on ApiException catch (e) {
-      if (mounted) v2Toast(context, e.message, error: true);
-    }
-  }
-
-  Widget _buildOverviewTab(Map<String, dynamic> provider, String lang, StaffState staffState) {
-    final status = providerState(provider, 'en').toLowerCase();
-    final notes = '${provider['staffNotes'] ?? provider['notes'] ?? ''}';
-    final stats = asMap(provider['stats']) ?? {};
-    
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          V2Card(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            personName(provider, lang, fallbackId: idOf(provider)),
-                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Ops.ink),
-                          ),
-                          Text(
-                            '#${provider['id']}',
-                            style: const TextStyle(color: Ops.muted, fontFamily: Ops.mono),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        V2StatusPill(
-                          label: status,
-                          tone: status == 'suspended' ? V2Tone.bad : 
-                                status == 'active' ? V2Tone.ok : V2Tone.warn,
-                        ),
-                        if (status == 'suspended') ...[
-                          const SizedBox(height: 4),
-                          V2StatusPill(
-                            label: lang == 'ar' ? 'معلق' : 'Suspended',
-                            tone: V2Tone.bad,
-                          ),
-                        ],
-                      ],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Text('${provider['phone'] ?? ''}', style: const TextStyle(fontFamily: Ops.mono)),
-                
-                // Stats
-                if (stats.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  Wrap(
-                    spacing: 16,
-                    runSpacing: 8,
-                    children: [
-                      if (stats['totalBookings'] != null)
-                        Text('${lang == 'ar' ? 'إجمالي الحجوزات:' : 'Total bookings:'} ${stats['totalBookings']}',
-                          style: const TextStyle(fontSize: 13, color: Ops.muted)),
-                      if (stats['completedBookings'] != null)
-                        Text('${lang == 'ar' ? 'الحجوزات المكتملة:' : 'Completed:'} ${stats['completedBookings']}',
-                          style: const TextStyle(fontSize: 13, color: Ops.muted)),
-                      if (stats['rating'] != null)
-                        Text('${lang == 'ar' ? 'التقييم:' : 'Rating:'} ${stats['rating']}',
-                          style: const TextStyle(fontSize: 13, color: Ops.muted)),
-                    ],
-                  ),
-                ],
-                
-                const SizedBox(height: 16),
-                
-                // Action buttons
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    // Vetting actions
-                    if (staffCan(staffState.effectiveRole, 'providers.vet') && status == 'pending') ...[
-                      ElevatedButton(
-                        onPressed: () => _vetProvider('approve'),
-                        style: ElevatedButton.styleFrom(backgroundColor: Ops.green),
-                        child: Text(lang == 'ar' ? 'موافقة' : 'Approve'),
-                      ),
-                      ElevatedButton(
-                        onPressed: () => _vetProvider('reject'),
-                        style: ElevatedButton.styleFrom(backgroundColor: Ops.terracottaInk),
-                        child: Text(lang == 'ar' ? 'رفض' : 'Reject'),
-                      ),
-                    ],
-                    
-                    // Suspend/reinstate actions
-                    if (staffCan(staffState.effectiveRole, 'providers.vet')) ...[
-                      if (status == 'active')
-                        ElevatedButton(
-                          onPressed: () async {
-                            String suspendReason = '';
-                            final confirmed = await v2Form(
-                              context,
-                              title: lang == 'ar' ? 'تعليق المهنية' : 'Suspend provider',
-                              confirmLabel: lang == 'ar' ? 'تعليق' : 'Suspend',
-                              bodyBuilder: (ctx, setState) {
-                                return V2FormField(
-                                  label: lang == 'ar' ? 'سبب التعليق' : 'Suspension reason',
-                                  child: TextField(
-                                    onChanged: (value) => suspendReason = value,
-                                    decoration: const InputDecoration(border: OutlineInputBorder()),
-                                    maxLines: 3,
-                                  ),
-                                );
-                              },
-                            );
-                            // Only call API when confirm is true and reason is not empty
-                            if (confirmed == true && suspendReason.isNotEmpty) {
-                              _suspendProvider(suspendReason);
-                            }
-                          },
-                          style: ElevatedButton.styleFrom(backgroundColor: Ops.terracottaInk),
-                          child: Text(lang == 'ar' ? 'تعليق' : 'Suspend'),
-                        )
-                      else if (status == 'suspended')
-                        ElevatedButton(
-                          onPressed: _reinstateProvider,
-                          style: ElevatedButton.styleFrom(backgroundColor: Ops.green),
-                          child: Text(lang == 'ar' ? 'إلغاء التعليق' : 'Reinstate'),
-                        ),
-                    ],
-                    
-                    // Reverify
-                    if (staffCan(staffState.effectiveRole, 'providers.vet') && status != 'pending')
-                      ElevatedButton(
-                        onPressed: _reverifyProvider,
-                        style: ElevatedButton.styleFrom(backgroundColor: Ops.plum),
-                        child: Text(lang == 'ar' ? 'إعادة تحقق' : 'Reverify'),
-                      ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          
-          const SizedBox(height: 16),
-          
-          // Notes section
-          V2Card(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  lang == 'ar' ? 'ملاحظات' : 'Notes',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 12),
-                if (staffCan(staffState.effectiveRole, 'notes.write'))
-                  GestureDetector(
-                    onTap: () async {
-                      String updatedNotes = notes;
-                      final confirmed = await v2Form(
-                        context,
-                        title: lang == 'ar' ? 'تحرير الملاحظات' : 'Edit notes',
-                        confirmLabel: lang == 'ar' ? 'حفظ' : 'Save',
-                        bodyBuilder: (ctx, setState) {
-                          return V2FormField(
-                            label: lang == 'ar' ? 'ملاحظات' : 'Notes',
-                            child: TextField(
-                              controller: TextEditingController(text: notes),
-                              onChanged: (value) => updatedNotes = value,
-                              decoration: const InputDecoration(border: OutlineInputBorder()),
-                              maxLines: 4,
-                            ),
-                          );
-                        },
-                      );
-                      if (confirmed) _updateNotes(updatedNotes);
-                    },
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Ops.border),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        notes.isEmpty 
-                          ? (lang == 'ar' ? 'اضغط لإضافة ملاحظات...' : 'Tap to add notes...')
-                          : notes,
-                        style: TextStyle(
-                          color: notes.isEmpty ? Ops.muted : Ops.ink,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ),
-                  )
-                else
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Ops.border),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      notes.isEmpty 
-                        ? (lang == 'ar' ? 'لا توجد ملاحظات' : 'No notes')
-                        : notes,
-                      style: TextStyle(
-                        color: notes.isEmpty ? Ops.muted : Ops.ink,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _updateDocStatus(String docType, String status, {String? note}) async {
-    try {
-      await staffClient.post('/admin/providers/${widget.providerId}/docs/$docType', data: {
-        'status': status,
-        if (note != null && note.isNotEmpty) 'note': note,
-      });
-      if (mounted) {
-        v2Toast(context, 'Document status updated');
-        _loadProvider();
-      }
-    } on ApiException catch (e) {
-      if (mounted) v2Toast(context, e.message, error: true);
-    }
-  }
-
-  Widget _buildDocumentsTab(Map<String, dynamic> provider, String lang, StaffState staffState) {
-    final idPath = '${provider['idPhotoUrl'] ?? provider['idPath'] ?? ''}'.isEmpty ? null : '${provider['idPhotoUrl'] ?? provider['idPath']}';
-    final fishPath = '${provider['fishPhotoUrl'] ?? provider['fishPath'] ?? ''}'.isEmpty ? null : '${provider['fishPhotoUrl'] ?? provider['fishPath']}';
-    
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (idPath != null) ...[
-            V2Card(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          lang == 'ar' ? 'بطاقة الهوية' : 'ID Document',
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                      if (staffCan(staffState.effectiveRole, 'providers.vet')) ...[
-                        TextButton.icon(
-                          onPressed: () => _updateDocStatus('id', 'accepted'),
-                          icon: const Icon(Icons.check, color: Ops.green, size: 16),
-                          label: Text(lang == 'ar' ? 'قبول' : 'Accept',
-                            style: const TextStyle(color: Ops.green)),
-                        ),
-                        TextButton.icon(
-                          onPressed: () async {
-                            String note = '';
-                            final confirmed = await v2Form(
-                              context,
-                              title: lang == 'ar' ? 'رفض الوثيقة' : 'Reject document',
-                              confirmLabel: lang == 'ar' ? 'رفض' : 'Reject',
-                              bodyBuilder: (ctx, setState) {
-                                return V2FormField(
-                                  label: lang == 'ar' ? 'سبب الرفض (اختياري)' : 'Rejection reason (optional)',
-                                  child: TextField(
-                                    onChanged: (value) => note = value,
-                                    decoration: const InputDecoration(border: OutlineInputBorder()),
-                                    maxLines: 2,
-                                  ),
-                                );
-                              },
-                            );
-                            if (confirmed) _updateDocStatus('id', 'rejected', note: note);
-                          },
-                          icon: const Icon(Icons.close, color: Ops.terracottaInk, size: 16),
-                          label: Text(lang == 'ar' ? 'رفض' : 'Reject',
-                            style: const TextStyle(color: Ops.terracottaInk)),
-                        ),
-                      ],
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  GestureDetector(
-                    onTap: () async {
-                      final bytes = await staffClient.uploadBytes(idPath);
-                      if (bytes != null && mounted) {
-                        showDialog(
-                          context: context,
-                          builder: (ctx) => Dialog(
-                            child: Container(
-                              constraints: const BoxConstraints(maxWidth: 600, maxHeight: 800),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  AppBar(
-                                    title: Text(lang == 'ar' ? 'بطاقة الهوية' : 'ID Document'),
-                                    automaticallyImplyLeading: true,
-                                  ),
-                                  Expanded(
-                                    child: Image.memory(bytes, fit: BoxFit.contain),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        );
-                      }
-                    },
-                    child: Container(
-                      height: 200,
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Ops.border),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: FutureBuilder<Uint8List?>(
-                        future: staffClient.uploadBytes(idPath),
-                        builder: (context, snapshot) {
-                          if (snapshot.hasData && snapshot.data != null) {
-                            return ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: Image.memory(snapshot.data!, fit: BoxFit.cover),
-                            );
-                          }
-                          return const Center(
-                            child: Icon(Icons.image, size: 48, color: Ops.muted),
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-          ],
-          
-          if (fishPath != null) ...[
-            V2Card(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          lang == 'ar' ? 'فيش جنائي' : 'Criminal Record',
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                      if (staffCan(staffState.effectiveRole, 'providers.vet')) ...[
-                        TextButton.icon(
-                          onPressed: () => _updateDocStatus('fish', 'accepted'),
-                          icon: const Icon(Icons.check, color: Ops.green, size: 16),
-                          label: Text(lang == 'ar' ? 'قبول' : 'Accept',
-                            style: const TextStyle(color: Ops.green)),
-                        ),
-                        TextButton.icon(
-                          onPressed: () async {
-                            String note = '';
-                            final confirmed = await v2Form(
-                              context,
-                              title: lang == 'ar' ? 'رفض الوثيقة' : 'Reject document',
-                              confirmLabel: lang == 'ar' ? 'رفض' : 'Reject',
-                              bodyBuilder: (ctx, setState) {
-                                return V2FormField(
-                                  label: lang == 'ar' ? 'سبب الرفض (اختياري)' : 'Rejection reason (optional)',
-                                  child: TextField(
-                                    onChanged: (value) => note = value,
-                                    decoration: const InputDecoration(border: OutlineInputBorder()),
-                                    maxLines: 2,
-                                  ),
-                                );
-                              },
-                            );
-                            if (confirmed) _updateDocStatus('fish', 'rejected', note: note);
-                          },
-                          icon: const Icon(Icons.close, color: Ops.terracottaInk, size: 16),
-                          label: Text(lang == 'ar' ? 'رفض' : 'Reject',
-                            style: const TextStyle(color: Ops.terracottaInk)),
-                        ),
-                      ],
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  GestureDetector(
-                    onTap: () async {
-                      final bytes = await staffClient.uploadBytes(fishPath);
-                      if (bytes != null && mounted) {
-                        showDialog(
-                          context: context,
-                          builder: (ctx) => Dialog(
-                            child: Container(
-                              constraints: const BoxConstraints(maxWidth: 600, maxHeight: 800),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  AppBar(
-                                    title: Text(lang == 'ar' ? 'فيش جنائي' : 'Criminal Record'),
-                                    automaticallyImplyLeading: true,
-                                  ),
-                                  Expanded(
-                                    child: Image.memory(bytes, fit: BoxFit.contain),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        );
-                      }
-                    },
-                    child: Container(
-                      height: 200,
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Ops.border),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: FutureBuilder<Uint8List?>(
-                        future: staffClient.uploadBytes(fishPath),
-                        builder: (context, snapshot) {
-                          if (snapshot.hasData && snapshot.data != null) {
-                            return ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: Image.memory(snapshot.data!, fit: BoxFit.cover),
-                            );
-                          }
-                          return const Center(
-                            child: Icon(Icons.image, size: 48, color: Ops.muted),
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-          ],
-          
-          if (idPath == null && fishPath == null)
-            const V2Empty(message: 'No documents uploaded'),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _updateServices(List<Map<String, dynamic>> services) async {
-    try {
-      await staffClient.patch('/admin/providers/${widget.providerId}', data: {
-        'items': services,
-      });
-      if (mounted) {
-        v2Toast(context, 'Services updated');
-        _loadProvider();
-      }
-    } on ApiException catch (e) {
-      if (mounted) v2Toast(context, e.message, error: true);
-    }
-  }
-
-  Widget _buildServicesTab(Map<String, dynamic> provider, String lang, StaffState staffState) {
-    final items = asDynList(provider['items'] ?? provider['services']);
-    final services = items.cast<Map<String, dynamic>>();
-    
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+          // Header row
+          Wrap(
+            spacing: 10,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Text(
-                lang == 'ar' ? 'الخدمات' : 'Services',
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-              ),
-              const Spacer(),
-              if (staffCan(staffState.effectiveRole, 'providers.write'))
-                ElevatedButton.icon(
-                  onPressed: () => _editServices(services, lang),
-                  icon: const Icon(Icons.edit, size: 16),
-                  label: Text(lang == 'ar' ? 'تحرير' : 'Edit'),
-                ),
+              V2Btn(label: lang == 'ar' ? '→ المهنيات' : '← Providers', onPressed: () => context.go(V2Paths.providers)),
+              V2StatusPill(label: vetting, tone: vettingTone(prov), large: true),
+              V2StatusPill(label: state, tone: providerStateTone(prov), large: true),
+              Text('${prov['phone'] ?? ''}', style: const TextStyle(fontSize: 13, color: Ops.muted, fontFamily: Ops.mono)),
+              const SizedBox(width: 1),
+              if (staffCan(role, 'providers.impersonate')) V2Btn.imp('Impersonate', onPressed: _impersonate),
+              if (canWrite) V2Btn.ghost(lang == 'ar' ? 'تعديل' : 'Edit', onPressed: _editProfile),
             ],
           ),
           const SizedBox(height: 16),
-          
-          if (services.isEmpty)
-            const V2Empty(message: 'No services configured')
-          else
-            V2DataTable(
-              headers: [
-                lang == 'ar' ? 'الخدمة' : 'Service',
-                lang == 'ar' ? 'المدة (د)' : 'Duration (min)',
-                lang == 'ar' ? 'السعر' : 'Price',
-              ],
-              rows: services.map((service) {
-                final svc = asMap(service) ?? {};
-                final nameEn = locName(svc['name'], 'en');
-                final nameAr = locName(svc['name'], 'ar');
-                final duration = asInt(svc['durationMin']);
-                final price = asInt(svc['price']);
-                
-                return [
-                  Text(lang == 'ar' ? nameAr : nameEn),
-                  Text('$duration', style: const TextStyle(fontFamily: Ops.mono)),
-                  Text(money(price, lang), style: const TextStyle(fontFamily: Ops.mono)),
-                ];
-              }).toList(),
-            ),
-        ],
-      ),
-    );
-  }
 
-  Future<void> _editServices(List<Map<String, dynamic>> currentServices, String lang) async {
-    List<Map<String, dynamic>> editableServices = List.from(currentServices);
-    
-    await v2Form(
-      context,
-      title: lang == 'ar' ? 'تحرير الخدمات' : 'Edit Services',
-      confirmLabel: lang == 'ar' ? 'حفظ' : 'Save',
-      bodyBuilder: (ctx, setState) {
-        return StatefulBuilder(
-          builder: (context, setFormState) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                ...editableServices.asMap().entries.map((entry) {
-                  final index = entry.key;
-                  final service = entry.value;
-                  
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 16),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Ops.border),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text('${lang == 'ar' ? 'خدمة' : 'Service'} ${index + 1}',
-                                style: const TextStyle(fontWeight: FontWeight.w600)),
-                            ),
-                            IconButton(
-                              onPressed: () {
-                                setFormState(() {
-                                  editableServices.removeAt(index);
-                                });
-                              },
-                              icon: const Icon(Icons.delete, color: Ops.terracottaInk),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        TextField(
-                          controller: TextEditingController(text: service['name']?['en'] ?? ''),
-                          decoration: InputDecoration(
-                            labelText: lang == 'ar' ? 'الاسم بالإنجليزية' : 'Name (English)',
-                            border: const OutlineInputBorder(),
-                          ),
-                          onChanged: (value) {
-                            service['name'] ??= {};
-                            service['name']['en'] = value;
-                          },
-                        ),
-                        const SizedBox(height: 8),
-                        TextField(
-                          controller: TextEditingController(text: service['name']?['ar'] ?? ''),
-                          decoration: InputDecoration(
-                            labelText: lang == 'ar' ? 'الاسم بالعربية' : 'Name (Arabic)',
-                            border: const OutlineInputBorder(),
-                          ),
-                          onChanged: (value) {
-                            service['name'] ??= {};
-                            service['name']['ar'] = value;
-                          },
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextField(
-                                controller: TextEditingController(text: '${service['durationMin'] ?? ''}'),
-                                decoration: InputDecoration(
-                                  labelText: lang == 'ar' ? 'المدة (دقائق)' : 'Duration (minutes)',
-                                  border: const OutlineInputBorder(),
-                                ),
-                                keyboardType: TextInputType.number,
-                                onChanged: (value) {
-                                  service['durationMin'] = int.tryParse(value) ?? 0;
-                                },
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: TextField(
-                                controller: TextEditingController(text: '${(service['price'] ?? 0) / 100}'),
-                                decoration: InputDecoration(
-                                  labelText: lang == 'ar' ? 'السعر (ج.م)' : 'Price (EGP)',
-                                  border: const OutlineInputBorder(),
-                                ),
-                                keyboardType: TextInputType.number,
-                                onChanged: (value) {
-                                  service['price'] = ((double.tryParse(value) ?? 0) * 100).round();
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  );
-                }).toList(),
-                
-                ElevatedButton.icon(
-                  onPressed: () {
-                    setFormState(() {
-                      editableServices.add({
-                        'name': {'en': '', 'ar': ''},
-                        'durationMin': 60,
-                        'price': 0,
-                      });
-                    });
-                  },
-                  icon: const Icon(Icons.add),
-                  label: Text(lang == 'ar' ? 'إضافة خدمة' : 'Add Service'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    ).then((confirmed) {
-      if (confirmed) _updateServices(editableServices);
-    });
-  }
-
-  List<Map<String, dynamic>> _availableAreas = [];
-  bool _loadingAreas = false;
-
-  Future<void> _loadAreas() async {
-    if (_availableAreas.isNotEmpty) return;
-    
-    setState(() => _loadingAreas = true);
-    try {
-      final data = await staffClient.get('/admin/areas');
-      setState(() {
-        _availableAreas = asMapList(data['areas']);
-        _loadingAreas = false;
-      });
-    } on ApiException catch (e) {
-      setState(() => _loadingAreas = false);
-      if (mounted) v2Toast(context, e.message, error: true);
-    }
-  }
-
-  Future<void> _updateAreas(List<String> selectedSlugs) async {
-    try {
-      await staffClient.patch('/admin/providers/${widget.providerId}', data: {
-        'areas': selectedSlugs,
-      });
-      if (mounted) {
-        v2Toast(context, 'Coverage areas updated');
-        _loadProvider();
-      }
-    } on ApiException catch (e) {
-      if (mounted) v2Toast(context, e.message, error: true);
-    }
-  }
-
-  Widget _buildCoverageTab(Map<String, dynamic> provider, String lang, StaffState staffState) {
-    final providerAreas = asDynList(provider['areas']).map((e) => '$e').toList();
-    final workDays = provider['workDays'] as List?;
-    
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          V2Card(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      lang == 'ar' ? 'مناطق التغطية' : 'Coverage Areas',
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                    ),
-                    const Spacer(),
-                    if (staffCan(staffState.effectiveRole, 'providers.vet'))
-                      ElevatedButton.icon(
-                        onPressed: () async {
-                          await _loadAreas();
-                          if (mounted) _editAreas(providerAreas, lang);
-                        },
-                        icon: const Icon(Icons.edit, size: 16),
-                        label: Text(lang == 'ar' ? 'تحرير' : 'Edit'),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                
-                if (_loadingAreas)
-                  const V2Loading()
-                else if (providerAreas.isEmpty)
-                  Text(
-                    lang == 'ar' ? 'لم يتم تحديد مناطق' : 'No areas selected',
-                    style: const TextStyle(color: Ops.muted),
-                  )
-                else
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: providerAreas.map((areaSlug) {
-                      final area = _availableAreas.firstWhere(
-                        (a) => a['slug'] == areaSlug,
-                        orElse: () => {'name': {'en': areaSlug, 'ar': areaSlug}},
-                      );
-                      return Chip(
-                        label: Text(locName(area['name'], lang)),
-                        backgroundColor: Ops.plum.withOpacity(0.1),
-                      );
-                    }).toList(),
-                  ),
-              ],
-            ),
-          ),
-          
-          if (workDays != null) ...[
-            const SizedBox(height: 16),
-            V2Card(
+          // Vetting strip
+          if (canVet)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 15),
+              decoration: BoxDecoration(
+                color: Ops.panelSand,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Ops.panelSandBorder),
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    lang == 'ar' ? 'أيام العمل' : 'Work Days',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                    reverifyAt != null
+                        ? '${lang == 'ar' ? 'التحقق · إعادة في' : 'Vetting · re-verify due'} ${formatDayOnly(prov['reverifyAt'])}'
+                        : (lang == 'ar' ? 'التحقق' : 'Vetting'),
+                    style: const TextStyle(fontSize: 11.5, color: Ops.muted),
                   ),
-                  const SizedBox(height: 12),
-                  
-                  if (workDays.isEmpty)
-                    Text(
-                      lang == 'ar' ? 'لم يتم تحديد أيام' : 'No days specified',
-                      style: const TextStyle(color: Ops.muted),
-                    )
-                  else
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: workDays.cast<String>().map((day) {
-                        return Chip(
-                          label: Text(_getDayName(day, lang)),
-                          backgroundColor: Ops.green.withOpacity(0.1),
-                        );
-                      }).toList(),
-                    ),
+                  const SizedBox(height: 2),
+                  Text(blocker, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 7,
+                    runSpacing: 7,
+                    children: [
+                      if (providerVetting(prov, 'en') != 'Vetted')
+                        V2Btn(
+                          label: lang == 'ar' ? 'تحقّق' : 'Vet',
+                          kind: V2BtnKind.primary,
+                          size: V2BtnSize.sm,
+                          onPressed: () => _confirmThen(
+                            lang == 'ar' ? 'التحقق من $name؟' : 'Vet $name?',
+                            lang == 'ar' ? 'يجعل الملف موثّقاً وقابلاً للحجز.' : 'Marks the profile vetted and makes it bookable.',
+                            lang == 'ar' ? 'تحقّق' : 'Vet',
+                            () => _post('/admin/providers/${widget.providerId}/vet',
+                                data: {'sexMarkerConfirmed': true}, okMsg: lang == 'ar' ? 'تم التحقق' : '$name vetted'),
+                          ),
+                        ),
+                      V2Btn(
+                        label: lang == 'ar' ? 'رفض' : 'Reject',
+                        kind: V2BtnKind.danger,
+                        size: V2BtnSize.sm,
+                        onPressed: () => _confirmThen(
+                          lang == 'ar' ? 'رفض $name؟' : 'Reject $name?',
+                          lang == 'ar' ? 'تُبلَّغ المهنية ولا تستطيع أخذ حجوزات.' : 'The pro is notified and cannot take bookings.',
+                          lang == 'ar' ? 'رفض' : 'Reject',
+                          () => _post('/admin/providers/${widget.providerId}/reject',
+                              okMsg: lang == 'ar' ? 'تم الرفض' : '$name rejected'),
+                          danger: true,
+                        ),
+                      ),
+                      V2Btn(
+                        label: suspended
+                            ? (lang == 'ar' ? 'إعادة تفعيل' : 'Reinstate')
+                            : (lang == 'ar' ? 'إيقاف' : 'Suspend'),
+                        kind: V2BtnKind.ghost,
+                        size: V2BtnSize.sm,
+                        onPressed: () => _suspendOrReinstate(suspended),
+                      ),
+                      V2Btn(
+                        label: lang == 'ar' ? 'جدولة إعادة تحقق' : 'Schedule re-verify',
+                        kind: V2BtnKind.ghost,
+                        size: V2BtnSize.sm,
+                        onPressed: () => _confirmThen(
+                          lang == 'ar' ? 'جدولة إعادة التحقق؟' : 'Schedule re-verify?',
+                          'POST /admin/providers/${widget.providerId}/reverify — ${lang == 'ar' ? 'يحدد الفحص التالي بعد سنة.' : 'sets the next check one year out.'}',
+                          lang == 'ar' ? 'جدولة' : 'Schedule',
+                          () => _post('/admin/providers/${widget.providerId}/reverify',
+                              okMsg: lang == 'ar' ? 'تمت جدولة إعادة التحقق' : 'Re-verify scheduled for $name'),
+                        ),
+                      ),
+                      V2Btn(
+                        label: lang == 'ar' ? 'طلب مستند' : 'Request document',
+                        kind: V2BtnKind.ghost,
+                        size: V2BtnSize.sm,
+                        onPressed: () => _appendNote(lang == 'ar' ? 'طُلب رفع مستند من المهنية' : 'Document re-upload requested'),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
-          ],
+          const SizedBox(height: 16),
+
+          // Tabs
+          V2TabBar(tabs: _tabs, active: tab, onSelect: (t) {
+            setState(() => tab = t);
+            if (t == 'Coverage') _areasOnce();
+          }),
+          const SizedBox(height: 16),
+
+          if (tab == 'Overview') _overview(prov, lang, canWrite),
+          if (tab == 'Documents') _documents(prov, lang, canVet),
+          if (tab == 'Services') _services(prov, lang, canWrite),
+          if (tab == 'Coverage') _coverage(prov, lang, canVet),
+          if (tab == 'Portfolio') _portfolio(prov, lang, canVet),
+          if (tab == 'Money') _money(prov, lang, canVet),
         ],
       ),
     );
   }
 
-  String _getDayName(String day, String lang) {
-    final days = {
-      'monday': lang == 'ar' ? 'الاثنين' : 'Monday',
-      'tuesday': lang == 'ar' ? 'الثلاثاء' : 'Tuesday', 
-      'wednesday': lang == 'ar' ? 'الأربعاء' : 'Wednesday',
-      'thursday': lang == 'ar' ? 'الخميس' : 'Thursday',
-      'friday': lang == 'ar' ? 'الجمعة' : 'Friday',
-      'saturday': lang == 'ar' ? 'السبت' : 'Saturday',
-      'sunday': lang == 'ar' ? 'الأحد' : 'Sunday',
-    };
-    return days[day.toLowerCase()] ?? day;
-  }
-
-  Future<void> _editAreas(List<String> currentAreas, String lang) async {
-    Set<String> selectedAreas = Set.from(currentAreas);
-    
-    final confirmed = await v2Form(
-      context,
-      title: lang == 'ar' ? 'تحرير مناطق التغطية' : 'Edit Coverage Areas',
-      confirmLabel: lang == 'ar' ? 'حفظ' : 'Save',
-      bodyBuilder: (ctx, setState) {
-        return StatefulBuilder(
-          builder: (context, setFormState) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  lang == 'ar' ? 'اختر المناطق:' : 'Select areas:',
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 12),
-                
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: _availableAreas.map((area) {
-                    final slug = '${area['slug'] ?? area['id'] ?? ''}';
-                    final isSelected = selectedAreas.contains(slug);
-                    
-                    return FilterChip(
-                      label: Text(locName(area['name'], lang)),
-                      selected: isSelected,
-                      onSelected: (selected) {
-                        setFormState(() {
-                          if (selected) {
-                            selectedAreas.add(slug);
-                          } else {
-                            selectedAreas.remove(slug);
-                          }
-                        });
-                      },
-                      selectedColor: Ops.plum.withOpacity(0.2),
-                      checkmarkColor: Ops.plum,
-                    );
-                  }).toList(),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-    
-    if (confirmed) _updateAreas(selectedAreas.toList());
-  }
-
-  Future<void> _updatePortfolio(List<String> portfolioUrls) async {
-    try {
-      await staffClient.patch('/admin/providers/${widget.providerId}', data: {
-        'portfolio': portfolioUrls,
-      });
-      if (mounted) {
-        v2Toast(context, 'Portfolio updated');
-        _loadProvider();
-      }
-    } on ApiException catch (e) {
-      if (mounted) v2Toast(context, e.message, error: true);
-    }
-  }
-
-  Widget _buildPortfolioTab(Map<String, dynamic> provider, String lang, StaffState staffState) {
-    final portfolio = asDynList(provider['portfolio']).map((e) => '$e').toList();
-    
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+  // ---- Overview -------------------------------------------------------------
+  Widget _overview(Map prov, String lang, bool canWrite) {
+    final notes = '${prov['staffNotes'] ?? ''}'.trim();
+    final stats = asMap(prov['stats']) ?? {};
+    final facts = <(String, String)>[
+      (lang == 'ar' ? 'الاسم على الهوية' : 'Name on ID', personName(prov, lang, fallbackId: idOf(prov))),
+      (lang == 'ar' ? 'الرقم القومي' : 'National ID', '${prov['nationalId'] ?? prov['national'] ?? ''}'),
+      (lang == 'ar' ? 'الهاتف' : 'Phone', '${prov['phone'] ?? ''}'),
+      (lang == 'ar' ? 'الفئة' : 'Category', '${prov['category'] ?? prov['vertical'] ?? ''}'),
+      (lang == 'ar' ? 'الخبرة' : 'Experience', '${prov['experience'] ?? prov['experienceYears'] ?? ''}'),
+      (lang == 'ar' ? 'انضمّت' : 'Joined', formatDayOnly(prov['createdAt'] ?? prov['consentedAt'])),
+      (lang == 'ar' ? 'التقييم' : 'Rating', asDouble(prov['rating']).toStringAsFixed(1)),
+    ];
+    return _twoCol(
+      lang,
+      leftFlex: 1,
+      rightFlex: 12 ~/ 10,
+      left: [
+        V2SectionCard(
+          title: lang == 'ar' ? 'الملف' : 'Profile',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                lang == 'ar' ? 'معرض الأعمال' : 'Portfolio',
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-              ),
-              const Spacer(),
-              if (staffCan(staffState.effectiveRole, 'providers.vet'))
-                ElevatedButton.icon(
-                  onPressed: () => _editPortfolio(portfolio, lang),
-                  icon: const Icon(Icons.edit, size: 16),
-                  label: Text(lang == 'ar' ? 'تحرير' : 'Edit'),
-                ),
+              for (final f in facts) _kv(f.$1, f.$2),
+              const SizedBox(height: 4),
+              Text(lang == 'ar' ? 'نبذة' : 'Bio', style: const TextStyle(fontSize: 12, color: Ops.muted)),
+              const SizedBox(height: 4),
+              Text('${prov['bio'] ?? ''}', style: const TextStyle(fontSize: 13, height: 1.6)),
             ],
           ),
-          const SizedBox(height: 16),
-          
-          if (portfolio.isEmpty)
-            const V2Empty(message: 'No portfolio images')
-          else
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-                childAspectRatio: 1,
-              ),
-              itemCount: portfolio.length,
-              itemBuilder: (context, index) {
-                final imageUrl = portfolio[index];
-                
-                return GestureDetector(
-                  onTap: () {
-                    showDialog(
-                      context: context,
-                      builder: (ctx) => Dialog(
-                        child: Container(
-                          constraints: const BoxConstraints(maxWidth: 600, maxHeight: 800),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              AppBar(
-                                title: Text('${lang == 'ar' ? 'صورة' : 'Image'} ${index + 1}'),
-                                automaticallyImplyLeading: true,
-                              ),
-                              Expanded(
-                                child: FutureBuilder<Uint8List?>(
-                                  future: staffClient.uploadBytes(imageUrl),
-                                  builder: (context, snapshot) {
-                                    if (snapshot.hasData && snapshot.data != null) {
-                                      return Image.memory(snapshot.data!, fit: BoxFit.contain);
-                                    }
-                                    return const Center(child: V2Loading());
-                                  },
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                  child: Container(
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Ops.border),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Stack(
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: FutureBuilder<Uint8List?>(
-                            future: staffClient.uploadBytes(imageUrl),
-                            builder: (context, snapshot) {
-                              if (snapshot.hasData && snapshot.data != null) {
-                                return Image.memory(
-                                  snapshot.data!,
-                                  fit: BoxFit.cover,
-                                  width: double.infinity,
-                                  height: double.infinity,
-                                );
-                              }
-                              return const Center(
-                                child: Icon(Icons.image, size: 32, color: Ops.muted),
-                              );
-                            },
-                          ),
-                        ),
-                        if (staffCan(staffState.effectiveRole, 'providers.vet'))
-                          Positioned(
-                            top: 4,
-                            right: 4,
-                            child: GestureDetector(
-                              onTap: () {
-                                final updatedPortfolio = List<String>.from(portfolio);
-                                updatedPortfolio.removeAt(index);
-                                _updatePortfolio(updatedPortfolio);
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.all(4),
-                                decoration: const BoxDecoration(
-                                  color: Ops.terracottaInk,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  Icons.close,
-                                  color: Colors.white,
-                                  size: 16,
-                                ),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _editPortfolio(List<String> currentPortfolio, String lang) async {
-    String url = '';
-    String requestNote = '';
-    final ok = await v2Form(
-      context,
-      title: lang == 'ar' ? 'تحرير المعرض' : 'Edit portfolio',
-      confirmLabel: lang == 'ar' ? 'حفظ' : 'Save',
-      bodyBuilder: (ctx, setLocal) => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            lang == 'ar'
-                ? 'أضيفي رابط صورة أو اطلبي صوراً جديدة من المهنية.'
-                : 'Add an image URL or request new photos from the professional.',
-            style: const TextStyle(fontSize: 13, color: Ops.muted),
-          ),
-          const SizedBox(height: 12),
-          V2FormField(
-            label: lang == 'ar' ? 'رابط صورة' : 'Image URL',
-            child: TextField(
-              onChanged: (v) => url = v,
-              decoration: const InputDecoration(hintText: 'https://…'),
-            ),
-          ),
-          const SizedBox(height: 12),
-          V2FormField(
-            label: lang == 'ar' ? 'طلب صور (ملاحظة)' : 'Request photos (note)',
-            child: TextField(
-              onChanged: (v) => requestNote = v,
-              maxLines: 2,
-              decoration: InputDecoration(
-                hintText: lang == 'ar' ? 'اختياري' : 'Optional',
-              ),
-            ),
-          ),
-        ],
-      ),
-      onValidate: () {
-        if (url.trim().isEmpty && requestNote.trim().isEmpty) {
-          v2Toast(context, lang == 'ar' ? 'أدخلي رابطاً أو ملاحظة' : 'Enter a URL or request note', error: true);
-          return false;
-        }
-        return true;
-      },
-    );
-    if (!ok) return;
-    try {
-      if (url.trim().isNotEmpty) {
-        final updated = [...currentPortfolio, url.trim()];
-        await staffClient.patch('/admin/providers/${widget.providerId}', data: {
-          'portfolio': updated,
-        });
-      }
-      if (requestNote.trim().isNotEmpty) {
-        await staffClient.patch('/admin/providers/${widget.providerId}/notes', data: {
-          'note': lang == 'ar'
-              ? 'طلب صور للمعرض: ${requestNote.trim()}'
-              : 'Portfolio photo request: ${requestNote.trim()}',
-        });
-      }
-      if (mounted) {
-        v2Toast(context, lang == 'ar' ? 'تم تحديث المعرض' : 'Portfolio updated');
-        _loadProvider();
-      }
-    } on ApiException catch (e) {
-      if (mounted) v2Toast(context, e.message, error: true);
-    }
-  }
-
-  Future<void> _updatePayoutMethod(Map<String, dynamic> payoutData) async {
-    try {
-      await staffClient.patch('/admin/providers/${widget.providerId}', data: payoutData);
-      if (mounted) {
-        v2Toast(context, 'Payout method updated');
-        _loadProvider();
-      }
-    } on ApiException catch (e) {
-      if (mounted) v2Toast(context, e.message, error: true);
-    }
-  }
-
-  Widget _buildMoneyTab(Map<String, dynamic> provider, String lang, StaffState staffState) {
-    final payoutMethod = '${provider['payoutMethod'] ?? ''}';
-    final payoutHandle = '${provider['payoutHandle'] ?? ''}';
-    final earnings = asMap(provider['earnings']);
-    final jobs = asMap(provider['jobs']);
-    
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Payout method
-          V2Card(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      lang == 'ar' ? 'طريقة الدفع' : 'Payout Method',
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                    ),
-                    const Spacer(),
-                    if (staffCan(staffState.effectiveRole, 'providers.vet'))
-                      ElevatedButton.icon(
-                        onPressed: () => _editPayoutMethod(payoutMethod, payoutHandle, lang),
-                        icon: const Icon(Icons.edit, size: 16),
-                        label: Text(lang == 'ar' ? 'تحرير' : 'Edit'),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                
-                if (payoutMethod.isEmpty)
-                  Text(
-                    lang == 'ar' ? 'لم يتم تحديد طريقة دفع' : 'No payout method set',
-                    style: const TextStyle(color: Ops.muted),
-                  )
-                else ...[
-                  Text(
-                    '${lang == 'ar' ? 'الطريقة:' : 'Method:'} $payoutMethod',
-                    style: const TextStyle(fontWeight: FontWeight.w500),
-                  ),
-                  if (payoutHandle.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      '${lang == 'ar' ? 'التفاصيل:' : 'Handle:'} $payoutHandle',
-                      style: const TextStyle(fontFamily: Ops.mono, color: Ops.muted),
-                    ),
-                  ],
-                ],
-              ],
-            ),
-          ),
-          
-          const SizedBox(height: 16),
-          
-          // Earnings summary
-          if (earnings != null)
-            V2Card(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    lang == 'ar' ? 'ملخص الأرباح' : 'Earnings Summary',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 12),
-                  
-                  Wrap(
-                    spacing: 24,
-                    runSpacing: 12,
-                    children: [
-                      if (earnings['total'] != null)
-                        _buildEarningStat(
-                          lang == 'ar' ? 'إجمالي الأرباح' : 'Total Earnings',
-                          money(asInt(earnings['total']), lang),
-                        ),
-                      if (earnings['pending'] != null)
-                        _buildEarningStat(
-                          lang == 'ar' ? 'في الانتظار' : 'Pending',
-                          money(asInt(earnings['pending']), lang),
-                        ),
-                      if (earnings['paid'] != null)
-                        _buildEarningStat(
-                          lang == 'ar' ? 'تم الدفع' : 'Paid Out',
-                          money(asInt(earnings['paid']), lang),
-                        ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          
-          if (jobs != null) ...[
-            const SizedBox(height: 16),
-            
-            // Jobs summary
-            V2Card(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    lang == 'ar' ? 'ملخص الوظائف' : 'Jobs Summary',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 12),
-                  
-                  Wrap(
-                    spacing: 24,
-                    runSpacing: 12,
-                    children: [
-                      if (jobs['total'] != null)
-                        _buildEarningStat(
-                          lang == 'ar' ? 'إجمالي الوظائف' : 'Total Jobs',
-                          '${jobs['total']}',
-                        ),
-                      if (jobs['completed'] != null)
-                        _buildEarningStat(
-                          lang == 'ar' ? 'مكتملة' : 'Completed',
-                          '${jobs['completed']}',
-                        ),
-                      if (jobs['cancelled'] != null)
-                        _buildEarningStat(
-                          lang == 'ar' ? 'ملغاة' : 'Cancelled',
-                          '${jobs['cancelled']}',
-                        ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-          
-          // Release payout action (if available)
-          // This would require checking if there's a release endpoint
-          // For now, we just show the summary
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEarningStat(String label, String value) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(fontSize: 12, color: Ops.muted),
         ),
-        const SizedBox(height: 2),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            fontFamily: Ops.mono,
+      ],
+      right: [
+        V2SectionCard(
+          title: lang == 'ar' ? 'الأداء' : 'Performance',
+          child: _statGrid([
+            (lang == 'ar' ? 'الوظائف' : 'Jobs', '${stats['totalBookings'] ?? stats['jobs'] ?? prov['jobCount'] ?? 0}'),
+            (lang == 'ar' ? 'التقييم' : 'Rating', asDouble(prov['rating']).toStringAsFixed(1)),
+            (lang == 'ar' ? 'الإكمال' : 'Completion', '${stats['completionRate'] ?? stats['completion'] ?? '—'}'),
+            (lang == 'ar' ? 'المطالبات' : 'Claims', '${stats['claims'] ?? 0}'),
+          ]),
+        ),
+        V2SectionCard(
+          title: lang == 'ar' ? 'ملاحظات الفريق' : 'Staff notes',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (notes.isNotEmpty)
+                for (final line in notes.split('\n'))
+                  Container(
+                    padding: const EdgeInsets.symmetric(vertical: 9),
+                    decoration: const BoxDecoration(border: Border(top: BorderSide(color: Ops.rowBorder))),
+                    child: Text(line, style: const TextStyle(fontSize: 13, height: 1.6)),
+                  )
+              else
+                const Text('—', style: TextStyle(fontSize: 13, color: Ops.muted)),
+              if (canWrite || staffCan(_role, 'notes.write')) _NoteComposer(onSave: _appendNote, lang: lang),
+            ],
           ),
         ),
       ],
     );
   }
 
-  Future<void> _editPayoutMethod(String currentMethod, String currentHandle, String lang) async {
-    String method = currentMethod;
-    String handle = currentHandle;
-    
-    final confirmed = await v2Form(
-      context,
-      title: lang == 'ar' ? 'تحرير طريقة الدفع' : 'Edit Payout Method',
-      confirmLabel: lang == 'ar' ? 'حفظ' : 'Save',
-      bodyBuilder: (ctx, setState) {
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+  // ---- Documents ----------------------------------------------------------
+  Widget _documents(Map prov, String lang, bool canVet) {
+    final docs = <(String key, String label, String? url, String status)>[
+      ('id', lang == 'ar' ? 'الرقم القومي' : 'National ID', _nonEmpty(prov['idPhotoUrl'] ?? prov['idPath']),
+          '${prov['idDocStatus'] ?? (providerVetting(prov, 'en') == 'Vetted' ? 'accepted' : 'pending')}'),
+      ('fish', lang == 'ar' ? 'الفيش الجنائي' : 'FISH (criminal record)', _nonEmpty(prov['fishPhotoUrl'] ?? prov['fishPath']),
+          '${prov['fishDocStatus'] ?? (providerVetting(prov, 'en') == 'Vetted' ? 'accepted' : 'pending')}'),
+      ('cert', lang == 'ar' ? 'شهادة المزاولة' : 'Trade certificate', _nonEmpty(prov['tradeCertUrl']),
+          '${prov['tradeCertStatus'] ?? 'not tracked'}'),
+    ];
+    return V2SectionCard(
+      title: lang == 'ar' ? 'المستندات' : 'Documents',
+      trailing: [
+        if (canVet)
+          V2Btn.ghost(lang == 'ar' ? 'طلب رفع' : 'Request upload',
+              onPressed: () => _appendNote(lang == 'ar' ? 'طُلب رفع مستند' : 'Document re-upload requested'),
+              size: V2BtnSize.sm),
+      ],
+      child: LayoutBuilder(builder: (context, box) {
+        final cols = box.maxWidth > 620 ? 3 : (box.maxWidth > 360 ? 2 : 1);
+        return Wrap(
+          spacing: 13,
+          runSpacing: 13,
           children: [
-            V2FormField(
-              label: lang == 'ar' ? 'طريقة الدفع' : 'Payout Method',
-              child: DropdownButtonFormField<String>(
-                value: method.isEmpty ? null : method,
-                decoration: const InputDecoration(border: OutlineInputBorder()),
-                items: [
-                  DropdownMenuItem(value: 'bank', child: Text(lang == 'ar' ? 'تحويل بنكي' : 'Bank Transfer')),
-                  DropdownMenuItem(value: 'vodafone_cash', child: Text(lang == 'ar' ? 'فودافون كاش' : 'Vodafone Cash')),
-                  DropdownMenuItem(value: 'orange_cash', child: Text(lang == 'ar' ? 'أورانج كاش' : 'Orange Cash')),
-                  DropdownMenuItem(value: 'etisalat_cash', child: Text(lang == 'ar' ? 'اتصالات كاش' : 'Etisalat Cash')),
-                ],
-                onChanged: (value) => method = value ?? '',
+            for (final d in docs)
+              SizedBox(
+                width: (box.maxWidth - (cols - 1) * 13) / cols,
+                child: _DocCard(
+                  label: d.$2,
+                  status: d.$4,
+                  url: d.$3,
+                  canAct: canVet && d.$1 != 'cert',
+                  onAccept: () => _post('/admin/providers/${widget.providerId}/docs/${d.$1}',
+                      data: {'status': 'accepted'}, okMsg: '${d.$2} ${lang == 'ar' ? 'مقبول' : 'accepted'}'),
+                  onReject: () => _rejectDoc(d.$1, d.$2, lang),
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            V2FormField(
-              label: lang == 'ar' ? 'رقم الحساب/الهاتف' : 'Account/Phone Number',
-              child: TextField(
-                controller: TextEditingController(text: handle),
-                decoration: const InputDecoration(border: OutlineInputBorder()),
-                onChanged: (value) => handle = value,
-              ),
-            ),
           ],
         );
-      },
+      }),
     );
-    
-    if (confirmed) {
-      _updatePayoutMethod({
-        'payoutMethod': method,
-        'payoutHandle': handle,
-      });
+  }
+
+  Future<void> _rejectDoc(String kind, String label, String lang) async {
+    var note = '';
+    final ok = await v2Form(
+      context,
+      title: lang == 'ar' ? 'رفض المستند' : 'Reject document',
+      confirmLabel: lang == 'ar' ? 'رفض' : 'Reject',
+      danger: true,
+      bodyBuilder: (ctx, _) => V2FormField(
+        label: lang == 'ar' ? 'السبب (اختياري)' : 'Reason (optional)',
+        child: TextField(onChanged: (v) => note = v, maxLines: 2),
+      ),
+    );
+    if (ok) {
+      _post('/admin/providers/${widget.providerId}/docs/$kind',
+          data: {'status': 'rejected', if (note.trim().isNotEmpty) 'note': note.trim()},
+          okMsg: '$label ${lang == 'ar' ? 'مرفوض' : 'rejected'}');
     }
+  }
+
+  // ---- Services ---------------------------------------------------------
+  Widget _services(Map prov, String lang, bool canWrite) {
+    final items = asDynList(prov['items'] ?? prov['services']).map((e) => asMap(e) ?? {}).toList();
+    return V2SectionCard(
+      title: lang == 'ar' ? 'الخدمات والأسعار' : 'Services & pricing',
+      trailing: [
+        if (canWrite)
+          V2Btn.primary(lang == 'ar' ? '+ إضافة خدمة' : '+ Add service',
+              onPressed: () => _editServices(items, lang, add: true), size: V2BtnSize.sm),
+      ],
+      child: Column(
+        children: [
+          if (items.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Text(lang == 'ar' ? 'لا خدمات على هذا الملف بعد' : 'No services on this profile yet',
+                  style: const TextStyle(fontSize: 13, color: Ops.muted)),
+            )
+          else
+            for (final s in items)
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 11),
+                decoration: const BoxDecoration(border: Border(top: BorderSide(color: Ops.rowBorder))),
+                child: Row(
+                  children: [
+                    Expanded(
+                      flex: 3,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(locName(s['name'], lang), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                          Text('${s['category'] ?? prov['category'] ?? ''}',
+                              style: const TextStyle(fontSize: 11.5, color: Ops.mutedSoft)),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      flex: 2,
+                      child: Text(money(asInt(s['price']), lang),
+                          style: const TextStyle(fontSize: 13, fontFamily: Ops.mono)),
+                    ),
+                    Expanded(
+                      flex: 2,
+                      child: Text('${asInt(s['durationMin'])} ${lang == 'ar' ? 'د' : 'min'}',
+                          style: const TextStyle(fontSize: 13, color: Ops.inkSoft)),
+                    ),
+                    if (canWrite) ...[
+                      V2Btn.ghost(lang == 'ar' ? 'تعديل' : 'Edit',
+                          onPressed: () => _editServices(items, lang, focus: s), size: V2BtnSize.row),
+                      const SizedBox(width: 6),
+                      V2Btn.danger(lang == 'ar' ? 'إزالة' : 'Remove',
+                          onPressed: () => _confirmThen(
+                                lang == 'ar' ? 'إزالة الخدمة؟' : 'Remove service?',
+                                '${locName(s['name'], lang)} ${lang == 'ar' ? 'ستُزال من الملف.' : 'is removed from the profile.'}',
+                                lang == 'ar' ? 'إزالة' : 'Remove',
+                                () {
+                                  final next = items.where((x) => x != s).toList();
+                                  _patch('/admin/providers/${widget.providerId}', {'items': next},
+                                      lang == 'ar' ? 'أُزيلت الخدمة' : 'Service removed');
+                                },
+                                danger: true,
+                              ),
+                          size: V2BtnSize.row),
+                    ],
+                  ],
+                ),
+              ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _editServices(List<Map<String, dynamic>> items, String lang, {Map? focus, bool add = false}) async {
+    final list = items.map((e) => Map<String, dynamic>.from(e)).toList();
+    if (add) list.add({'name': {'en': '', 'ar': ''}, 'durationMin': 60, 'price': 0, 'category': (p ?? {})['category']});
+    final ok = await v2Form(
+      context,
+      title: lang == 'ar' ? 'تحرير الخدمات' : 'Edit services',
+      bodyBuilder: (ctx, setLocal) => StatefulBuilder(
+        builder: (context, sb) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (var i = 0; i < list.length; i++)
+              Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(border: Border.all(color: Ops.border), borderRadius: BorderRadius.circular(10)),
+                child: Column(
+                  children: [
+                    Row(children: [
+                      Expanded(child: Text('${lang == 'ar' ? 'خدمة' : 'Service'} ${i + 1}', style: const TextStyle(fontWeight: FontWeight.w600))),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline, size: 18, color: Ops.terracottaInk),
+                        onPressed: () => sb(() => list.removeAt(i)),
+                      ),
+                    ]),
+                    TextField(
+                      controller: TextEditingController(text: '${(list[i]['name'] as Map?)?['en'] ?? ''}'),
+                      decoration: InputDecoration(labelText: lang == 'ar' ? 'الاسم (EN)' : 'Name (EN)'),
+                      onChanged: (v) => (list[i]['name'] ??= <String, dynamic>{})['en'] = v,
+                    ),
+                    TextField(
+                      controller: TextEditingController(text: '${(list[i]['name'] as Map?)?['ar'] ?? ''}'),
+                      decoration: InputDecoration(labelText: lang == 'ar' ? 'الاسم (ع)' : 'Name (AR)'),
+                      onChanged: (v) => (list[i]['name'] ??= <String, dynamic>{})['ar'] = v,
+                    ),
+                    Row(children: [
+                      Expanded(
+                        child: TextField(
+                          controller: TextEditingController(text: '${asInt(list[i]['durationMin'])}'),
+                          decoration: InputDecoration(labelText: lang == 'ar' ? 'المدة (د)' : 'Duration (min)'),
+                          keyboardType: TextInputType.number,
+                          onChanged: (v) => list[i]['durationMin'] = int.tryParse(v) ?? 0,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          controller: TextEditingController(text: '${(asInt(list[i]['price']) / 100)}'),
+                          decoration: InputDecoration(labelText: lang == 'ar' ? 'السعر (ج.م)' : 'Price (EGP)'),
+                          keyboardType: TextInputType.number,
+                          onChanged: (v) => list[i]['price'] = ((double.tryParse(v) ?? 0) * 100).round(),
+                        ),
+                      ),
+                    ]),
+                  ],
+                ),
+              ),
+            V2Btn.ghost(lang == 'ar' ? '+ خدمة' : '+ Service',
+                onPressed: () => sb(() => list.add({'name': {'en': '', 'ar': ''}, 'durationMin': 60, 'price': 0}))),
+          ],
+        ),
+      ),
+    );
+    if (ok) _patch('/admin/providers/${widget.providerId}', {'items': list}, lang == 'ar' ? 'تم تحديث الخدمات' : 'Services updated');
+  }
+
+  // ---- Coverage --------------------------------------------------------
+  Widget _coverage(Map prov, String lang, bool canVet) {
+    final selected = asDynList(prov['areas']).map((e) => '$e').toSet();
+    final sched = asMap(prov['schedule']) ?? asMap(prov['availability']) ?? {};
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    return _twoCol(
+      lang,
+      left: [
+        V2SectionCard(
+          title: lang == 'ar' ? 'مناطق التغطية' : 'Coverage areas',
+          subtitle: lang == 'ar' ? 'اضغطي منطقة لتفعيلها على هذا الملف' : 'Tap an area to toggle it on this profile',
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              if (areas.isEmpty)
+                Text(lang == 'ar' ? 'حمّلي المناطق…' : 'Loading areas…', style: const TextStyle(fontSize: 12, color: Ops.muted)),
+              for (final a in areas)
+                Builder(builder: (_) {
+                  final slug = '${a['slug'] ?? a['id'] ?? ''}';
+                  final on = selected.contains(slug);
+                  return V2Pill(
+                    label: locName(a['name'], lang),
+                    on: on,
+                    onTap: canVet
+                        ? () {
+                            final next = {...selected};
+                            on ? next.remove(slug) : next.add(slug);
+                            _patch('/admin/providers/${widget.providerId}', {'areas': next.toList()},
+                                lang == 'ar' ? 'تم تحديث التغطية' : 'Coverage updated');
+                          }
+                        : () {},
+                  );
+                }),
+            ],
+          ),
+        ),
+      ],
+      right: [
+        V2SectionCard(
+          title: lang == 'ar' ? 'الجدول الأسبوعي' : 'Weekly schedule',
+          child: Column(
+            children: [
+              for (final d in days)
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  decoration: const BoxDecoration(border: Border(top: BorderSide(color: Ops.rowBorder))),
+                  child: Row(
+                    children: [
+                      SizedBox(width: 48, child: Text(d, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600))),
+                      const SizedBox(width: 11),
+                      Expanded(
+                        child: Text(
+                          (sched[d.toLowerCase()] ?? sched[d]) != null && '${sched[d.toLowerCase()] ?? sched[d]}' != 'false'
+                              ? '09:00 — 21:00'
+                              : (lang == 'ar' ? 'غير متاح' : 'Unavailable'),
+                          style: const TextStyle(fontSize: 12.5, color: Ops.inkSoft, fontFamily: Ops.mono),
+                        ),
+                      ),
+                      V2StatusPill.forLabel(
+                          (sched[d.toLowerCase()] ?? sched[d]) != null ? 'Active' : 'Inactive'),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ---- Portfolio -----------------------------------------------------
+  Widget _portfolio(Map prov, String lang, bool canVet) {
+    final port = asDynList(prov['portfolio']).map((e) => '$e').toList();
+    return V2SectionCard(
+      title: lang == 'ar' ? 'المعرض' : 'Portfolio',
+      subtitle: lang == 'ar' ? 'يظهر في ملف المهنية العام' : "Shown on the provider's public profile",
+      trailing: [
+        if (canVet)
+          V2Btn.ghost(lang == 'ar' ? 'طلب صور' : 'Request photos',
+              onPressed: () => _appendNote(lang == 'ar' ? 'طُلبت صور للمعرض' : 'Portfolio photos requested'),
+              size: V2BtnSize.sm),
+      ],
+      child: port.isEmpty
+          ? Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Text(lang == 'ar' ? 'لا صور بعد' : 'No portfolio photos yet',
+                  style: const TextStyle(fontSize: 13, color: Ops.muted)),
+            )
+          : LayoutBuilder(builder: (context, box) {
+              final cols = (box.maxWidth / 160).floor().clamp(2, 5);
+              return Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  for (var i = 0; i < port.length; i++)
+                    SizedBox(
+                      width: (box.maxWidth - (cols - 1) * 12) / cols,
+                      child: Column(
+                        children: [
+                          AspectRatio(
+                            aspectRatio: 1,
+                            child: _RemoteImage(path: port[i]),
+                          ),
+                          const SizedBox(height: 7),
+                          if (canVet)
+                            V2Btn.danger(lang == 'ar' ? 'إزالة' : 'Remove',
+                                onPressed: () {
+                                  final next = [...port]..removeAt(i);
+                                  _patch('/admin/providers/${widget.providerId}', {'portfolio': next},
+                                      lang == 'ar' ? 'أُزيلت الصورة' : 'Photo removed');
+                                },
+                                size: V2BtnSize.row),
+                        ],
+                      ),
+                    ),
+                ],
+              );
+            }),
+    );
+  }
+
+  // ---- Money -------------------------------------------------------
+  Widget _money(Map prov, String lang, bool canVet) {
+    final method = '${prov['payoutMethod'] ?? ''}';
+    final handle = '${prov['payoutHandle'] ?? prov['payoutAccount'] ?? ''}';
+    final ledger = asMap(prov['ledger']) ?? asMap(prov['earnings']) ?? {};
+    final jobs = asDynList(prov['recentJobs'] ?? prov['jobsList']).map((e) => asMap(e) ?? {}).toList();
+    return _twoCol(
+      lang,
+      left: [
+        V2SectionCard(
+          title: lang == 'ar' ? 'حساب الدفع' : 'Payout account',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _kv(lang == 'ar' ? 'الطريقة' : 'Method', method.isEmpty ? '—' : method, mono: true),
+              _kv(lang == 'ar' ? 'الحساب' : 'Account', handle.isEmpty ? '—' : handle, mono: true),
+              _kv(lang == 'ar' ? 'المتاح' : 'Available', money(asInt(ledger['available'] ?? ledger['pending']), lang), mono: true),
+              _kv(lang == 'ar' ? 'المحجوز' : 'Held', money(asInt(ledger['held']), lang), mono: true),
+              const SizedBox(height: 8),
+              if (canVet)
+                Row(children: [
+                  V2Btn.ghost(lang == 'ar' ? 'تعديل الحساب' : 'Edit account',
+                      onPressed: () => _editPayout(method, handle, lang), size: V2BtnSize.sm),
+                ]),
+            ],
+          ),
+        ),
+      ],
+      right: [
+        V2SectionCard(
+          title: lang == 'ar' ? 'سجل الوظائف' : 'Job history',
+          child: jobs.isEmpty
+              ? Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  child: Text(lang == 'ar' ? 'لا وظائف بعد' : 'No jobs yet',
+                      style: const TextStyle(fontSize: 13, color: Ops.muted)),
+                )
+              : Column(
+                  children: [
+                    for (final j in jobs)
+                      Container(
+                        padding: const EdgeInsets.symmetric(vertical: 11),
+                        decoration: const BoxDecoration(border: Border(top: BorderSide(color: Ops.rowBorder))),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(serviceLabel(j, lang), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                                  Text(
+                                      '${formatDayOnly(j['slotStart'])} · ${clientNameOf(j, lang)} · ${bookingRef(j)}',
+                                      style: const TextStyle(fontSize: 11.5, color: Ops.mutedSoft)),
+                                ],
+                              ),
+                            ),
+                            V2StatusPill(label: statusLabel('${j['status']}', lang), tone: statusTone('${j['status']}')),
+                            const SizedBox(width: 10),
+                            Text(money(asInt(j['total']), lang),
+                                style: const TextStyle(fontSize: 13, fontFamily: Ops.mono, fontWeight: FontWeight.w600)),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _editPayout(String method, String handle, String lang) async {
+    var m = method;
+    final h = TextEditingController(text: handle);
+    final ok = await v2Form(
+      context,
+      title: lang == 'ar' ? 'تعديل حساب الدفع' : 'Edit payout account',
+      bodyBuilder: (ctx, _) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          V2FormField(
+            label: lang == 'ar' ? 'الطريقة' : 'Method',
+            child: DropdownButtonFormField<String>(
+              initialValue: m.isEmpty ? null : m,
+              items: const [
+                DropdownMenuItem(value: 'instapay', child: Text('InstaPay')),
+                DropdownMenuItem(value: 'wallet', child: Text('Mobile wallet')),
+                DropdownMenuItem(value: 'bank', child: Text('Bank transfer')),
+              ],
+              onChanged: (v) => m = v ?? '',
+            ),
+          ),
+          const SizedBox(height: 12),
+          V2FormField(label: lang == 'ar' ? 'رقم الحساب/الهاتف' : 'Account / phone', child: TextField(controller: h)),
+        ],
+      ),
+    );
+    if (ok) {
+      _patch('/admin/providers/${widget.providerId}', {'payoutMethod': m, 'payoutHandle': h.text.trim()},
+          lang == 'ar' ? 'تم تحديث حساب الدفع' : 'Payout account updated');
+    }
+  }
+
+  // ---- shared bits ----------------------------------------------------
+  Widget _twoCol(String lang, {required List<Widget> left, required List<Widget> right, int leftFlex = 1, int rightFlex = 1}) {
+    Widget stack(List<Widget> ws) => Column(
+        children: [for (final w in ws) Padding(padding: const EdgeInsets.only(bottom: Ops.gap), child: w)]);
+    return LayoutBuilder(builder: (context, box) {
+      if (box.maxWidth < 900) return stack([...left, ...right]);
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(flex: leftFlex, child: stack(left)),
+          const SizedBox(width: Ops.gap),
+          Expanded(flex: rightFlex, child: stack(right)),
+        ],
+      );
+    });
+  }
+
+  Widget _kv(String k, String v, {bool mono = false}) {
+    return Container(
+      padding: const EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Ops.rowBorder))),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(child: Text(k, style: const TextStyle(fontSize: 12.5, color: Ops.muted))),
+          const SizedBox(width: 12),
+          Flexible(
+            child: Text(v.isEmpty ? '—' : v,
+                textAlign: TextAlign.end,
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, fontFamily: mono ? Ops.mono : Ops.sans)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _statGrid(List<(String, String)> stats) {
+    return Container(
+      decoration: BoxDecoration(color: Ops.borderSoft, borderRadius: BorderRadius.circular(11)),
+      clipBehavior: Clip.antiAlias,
+      child: Wrap(
+        spacing: 1,
+        runSpacing: 1,
+        children: [
+          for (final s in stats)
+            SizedBox(
+              width: 104,
+              child: Container(
+                color: Ops.cardAlt,
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(s.$1, style: const TextStyle(fontSize: 11, color: Ops.muted)),
+                    const SizedBox(height: 3),
+                    Text(s.$2, style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w700, fontFamily: Ops.mono)),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  String? _nonEmpty(dynamic v) {
+    final s = '${v ?? ''}'.trim();
+    return s.isEmpty ? null : s;
+  }
+}
+
+class _NoteComposer extends StatefulWidget {
+  const _NoteComposer({required this.onSave, required this.lang});
+  final Future<void> Function(String) onSave;
+  final String lang;
+
+  @override
+  State<_NoteComposer> createState() => _NoteComposerState();
+}
+
+class _NoteComposerState extends State<_NoteComposer> {
+  final _c = TextEditingController();
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ar = widget.lang == 'ar';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 10),
+        TextField(
+          controller: _c,
+          maxLines: 3,
+          decoration: InputDecoration(hintText: ar ? 'ملاحظة تحقّق، ملخص مكالمة، تحذير…' : 'Vetting note, phone screen summary, warning…'),
+        ),
+        const SizedBox(height: 10),
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: V2Btn.primary(ar ? 'حفظ الملاحظة' : 'Save note', onPressed: () {
+            final t = _c.text.trim();
+            if (t.isEmpty) return;
+            widget.onSave(t);
+            _c.clear();
+          }),
+        ),
+      ],
+    );
+  }
+}
+
+class _DocCard extends StatelessWidget {
+  const _DocCard({
+    required this.label,
+    required this.status,
+    required this.url,
+    required this.canAct,
+    required this.onAccept,
+    required this.onReject,
+  });
+  final String label;
+  final String status;
+  final String? url;
+  final bool canAct;
+  final VoidCallback onAccept;
+  final VoidCallback onReject;
+
+  @override
+  Widget build(BuildContext context) {
+    final accepted = status.toLowerCase() == 'accepted';
+    final chipLabel = status.toLowerCase() == 'accepted'
+        ? 'Accepted'
+        : status.toLowerCase() == 'rejected'
+            ? 'Rejected'
+            : status.toLowerCase().contains('track')
+                ? 'Not tracked'
+                : url == null
+                    ? 'Missing'
+                    : 'Pending review';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(child: Text(label, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600))),
+            V2StatusPill.forLabel(chipLabel),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Container(
+          height: 120,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(11),
+            color: accepted ? const Color(0xFFF1F6EF) : Ops.impBg,
+            border: Border.all(
+              color: accepted ? const Color(0xFFCFDCCB) : const Color(0xFFD9BFB4),
+              style: accepted ? BorderStyle.solid : BorderStyle.solid,
+            ),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: url == null
+              ? Text('— ${label.toLowerCase()} —', style: const TextStyle(fontSize: 11, color: Ops.mutedSoft, fontFamily: Ops.mono))
+              : _RemoteImage(path: url!),
+        ),
+        const SizedBox(height: 8),
+        if (canAct)
+          Row(
+            children: [
+              V2Btn.ghost('Accept', onPressed: onAccept, size: V2BtnSize.row),
+              const SizedBox(width: 6),
+              V2Btn.danger('Reject', onPressed: onReject, size: V2BtnSize.row),
+            ],
+          ),
+      ],
+    );
+  }
+}
+
+class _RemoteImage extends StatelessWidget {
+  const _RemoteImage({required this.path});
+  final String path;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () async {
+        final bytes = await staffClient.uploadBytes(path);
+        if (bytes == null || !context.mounted) return;
+        showDialog<void>(
+          context: context,
+          builder: (_) => Dialog(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 640, maxHeight: 820),
+              child: InteractiveViewer(child: Image.memory(bytes, fit: BoxFit.contain)),
+            ),
+          ),
+        );
+      },
+      child: FutureBuilder<Uint8List?>(
+        future: staffClient.uploadBytes(path),
+        builder: (context, snap) {
+          if (snap.hasData && snap.data != null) {
+            return SizedBox.expand(child: Image.memory(snap.data!, fit: BoxFit.cover));
+          }
+          return const Center(child: Icon(Icons.image_outlined, size: 34, color: Ops.mutedSoft));
+        },
+      ),
+    );
   }
 }

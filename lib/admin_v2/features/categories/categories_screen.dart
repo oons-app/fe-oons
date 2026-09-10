@@ -5,14 +5,19 @@ import 'package:oons/admin_v2/chrome/toast.dart';
 import 'package:oons/admin_v2/data/maps.dart';
 import 'package:oons/admin_v2/data/permissions.dart';
 import 'package:oons/admin_v2/data/session.dart';
-import 'package:oons/admin_v2/l10n/copy.dart';
 import 'package:oons/admin_v2/data/staff_client.dart';
+import 'package:oons/admin_v2/data/ui_state.dart';
+import 'package:oons/admin_v2/l10n/copy.dart';
 import 'package:oons/admin_v2/theme/tokens.dart';
 import 'package:oons/admin_v2/ui/atoms.dart';
+import 'package:oons/admin_v2/ui/buttons.dart';
+import 'package:oons/admin_v2/ui/grid_table.dart';
+import 'package:oons/admin_v2/ui/list_view.dart';
 import 'package:oons/data/api.dart';
 
 class CategoriesScreen extends ConsumerStatefulWidget {
   const CategoriesScreen({super.key});
+
   @override
   ConsumerState<CategoriesScreen> createState() => _CategoriesScreenState();
 }
@@ -21,124 +26,154 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
   List<Map<String, dynamic>> categories = [];
   bool loading = true;
   String? error;
+  String filter = 'All';
+  String q = '';
+
+  static const _verticals = [
+    ('beauty', 'Beauty'),
+    ('cleaning', 'Home'),
+    ('chef', 'Food'),
+  ];
+  static const _filters = ['All', 'Active', 'Draft', 'Locked'];
 
   @override
   void initState() {
     super.initState();
     _load();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        ref.read(v2HeaderConfigProvider.notifier).state =
+            V2HeaderConfig(newLabel: 'Category', onNewRecord: () => _edit(null));
+      }
+    });
   }
 
   Future<void> _load() async {
     try {
-      setState(() { loading = true; error = null; });
+      setState(() {
+        loading = true;
+        error = null;
+      });
       final data = await staffClient.get('/admin/categories', query: {'includeLocked': '1', 'children': '1'});
-      setState(() { categories = asMapList(data['categories']); loading = false; });
-    } on ApiException catch (e) {
-      setState(() { error = e.message; loading = false; });
-    }
-  }
-
-  Future<void> _toggleLock(String id, bool isLocked) async {
-    final lang = ref.read(localeCodeProvider);
-    try {
-      await staffClient.patch('/admin/categories/$id', data: {'locked': !isLocked});
-      if (mounted) { v2Toast(context, lang == 'ar' ? 'تم التحديث' : 'Updated'); _load(); }
-    } on ApiException catch (e) {
-      if (mounted) v2Toast(context, e.message, error: true);
-    }
-  }
-
-  Future<void> _reorderCategory(String id, bool moveUp) async {
-    final lang = ref.read(localeCodeProvider);
-    try {
-      final direction = moveUp ? 'up' : 'down';
-      await staffClient.post('/admin/categories/reorder', data: {'categoryId': id, 'direction': direction});
-      if (mounted) { v2Toast(context, lang == 'ar' ? 'تم إعادة الترتيب' : 'Reordered'); _load(); }
-    } on ApiException catch (e) {
-      if (mounted) v2Toast(context, e.message, error: true);
-    }
-  }
-
-  Future<void> _editCategory(Map<String, dynamic> category) async {
-    final lang = ref.read(localeCodeProvider);
-    final originalName = asMap(category['name']);
-    String? nameEn = originalName?['en'], nameAr = originalName?['ar'], slug = category['slug'], vertical = category['vertical'];
-    final confirmed = await v2Form(
-      context,
-      title: lang == 'ar' ? 'تعديل الفئة' : 'Edit category',
-      confirmLabel: lang == 'ar' ? 'حفظ' : 'Save',
-      bodyBuilder: (ctx, setLocal) => Column(children: [
-        V2FormField(label: 'Name (EN)', child: TextField(controller: TextEditingController(text: nameEn), onChanged: (v) => nameEn = v, decoration: const InputDecoration(border: OutlineInputBorder()))),
-        const SizedBox(height: 12),
-        V2FormField(label: 'الاسم (AR)', child: TextField(controller: TextEditingController(text: nameAr), onChanged: (v) => nameAr = v, decoration: const InputDecoration(border: OutlineInputBorder()))),
-        const SizedBox(height: 12),
-        V2FormField(label: 'Slug', child: TextField(controller: TextEditingController(text: slug), onChanged: (v) => slug = v, decoration: const InputDecoration(border: OutlineInputBorder()))),
-        const SizedBox(height: 12),
-        V2FormField(
-          label: 'Vertical',
-          child: DropdownButtonFormField<String>(
-            value: vertical,
-            decoration: const InputDecoration(border: OutlineInputBorder()),
-            items: const [
-              DropdownMenuItem(value: 'beauty', child: Text('Beauty')),
-              DropdownMenuItem(value: 'cleaning', child: Text('Home')),
-              DropdownMenuItem(value: 'chef', child: Text('Food')),
-            ],
-            onChanged: (v) => setLocal(() => vertical = v),
-          ),
-        ),
-      ]),
-    );
-    if (!confirmed) return;
-    try {
-      await staffClient.patch('/admin/categories/${idOf(category)}', data: {
-        'name': {'en': nameEn, 'ar': nameAr},
-        'slug': slug,
-        'vertical': vertical,
+      setState(() {
+        categories = asMapList(data['categories']);
+        loading = false;
       });
-      if (mounted) { v2Toast(context, lang == 'ar' ? 'تم التحديث' : 'Updated'); _load(); }
+    } on ApiException catch (e) {
+      setState(() {
+        error = e.message;
+        loading = false;
+      });
+    }
+  }
+
+  String _status(Map c) {
+    if (c['locked'] == true || '${c['status']}'.contains('lock')) return 'Locked';
+    if ('${c['status']}'.toLowerCase() == 'draft' || c['active'] == false) return 'Draft';
+    return 'Active';
+  }
+
+  int _count(String f) => f == 'All' ? categories.length : categories.where((c) => _status(c) == f).length;
+
+  List<Map<String, dynamic>> get _rows {
+    var list = categories;
+    if (filter != 'All') list = list.where((c) => _status(c) == filter).toList();
+    if (q.isNotEmpty) {
+      final n = q.toLowerCase();
+      list = list.where((c) => c.values.join(' ').toLowerCase().contains(n)).toList();
+    }
+    return list;
+  }
+
+  Future<void> _edit(Map? c) async {
+    final lang = ref.read(localeCodeProvider);
+    final en = TextEditingController(text: '${asMap(c?['name'])?['en'] ?? ''}');
+    final ar = TextEditingController(text: '${asMap(c?['name'])?['ar'] ?? ''}');
+    final slug = TextEditingController(text: '${c?['slug'] ?? ''}');
+    var vertical = '${c?['vertical'] ?? 'beauty'}';
+    final ok = await v2Form(
+      context,
+      title: c == null ? (lang == 'ar' ? 'فئة جديدة' : 'New category') : (lang == 'ar' ? 'تعديل الفئة' : 'Edit category'),
+      bodyBuilder: (ctx, setLocal) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          V2FormField(label: 'Name (EN)', child: TextField(controller: en)),
+          const SizedBox(height: 12),
+          V2FormField(label: 'الاسم (AR)', child: TextField(controller: ar)),
+          const SizedBox(height: 12),
+          V2FormField(label: 'Slug', child: TextField(controller: slug)),
+          const SizedBox(height: 12),
+          V2FormField(
+            label: 'Vertical',
+            child: DropdownButtonFormField<String>(
+              initialValue: vertical,
+              items: [for (final v in _verticals) DropdownMenuItem(value: v.$1, child: Text(v.$2))],
+              onChanged: (v) => vertical = v ?? 'beauty',
+            ),
+          ),
+        ],
+      ),
+      onValidate: () {
+        if (en.text.trim().isEmpty) {
+          v2Toast(context, lang == 'ar' ? 'الاسم مطلوب' : 'Name is required', error: true);
+          return false;
+        }
+        return true;
+      },
+    );
+    if (!ok) return;
+    final payload = {
+      'name': {'en': en.text.trim(), 'ar': ar.text.trim()},
+      'slug': slug.text.trim(),
+      'vertical': vertical,
+    };
+    try {
+      if (c == null) {
+        await staffClient.post('/admin/categories', data: payload);
+      } else {
+        await staffClient.patch('/admin/categories/${idOf(c)}', data: payload);
+      }
+      if (mounted) {
+        v2Toast(context, c == null ? (lang == 'ar' ? 'تم الإنشاء' : 'Category created') : (lang == 'ar' ? 'تم التحديث' : 'Category updated'));
+        _load();
+      }
     } on ApiException catch (e) {
       if (mounted) v2Toast(context, e.message, error: true);
     }
   }
 
-  Future<void> _createCategory() async {
-    final lang = ref.read(localeCodeProvider);
-    String? nameEn, nameAr, slug, vertical = 'beauty';
-    final confirmed = await v2Form(
-      context,
-      title: lang == 'ar' ? 'إنشاء فئة' : 'Create category',
-      confirmLabel: lang == 'ar' ? 'إنشاء' : 'Create',
-      bodyBuilder: (ctx, setLocal) => Column(children: [
-        V2FormField(label: 'Name (EN)', child: TextField(onChanged: (v) => nameEn = v, decoration: const InputDecoration(border: OutlineInputBorder()))),
-        const SizedBox(height: 12),
-        V2FormField(label: 'الاسم (AR)', child: TextField(onChanged: (v) => nameAr = v, decoration: const InputDecoration(border: OutlineInputBorder()))),
-        const SizedBox(height: 12),
-        V2FormField(label: 'Slug', child: TextField(onChanged: (v) => slug = v, decoration: const InputDecoration(border: OutlineInputBorder()))),
-        const SizedBox(height: 12),
-        V2FormField(
-          label: 'Vertical',
-          child: DropdownButtonFormField<String>(
-            value: vertical,
-            decoration: const InputDecoration(border: OutlineInputBorder()),
-            items: const [
-              DropdownMenuItem(value: 'beauty', child: Text('Beauty')),
-              DropdownMenuItem(value: 'cleaning', child: Text('Home')),
-              DropdownMenuItem(value: 'chef', child: Text('Food')),
-            ],
-            onChanged: (v) => setLocal(() => vertical = v),
-          ),
-        ),
-      ]),
-    );
-    if (!confirmed) return;
+  Future<void> _toggleLock(Map c) async {
     try {
-      await staffClient.post('/admin/categories', data: {
-        'name': {'en': nameEn, 'ar': nameAr},
-        'slug': slug,
-        'vertical': vertical,
-      });
-      if (mounted) { v2Toast(context, lang == 'ar' ? 'تم الإنشاء' : 'Created'); _load(); }
+      await staffClient.patch('/admin/categories/${idOf(c)}', data: {'locked': !(c['locked'] == true)});
+      _load();
+    } on ApiException catch (e) {
+      if (mounted) v2Toast(context, e.message, error: true);
+    }
+  }
+
+  Future<void> _reorder(Map c, bool up) async {
+    try {
+      await staffClient.post('/admin/categories/reorder', data: {'categoryId': idOf(c), 'direction': up ? 'up' : 'down'});
+      _load();
+    } on ApiException catch (e) {
+      if (mounted) v2Toast(context, e.message, error: true);
+    }
+  }
+
+  Future<void> _delete(Map c) async {
+    final lang = ref.read(localeCodeProvider);
+    final ok = await v2Confirm(context,
+        title: lang == 'ar' ? 'حذف الفئة؟' : 'Delete category?',
+        body: '"${locName(c['name'], lang)}" ${lang == 'ar' ? 'ستُحذف.' : 'is removed from the console.'}',
+        confirmLabel: t(V2Copy.delete, lang),
+        danger: true);
+    if (!ok) return;
+    try {
+      await staffClient.delete('/admin/categories/${idOf(c)}');
+      if (mounted) {
+        v2Toast(context, lang == 'ar' ? 'تم الحذف' : 'Category deleted');
+        _load();
+      }
     } on ApiException catch (e) {
       if (mounted) v2Toast(context, e.message, error: true);
     }
@@ -147,82 +182,55 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
   @override
   Widget build(BuildContext context) {
     final lang = ref.watch(localeCodeProvider);
-    final staffState = ref.watch(staffSessionProvider);
-    if (!staffCan(staffState.effectiveRole, 'categories.write')) {
-      return const V2Gate(allowed: false, child: SizedBox.shrink());
-    }
-    return ColoredBox(
-      color: Ops.page,
-      child: Column(children: [
-        V2PageHeader(
-          title: lang == 'ar' ? 'الفئات' : 'Categories',
-          lang: lang,
-          resultCount: loading ? null : categories.length,
-          actions: [ElevatedButton.icon(onPressed: _createCategory, icon: const Icon(Icons.add, size: 16), label: Text(lang == 'ar' ? 'إنشاء' : 'Create'))],
-        ),
-        Expanded(child: loading
-          ? const V2Loading()
-          : error != null
-            ? Center(child: V2ErrorBanner(message: error!, onRetry: _load))
-            : categories.isEmpty
-              ? const V2Empty()
-              : ListView(padding: const EdgeInsets.symmetric(horizontal: 20), children: [
-                  V2Card(padding: EdgeInsets.zero, child: V2DataTable(
-                    headers: [
-                      lang == 'ar' ? 'الفئة' : 'Category',
-                      lang == 'ar' ? 'المحور' : 'Vertical',
-                      lang == 'ar' ? 'الترتيب' : 'Order',
-                      lang == 'ar' ? 'المهنيات' : 'Providers',
-                      lang == 'ar' ? 'الحالة' : 'Status',
-                      lang == 'ar' ? 'إجراءات' : 'Actions',
-                    ],
-                    rows: [
-                      for (int i = 0; i < categories.length; i++)
-                        [
-                          Text(locName(categories[i]['name'], lang), style: const TextStyle(fontWeight: FontWeight.w600)),
-                          Text('${categories[i]['vertical'] ?? ''}'),
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text('${asInt(categories[i]['sortOrder'])}', style: const TextStyle(fontFamily: Ops.mono)),
-                              const SizedBox(width: 8),
-                              if (i > 0) 
-                                IconButton(
-                                  onPressed: () => _reorderCategory(idOf(categories[i]), true),
-                                  icon: const Icon(Icons.keyboard_arrow_up, size: 16),
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(),
-                                  tooltip: lang == 'ar' ? 'رفع' : 'Move up',
-                                ),
-                              if (i < categories.length - 1)
-                                IconButton(
-                                  onPressed: () => _reorderCategory(idOf(categories[i]), false),
-                                  icon: const Icon(Icons.keyboard_arrow_down, size: 16),
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(),
-                                  tooltip: lang == 'ar' ? 'خفض' : 'Move down',
-                                ),
-                            ],
-                          ),
-                          Text('${asInt(categories[i]['providerCount'] ?? categories[i]['serviceCount'])}', style: const TextStyle(fontFamily: Ops.mono)),
-                          InkWell(
-                            onTap: () => _toggleLock(idOf(categories[i]), categories[i]['locked'] == true),
-                            child: V2StatusPill(
-                              label: statusLabel('${categories[i]['status'] ?? (categories[i]['locked'] == true ? 'locked' : 'active')}', lang),
-                              tone: statusTone('${categories[i]['status'] ?? (categories[i]['locked'] == true ? 'locked' : 'active')}'),
-                            ),
-                          ),
-                          TextButton(
-                            onPressed: () => _editCategory(categories[i]),
-                            child: Text(lang == 'ar' ? 'تعديل' : 'Edit'),
-                          ),
-                        ],
-                    ],
-                  )),
-                  const SizedBox(height: 24),
-                ]),
-        ),
-      ]),
+    final role = ref.watch(staffSessionProvider).effectiveRole;
+    if (!staffCan(role, 'categories.write')) return const V2Gate(allowed: false, child: SizedBox.shrink());
+    ref.listen(v2QueryProvider, (_, n) => setState(() => q = n.trim()));
+    final visible = _rows;
+
+    return V2ListView(
+      loading: loading,
+      error: error,
+      onRetry: _load,
+      resultLabel: '${visible.length} ${lang == 'ar' ? 'نتيجة' : 'results'}',
+      emptyText: lang == 'ar' ? 'لا فئات' : 'Nothing here yet',
+      actionsWidth: 210,
+      trailingActions: [
+        V2Btn.primary(lang == 'ar' ? '+ فئة' : '+ New Category', onPressed: () => _edit(null), size: V2BtnSize.sm),
+      ],
+      filters: [
+        for (final f in _filters)
+          V2FilterChip(label: f, count: _count(f), selected: filter == f, onTap: () => setState(() => filter = f)),
+      ],
+      columns: [
+        V2Col(lang == 'ar' ? 'الفئة' : 'Category', flex: 1),
+        V2Col('Slug', flex: 1),
+        V2Col(lang == 'ar' ? 'الخدمات' : 'Services', fixed: 90),
+        V2Col(lang == 'ar' ? 'الحالة' : 'Status', fixed: 110),
+      ],
+      rows: [
+        for (var i = 0; i < visible.length; i++)
+          V2GridRow(
+            cells: [
+              Text(locName(visible[i]['name'], lang),
+                  maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+              Text('${visible[i]['slug'] ?? ''}',
+                  maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12.5, fontFamily: Ops.mono, color: Ops.inkSoft)),
+              Text('${asInt(visible[i]['providerCount'] ?? visible[i]['serviceCount'])}',
+                  style: const TextStyle(fontSize: 13, fontFamily: Ops.mono)),
+              Align(alignment: AlignmentDirectional.centerStart, child: V2StatusPill.forLabel(_status(visible[i]))),
+            ],
+            actions: [
+              V2Btn(
+                  label: (visible[i]['locked'] == true) ? (lang == 'ar' ? 'فتح' : 'Unlock') : (lang == 'ar' ? 'قفل' : 'Lock'),
+                  onPressed: () => _toggleLock(visible[i]),
+                  size: V2BtnSize.row),
+              V2Btn(label: '↑', onPressed: i == 0 ? null : () => _reorder(visible[i], true), size: V2BtnSize.row),
+              V2Btn(label: '↓', onPressed: i == visible.length - 1 ? null : () => _reorder(visible[i], false), size: V2BtnSize.row),
+              V2Btn.ghost(lang == 'ar' ? 'تعديل' : 'Edit', onPressed: () => _edit(visible[i]), size: V2BtnSize.row),
+              V2Btn.danger(lang == 'ar' ? 'حذف' : 'Delete', onPressed: () => _delete(visible[i]), size: V2BtnSize.row),
+            ],
+          ),
+      ],
     );
   }
 }

@@ -7,10 +7,14 @@ import 'package:oons/admin_v2/data/maps.dart';
 import 'package:oons/admin_v2/data/paths.dart';
 import 'package:oons/admin_v2/data/permissions.dart';
 import 'package:oons/admin_v2/data/session.dart';
-import 'package:oons/admin_v2/l10n/copy.dart';
 import 'package:oons/admin_v2/data/staff_client.dart';
+import 'package:oons/admin_v2/data/ui_state.dart';
+import 'package:oons/admin_v2/l10n/copy.dart';
 import 'package:oons/admin_v2/theme/tokens.dart';
 import 'package:oons/admin_v2/ui/atoms.dart';
+import 'package:oons/admin_v2/ui/buttons.dart';
+import 'package:oons/admin_v2/ui/grid_table.dart';
+import 'package:oons/admin_v2/ui/list_view.dart';
 import 'package:oons/data/api.dart';
 
 class ClaimsScreen extends ConsumerStatefulWidget {
@@ -22,69 +26,93 @@ class ClaimsScreen extends ConsumerStatefulWidget {
 
 class _ClaimsScreenState extends ConsumerState<ClaimsScreen> {
   List<Map<String, dynamic>> claims = [];
-  List<Map<String, dynamic>> filteredClaims = [];
   bool loading = true;
   String? error;
-  String selectedFilter = 'All';
-  final List<String> filters = ['All', 'Open', 'Escalated', 'Closed'];
+  String filter = 'All';
+  String q = '';
+
+  static const _filters = ['All', 'Open', 'Escalated', 'Closed'];
 
   @override
   void initState() {
     super.initState();
-    _loadClaims();
+    _load();
   }
 
-  Future<void> _loadClaims() async {
+  Future<void> _load() async {
     try {
-      setState(() { loading = true; error = null; });
+      setState(() {
+        loading = true;
+        error = null;
+      });
       final data = await staffClient.get('/admin/claims');
       setState(() {
         claims = asMapList(data['claims']);
-        _applyFilter();
         loading = false;
       });
     } on ApiException catch (e) {
-      setState(() { error = e.message; loading = false; });
+      setState(() {
+        error = e.message;
+        loading = false;
+      });
     }
   }
 
-  void _applyFilter() {
-    if (selectedFilter == 'All') {
-      filteredClaims = List.from(claims);
-    } else {
-      filteredClaims = claims.where((claim) {
-        final status = '${claim['status']}'.toLowerCase();
-        return status == selectedFilter.toLowerCase();
+  bool _isClosed(Map c) {
+    final s = '${c['status']}'.toLowerCase();
+    return s == 'resolved' || s == 'closed' || s == 'rejected';
+  }
+
+  int _count(String f) {
+    if (f == 'All') return claims.length;
+    return claims.where((c) {
+      final s = '${c['status']}'.toLowerCase();
+      if (f == 'Closed') return _isClosed(c);
+      return s == f.toLowerCase();
+    }).length;
+  }
+
+  List<Map<String, dynamic>> get _rows {
+    var list = claims;
+    if (filter != 'All') {
+      list = list.where((c) {
+        if (filter == 'Closed') return _isClosed(c);
+        return '${c['status']}'.toLowerCase() == filter.toLowerCase();
       }).toList();
     }
+    if (q.isNotEmpty) {
+      final needle = q.toLowerCase();
+      list = list.where((c) => c.values.join(' ').toLowerCase().contains(needle)).toList();
+    }
+    return list;
   }
 
-  void _onFilterChange(String filter) {
-    setState(() {
-      selectedFilter = filter;
-      _applyFilter();
-    });
-  }
-
-  Future<void> _resolveClaim(String claimId) async {
+  Future<void> _resolve(Map c) async {
     final lang = ref.read(localeCodeProvider);
-    String? note;
-    final confirmed = await v2Form(
+    var note = '';
+    final ok = await v2Form(
       context,
-      title: lang == 'ar' ? 'حل المطالبة' : 'Resolve claim',
-      confirmLabel: lang == 'ar' ? 'حل' : 'Resolve',
-      bodyBuilder: (ctx, setState) => V2FormField(
-        label: lang == 'ar' ? 'ملاحظة الحل' : 'Resolution note',
-        child: TextField(onChanged: (v) => note = v, maxLines: 3, decoration: const InputDecoration(border: OutlineInputBorder())),
+      title: '${lang == 'ar' ? 'إغلاق المطالبة' : 'Close claim'} #${shortId(idOf(c))}',
+      confirmLabel: lang == 'ar' ? 'إغلاق المطالبة' : 'Close claim',
+      bodyBuilder: (ctx, _) => V2FormField(
+        label: lang == 'ar' ? 'ملاحظة الحل (مطلوبة)' : 'Resolution note (required)',
+        child: TextField(onChanged: (v) => note = v, maxLines: 3),
       ),
+      onValidate: () {
+        if (note.trim().isEmpty) {
+          v2Toast(context, lang == 'ar' ? 'الملاحظة مطلوبة' : 'A note is required', error: true);
+          return false;
+        }
+        return true;
+      },
     );
-    if (!confirmed) return;
+    if (!ok) return;
     try {
-      await staffClient.post('/admin/claims/$claimId/resolve', data: {
-        'status': 'resolved',
-        if (note != null && note!.isNotEmpty) 'note': note,
-      });
-      if (mounted) { v2Toast(context, lang == 'ar' ? 'تم حل المطالبة' : 'Claim resolved'); _loadClaims(); }
+      await staffClient.post('/admin/claims/${idOf(c)}/resolve', data: {'status': 'resolved', 'note': note.trim()});
+      if (mounted) {
+        v2Toast(context, lang == 'ar' ? 'تم إغلاق المطالبة' : 'Claim closed');
+        _load();
+      }
     } on ApiException catch (e) {
       if (mounted) v2Toast(context, e.message, error: true);
     }
@@ -93,80 +121,73 @@ class _ClaimsScreenState extends ConsumerState<ClaimsScreen> {
   @override
   Widget build(BuildContext context) {
     final lang = ref.watch(localeCodeProvider);
-    final staffState = ref.watch(staffSessionProvider);
-    if (!staffCan(staffState.effectiveRole, 'claims.read')) {
-      return const V2Gate(allowed: false, child: SizedBox.shrink());
-    }
-    final canWrite = staffCan(staffState.effectiveRole, 'claims.write');
-    return ColoredBox(
-      color: Ops.page,
-      child: Column(children: [
-        V2PageHeader(title: lang == 'ar' ? 'المطالبات' : 'Claims', lang: lang, resultCount: loading ? null : filteredClaims.length),
-        // Filter chips
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-          child: Row(
-            children: [
-              ...filters.map((filter) => Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: V2FilterChip(
-                  label: filter,
-                  selected: selectedFilter == filter,
-                  onTap: () => _onFilterChange(filter),
-                ),
-              )),
+    final role = ref.watch(staffSessionProvider).effectiveRole;
+    if (!staffCan(role, 'claims.read')) return const V2Gate(allowed: false, child: SizedBox.shrink());
+    final canWrite = staffCan(role, 'claims.write');
+    ref.listen(v2QueryProvider, (_, n) => setState(() => q = n.trim()));
+
+    return V2ListView(
+      loading: loading,
+      error: error,
+      onRetry: _load,
+      resultLabel: '${_rows.length} ${lang == 'ar' ? 'نتيجة' : 'results'}',
+      emptyText: lang == 'ar' ? 'لا مطالبات' : 'Nothing here yet',
+      actionsWidth: canWrite ? 96 : 8,
+      filters: [
+        for (final f in _filters)
+          V2FilterChip(
+            label: f,
+            count: _count(f),
+            selected: filter == f,
+            onTap: () => setState(() => filter = f),
+          ),
+      ],
+      columns: [
+        V2Col(lang == 'ar' ? 'المطالبة' : 'Claim', fixed: 118),
+        V2Col(lang == 'ar' ? 'الحجز' : 'Booking', fixed: 130),
+        V2Col(lang == 'ar' ? 'العميلة' : 'Customer', flex: 1),
+        V2Col(lang == 'ar' ? 'المالك' : 'Owner', flex: 0.9),
+        V2Col(lang == 'ar' ? 'فُتحت' : 'Opened', fixed: 108),
+        V2Col(lang == 'ar' ? 'الحالة' : 'Status', fixed: 118),
+      ],
+      rows: [
+        for (final c in _rows)
+          V2GridRow(
+            cells: [
+              Text('#${shortId(idOf(c))}',
+                  style: const TextStyle(fontSize: 13, fontFamily: Ops.mono, fontWeight: FontWeight.w600)),
+              GestureDetector(
+                onTap: () {
+                  final bid = '${c['bookingId'] ?? ''}';
+                  if (bid.isNotEmpty) context.go(V2Paths.booking(bid));
+                },
+                child: Text('#${shortId('${c['bookingId'] ?? ''}')}',
+                    style: const TextStyle(fontSize: 12.5, fontFamily: Ops.mono, color: Ops.plum)),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('${c['customer'] ?? c['customerName'] ?? ''}',
+                      maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13)),
+                  Text('${c['kind'] ?? c['type'] ?? ''}',
+                      maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, color: Ops.mutedSoft)),
+                ],
+              ),
+              Text('${c['owner'] ?? c['resolvedByAdminId'] ?? '—'}',
+                  maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, color: Ops.inkSoft)),
+              Text(formatDayOnly(c['createdAt']), style: const TextStyle(fontSize: 12.5, fontFamily: Ops.mono, color: Ops.muted)),
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: V2StatusPill(label: statusLabel('${c['status']}', lang), tone: statusTone('${c['status']}')),
+              ),
+            ],
+            actions: [
+              if (canWrite && !_isClosed(c))
+                V2Btn(label: lang == 'ar' ? 'حل' : 'Resolve', onPressed: () => _resolve(c), kind: V2BtnKind.primary, size: V2BtnSize.row),
             ],
           ),
-        ),
-        Expanded(child: loading
-          ? const V2Loading()
-          : error != null
-            ? Center(child: V2ErrorBanner(message: error!, onRetry: _loadClaims))
-            : filteredClaims.isEmpty
-              ? const V2Empty()
-              : ListView(padding: const EdgeInsets.symmetric(horizontal: 20), children: [
-                  V2Card(padding: EdgeInsets.zero, child: V2DataTable(
-                    headers: [
-                      lang == 'ar' ? 'المطالبة' : 'Claim',
-                      lang == 'ar' ? 'النوع' : 'Type',
-                      lang == 'ar' ? 'الحجز' : 'Booking',
-                      lang == 'ar' ? 'العميل' : 'Customer',
-                      lang == 'ar' ? 'الحالة' : 'Status',
-                      lang == 'ar' ? 'التفاصيل' : 'Details',
-                      lang == 'ar' ? 'التاريخ' : 'Date',
-                      if (canWrite) lang == 'ar' ? 'إجراءات' : 'Actions',
-                    ],
-                    rows: [
-                      for (final claim in filteredClaims)
-                        [
-                          Text('#${shortId(idOf(claim))}', style: const TextStyle(fontFamily: Ops.mono, fontWeight: FontWeight.w600)),
-                          Text('${claim['kind'] ?? claim['type'] ?? ''}'),
-                          InkWell(
-                            onTap: () {
-                              final bid = '${claim['bookingId'] ?? ''}';
-                              if (bid.isEmpty) return;
-                              context.go(V2Paths.booking(bid));
-                            },
-                            child: Text('#${shortId('${claim['bookingId'] ?? ''}')}', style: const TextStyle(fontFamily: Ops.mono, fontSize: 12, color: Ops.plum, decoration: TextDecoration.underline)),
-                          ),
-                          Text('${claim['customer'] ?? claim['customerName'] ?? ''}', style: const TextStyle(fontSize: 12)),
-                          V2StatusPill(label: statusLabel('${claim['status']}', lang), tone: statusTone('${claim['status']}')),
-                          Text('${claim['body'] ?? claim['resolutionNote'] ?? ''}', style: const TextStyle(fontSize: 12)),
-                          Text(formatDay(claim['createdAt'], lang), style: const TextStyle(fontSize: 12, color: Ops.muted)),
-                          if (canWrite)
-                            TextButton(
-                              onPressed: '${claim['status']}'.toLowerCase() == 'resolved' || '${claim['status']}'.toLowerCase() == 'closed'
-                                  ? null
-                                  : () => _resolveClaim(idOf(claim)),
-                              child: Text(lang == 'ar' ? 'حل' : 'Resolve'),
-                            ),
-                        ],
-                    ],
-                  )),
-                  const SizedBox(height: 24),
-                ]),
-        ),
-      ]),
+      ],
     );
   }
 }
