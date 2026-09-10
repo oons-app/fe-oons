@@ -59,9 +59,9 @@ class _PayoutsScreenState extends ConsumerState<PayoutsScreen> {
 
   String _status(Map p) {
     final s = '${p['status'] ?? 'pending'}'.toLowerCase();
-    if (s == 'held') return 'Held';
-    if (s == 'paid' || s == 'released') return 'Paid';
-    return 'Pending';
+    if (s == 'held' || s == 'dispute') return 'Held';
+    if (s == 'paid' || s == 'released' || s == 'settled') return 'Paid';
+    return 'Pending'; // pending | ready | processing
   }
 
   int _count(String f) => f == 'All' ? payouts.length : payouts.where((p) => _status(p) == f).length;

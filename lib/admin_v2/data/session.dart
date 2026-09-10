@@ -51,6 +51,7 @@ class StaffSession extends StateNotifier<StaffState> {
     staffClient.token = t;
     try {
       final me = await staffClient.get('/admin/me');
+      await _loadGrants();
       state = StaffState(
         token: t,
         staffRole: '${me['staffRole'] ?? ''}',
@@ -69,13 +70,34 @@ class StaffSession extends StateNotifier<StaffState> {
     final r = await staffClient.post('/admin/login', data: {'email': email, 'password': password});
     final token = r['accessToken'] as String;
     staffClient.token = token;
+    await staffClient.persistToken(token);
+    await _loadGrants();
     state = StaffState(
       token: token,
       staffRole: '${r['staffRole'] ?? ''}',
       staff: r['staff'] is Map ? r['staff'] as Map : null,
       ready: true,
     );
-    await staffClient.persistToken(token);
+  }
+
+  /// Cache the server RBAC matrix so `staffCan` reflects the real
+  /// `staffrbac.Can` table, not the local fallback. Non-fatal on failure.
+  Future<void> _loadGrants() async {
+    try {
+      final m = await staffClient.get('/admin/rbac/matrix');
+      final raw = m['grants'];
+      if (raw is Map) {
+        final parsed = <String, Map<String, bool>>{};
+        raw.forEach((role, row) {
+          if (row is Map) {
+            parsed['$role'] = {for (final e in row.entries) '${e.key}': e.value == true};
+          }
+        });
+        setStaffGrants(parsed);
+      }
+    } catch (_) {
+      // keep the local fallback table
+    }
   }
 
   void setViewAsRole(String? role) {

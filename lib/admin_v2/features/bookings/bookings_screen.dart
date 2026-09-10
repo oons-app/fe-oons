@@ -44,8 +44,12 @@ class BookingsScreen extends ConsumerStatefulWidget {
 class _BookingsScreenState extends ConsumerState<BookingsScreen> with WidgetsBindingObserver {
   List<Map<String, dynamic>> bookings = [];
   Map<String, int> statusCounts = {};
+  int total = 0;
   bool loading = true;
+  bool loadingMore = false;
   String? error;
+
+  static const _pageSize = 50;
   String statusFilter = '';
   String queryFilter = '';
   bool unpaidOps = false;
@@ -110,14 +114,20 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> with WidgetsBin
     });
   }
 
-  Future<void> _load() async {
+  Future<void> _load({bool append = false}) async {
     setState(() {
-      loading = true;
+      if (append) {
+        loadingMore = true;
+      } else {
+        loading = true;
+      }
       error = null;
     });
     try {
+      final skip = append ? bookings.length : 0;
       final query = <String, dynamic>{
-        'limit': 100,
+        'limit': _pageSize,
+        'skip': skip,
         if (widget.live) 'live': '1',
         if (!widget.live && statusFilter.isNotEmpty) 'status': statusFilter,
         if (queryFilter.isNotEmpty) 'q': queryFilter,
@@ -125,14 +135,13 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> with WidgetsBin
       };
       final data = await staffClient.get('/admin/bookings', query: query);
       final rows = asMapList(data['bookings']);
+      // Server returns a `$group`-derived counts map keyed by enum key
+      // (`paid`, `on_the_way`, …) over the un-status-filtered scope.
+      final srv = asMap(data['counts']);
       final counts = <String, int>{};
-      try {
-        final all = await staffClient.get('/admin/bookings', query: {'limit': 200});
-        for (final b in asMapList(all['bookings'])) {
-          final s = '${b['status'] ?? ''}'.toLowerCase();
-          counts[s] = (counts[s] ?? 0) + 1;
-        }
-      } catch (_) {
+      if (srv != null && srv.isNotEmpty) {
+        srv.forEach((k, v) => counts[k.toString().toLowerCase()] = asInt(v));
+      } else {
         for (final b in rows) {
           final s = '${b['status'] ?? ''}'.toLowerCase();
           counts[s] = (counts[s] ?? 0) + 1;
@@ -140,10 +149,13 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> with WidgetsBin
       }
       if (!mounted) return;
       setState(() {
-        bookings = rows;
-        statusCounts = counts;
+        bookings = append ? [...bookings, ...rows] : rows;
+        // Counts only reflect the full scope on a fresh (skip 0) load.
+        if (!append || statusCounts.isEmpty) statusCounts = counts;
+        total = asInt(data['total']);
         loading = false;
-        if (!bulkMode) selected.clear();
+        loadingMore = false;
+        if (!bulkMode && !append) selected.clear();
       });
       _publishHeader();
     } on ApiException catch (e) {
@@ -151,11 +163,20 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> with WidgetsBin
       setState(() {
         error = e.message;
         loading = false;
+        loadingMore = false;
       });
     }
   }
 
-  int get _totalAll => statusCounts.isEmpty ? bookings.length : statusCounts.values.fold(0, (a, b) => a + b);
+  /// `total` is the server count for the *active* query (drives paging + the
+  /// result label). The "All" chip must show the full un-filtered scope, which
+  /// is the sum of the `counts` map.
+  bool get _hasMore => total > 0 && bookings.length < total;
+
+  int get _totalAll {
+    if (statusCounts.isNotEmpty) return statusCounts.values.fold(0, (a, b) => a + b);
+    return total > 0 ? total : bookings.length;
+  }
 
   /// Chip key -> the real enum keys it groups (must match the backend
   /// `bookingStatusFilter`).
@@ -562,7 +583,10 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> with WidgetsBin
               const SizedBox(height: 12),
               Row(
                 children: [
-                  Text('${bookings.length} ${lang == 'ar' ? 'نتيجة' : 'results'}',
+                  Text(
+                      total > bookings.length
+                          ? '${bookings.length} / $total ${lang == 'ar' ? 'نتيجة' : 'results'}'
+                          : '${bookings.length} ${lang == 'ar' ? 'نتيجة' : 'results'}',
                       style: const TextStyle(fontSize: 12.5, color: Ops.muted)),
                   const Spacer(),
                   if (canPay && !widget.live) ...[
@@ -642,6 +666,18 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> with WidgetsBin
                       ),
                   ],
                 ),
+              if (!loading && error == null && _hasMore) ...[
+                const SizedBox(height: 14),
+                Center(
+                  child: V2Btn.ghost(
+                    loadingMore
+                        ? (lang == 'ar' ? 'جارٍ التحميل…' : 'Loading…')
+                        : (lang == 'ar' ? 'تحميل المزيد' : 'Load more'),
+                    onPressed: loadingMore ? null : () => _load(append: true),
+                    size: V2BtnSize.sm,
+                  ),
+                ),
+              ],
             ],
           ),
         ),

@@ -23,9 +23,24 @@ String roleLabel(String apiRole) {
   }
 }
 
-/// Screen / action permissions — mirrors server `staffrbac.Can` + prototype PERMS.
+/// Grant map fetched from `GET /admin/rbac/matrix` on sign-in — the server's
+/// `staffrbac.Can` table. `staffCan` consults this first; the switch below is
+/// only a pre-login / offline fallback.
+Map<String, Map<String, bool>> _serverGrants = const {};
+
+void setStaffGrants(Map<String, Map<String, bool>> grants) => _serverGrants = grants;
+
+/// Screen / action permissions. Prefers the server RBAC matrix; falls back to
+/// the local table (which mirrors `staffrbac.Can`).
 bool staffCan(String role, String perm) {
   if (role == roleSuper) return true;
+  final row = _serverGrants[role];
+  if (row != null) {
+    if (row[perm] == true) return true;
+    if (row['*'] == true) return true;
+    // Server row present but perm absent/false → trust it, skip the fallback.
+    if (row.containsKey(perm)) return false;
+  }
   switch (perm) {
     case 'staff.write':
       return false;
