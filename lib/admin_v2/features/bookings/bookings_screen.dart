@@ -443,6 +443,60 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> with WidgetsBin
 
   void _toggle(String id) => setState(() => selected.contains(id) ? selected.remove(id) : selected.add(id));
 
+  Future<void> _raiseClaim(Map b) async {
+    final lang = ref.read(localeCodeProvider);
+    var kind = 'damage';
+    var note = '';
+    final ok = await v2Form(
+      context,
+      title: lang == 'ar' ? 'فتح مطالبة' : 'Raise a claim',
+      confirmLabel: lang == 'ar' ? 'فتح المطالبة' : 'Raise claim',
+      bodyBuilder: (ctx, setLocal) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            lang == 'ar'
+                ? 'مطالبة على الحجز ${bookingRef(b)} للعميلة ${clientNameOf(b, lang)}.'
+                : 'Opens a claim against booking ${bookingRef(b)} for ${clientNameOf(b, lang)}.',
+            style: const TextStyle(fontSize: 13, height: 1.5),
+          ),
+          const SizedBox(height: 12),
+          V2FormField(
+            label: lang == 'ar' ? 'النوع' : 'Type',
+            child: DropdownButtonFormField<String>(
+              initialValue: kind,
+              items: const [
+                DropdownMenuItem(value: 'damage', child: Text('Damage')),
+                DropdownMenuItem(value: 'theft', child: Text('Theft')),
+                DropdownMenuItem(value: 'payout', child: Text('Payout dispute')),
+              ],
+              onChanged: (v) => kind = v ?? 'damage',
+            ),
+          ),
+          const SizedBox(height: 12),
+          V2FormField(
+            label: lang == 'ar' ? 'ملاحظة (مطلوبة)' : 'Note (required)',
+            child: TextField(onChanged: (v) => note = v, maxLines: 3),
+          ),
+        ],
+      ),
+      onValidate: () {
+        if (note.trim().isEmpty) {
+          v2Toast(context, lang == 'ar' ? 'اكتبي ملاحظة' : 'Add a note', error: true);
+          return false;
+        }
+        return true;
+      },
+    );
+    if (!ok) return;
+    try {
+      await staffClient.post('/admin/bookings/${idOf(b)}/claims', data: {'kind': kind, 'body': note.trim()});
+      if (mounted) v2Toast(context, lang == 'ar' ? 'تم فتح المطالبة' : 'Claim opened');
+    } on ApiException catch (e) {
+      if (mounted) v2Toast(context, e.message, error: true);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final lang = ref.watch(localeCodeProvider);
@@ -528,7 +582,7 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> with WidgetsBin
               else
                 V2GridTable(
                   bulkMode: bulkMode,
-                  actionsWidth: 96,
+                  actionsWidth: widget.live ? 150 : 96,
                   emptyText: lang == 'ar'
                       ? 'لا شيء هنا بعد — امسح الفلتر أو البحث'
                       : 'Nothing here yet — clear the filter or search, or create a new record',
@@ -569,6 +623,13 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> with WidgetsBin
                             onPressed: () => context.go(V2Paths.booking(idOf(b))),
                             size: V2BtnSize.row,
                           ),
+                          if (widget.live && staffCan(role, 'claims.write'))
+                            V2Btn(
+                              label: lang == 'ar' ? 'مطالبة' : 'Claim',
+                              onPressed: () => _raiseClaim(b),
+                              kind: V2BtnKind.danger,
+                              size: V2BtnSize.row,
+                            ),
                         ],
                       ),
                   ],
