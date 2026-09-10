@@ -251,12 +251,15 @@ class _ProvidersScreenState extends ConsumerState<ProvidersScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          if (loading && all.isEmpty)
-            const Padding(padding: EdgeInsets.only(top: 60), child: V2Loading())
-          else if (error != null)
+          if (error != null && all.isEmpty)
             V2ErrorBanner(message: error!, onRetry: _load)
-          else
+          else ...[
+            if (error != null) ...[
+              V2ErrorBanner(message: error!, onRetry: _load),
+              const SizedBox(height: 12),
+            ],
             V2GridTable(
+              loading: loading,
               actionsWidth: canImpersonate || canVet ? 170 : 70,
               emptyText: lang == 'ar' ? 'لا مهنيات مطابقة' : 'No matching professionals',
               columns: [
@@ -299,6 +302,7 @@ class _ProvidersScreenState extends ConsumerState<ProvidersScreen> {
                   ),
               ],
             ),
+          ],
         ],
       ),
     );

@@ -28,6 +28,7 @@ class _CouponsScreenState extends ConsumerState<CouponsScreen> {
   bool loading = true;
   String? error;
   String filter = 'All';
+  String vFilter = '';
   String q = '';
 
   static const _filters = ['All', 'Active', 'Inactive'];
@@ -75,9 +76,23 @@ class _CouponsScreenState extends ConsumerState<CouponsScreen> {
     return coupons.where((c) => f == 'Active' ? _active(c) : !_active(c)).length;
   }
 
+  /// Verticals actually present across the loaded coupons (for the chip row).
+  List<String> get _verticalsPresent {
+    final s = <String>{};
+    for (final c in coupons) {
+      final v = '${c['vertical'] ?? ''}'.trim().toLowerCase();
+      if (v.isNotEmpty) s.add(v);
+    }
+    final out = s.toList()..sort();
+    return out;
+  }
+
   List<Map<String, dynamic>> get _rows {
     var list = coupons;
     if (filter != 'All') list = list.where((c) => filter == 'Active' ? _active(c) : !_active(c)).toList();
+    if (vFilter.isNotEmpty) {
+      list = list.where((c) => '${c['vertical'] ?? ''}'.trim().toLowerCase() == vFilter).toList();
+    }
     if (q.isNotEmpty) {
       final n = q.toLowerCase();
       list = list.where((c) => c.values.join(' ').toLowerCase().contains(n)).toList();
@@ -90,6 +105,8 @@ class _CouponsScreenState extends ConsumerState<CouponsScreen> {
     final code = TextEditingController(text: '${c?['code'] ?? ''}');
     var type = _isPercent(c ?? {}) || c == null ? 'percent' : 'fixed';
     var scope = '${c?['scope'] ?? 'Platform'}';
+    var vertical = '${c?['vertical'] ?? ''}';
+    final areas = TextEditingController(text: asDynList(c?['areas']).join(', '));
     final value = TextEditingController(
         text: c == null
             ? ''
@@ -132,6 +149,24 @@ class _CouponsScreenState extends ConsumerState<CouponsScreen> {
             V2FormField(
                 label: lang == 'ar' ? 'حد الاستخدام' : 'Redemption limit',
                 child: TextField(controller: limit, keyboardType: TextInputType.number)),
+            const SizedBox(height: 12),
+            V2FormField(
+              label: lang == 'ar' ? 'العمودية' : 'Vertical',
+              child: DropdownButtonFormField<String>(
+                initialValue: vertical.isEmpty ? '' : vertical,
+                items: [
+                  DropdownMenuItem(value: '', child: Text(lang == 'ar' ? 'كل العموديات' : 'All verticals')),
+                  for (final v in const ['beauty', 'cleaning', 'chef', 'childcare', 'wellness'])
+                    DropdownMenuItem(value: v, child: Text(verticalLabel(v, lang))),
+                ],
+                onChanged: (v) => vertical = v ?? '',
+              ),
+            ),
+            const SizedBox(height: 12),
+            V2FormField(
+              label: lang == 'ar' ? 'مناطق (مفصولة بفواصل، فارغ = الكل)' : 'Areas (comma-separated, blank = all)',
+              child: TextField(controller: areas),
+            ),
           ],
         ),
         onValidate: () {
@@ -145,11 +180,14 @@ class _CouponsScreenState extends ConsumerState<CouponsScreen> {
       if (!ok) return;
       final raw = double.tryParse(value.text.trim()) ?? 0;
       final amount = type == 'fixed' ? (raw * 100).round() : raw.round();
+      final areaList = areas.text.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
       final payload = {
         'code': code.text.trim(),
         'scope': scope,
         'discountType': type,
         'amount': amount,
+        'vertical': vertical,
+        'areas': areaList,
         if (limit.text.trim().isNotEmpty) 'maxRedemptions': int.tryParse(limit.text.trim()),
         if (c == null) 'active': true,
       };
@@ -170,6 +208,7 @@ class _CouponsScreenState extends ConsumerState<CouponsScreen> {
       code.dispose();
       value.dispose();
       limit.dispose();
+      areas.dispose();
     }
   }
 
@@ -276,6 +315,19 @@ class _CouponsScreenState extends ConsumerState<CouponsScreen> {
       filters: [
         for (final f in _filters)
           V2FilterChip(label: f, count: _count(f), selected: filter == f, onTap: () => setState(() => filter = f)),
+        if (_verticalsPresent.isNotEmpty) ...[
+          V2FilterChip(
+              label: lang == 'ar' ? 'كل العموديات' : 'All verticals',
+              selected: vFilter.isEmpty,
+              onTap: () => setState(() => vFilter = '')),
+          for (final v in _verticalsPresent)
+            V2FilterChip(
+              label: verticalLabel(v, lang),
+              count: coupons.where((c) => '${c['vertical'] ?? ''}'.trim().toLowerCase() == v).length,
+              selected: vFilter == v,
+              onTap: () => setState(() => vFilter = v),
+            ),
+        ],
       ],
       columns: [
         V2Col(lang == 'ar' ? 'الكود' : 'Code', fixed: 120),
@@ -295,7 +347,15 @@ class _CouponsScreenState extends ConsumerState<CouponsScreen> {
                 children: [
                   Text('${c['code'] ?? ''}',
                       style: const TextStyle(fontSize: 13, fontFamily: Ops.mono, fontWeight: FontWeight.w600)),
-                  Text('${c['scope'] ?? 'Platform'}', style: const TextStyle(fontSize: 11, color: Ops.mutedSoft)),
+                  Text(
+                    [
+                      '${c['scope'] ?? 'Platform'}',
+                      if ('${c['vertical'] ?? ''}'.trim().isNotEmpty) verticalLabel(c['vertical'], lang),
+                      if (asDynList(c['areas']).isNotEmpty)
+                        '${asDynList(c['areas']).length} ${lang == 'ar' ? 'منطقة' : 'areas'}',
+                    ].join(' · '),
+                    style: const TextStyle(fontSize: 11, color: Ops.mutedSoft),
+                  ),
                 ],
               ),
               Column(

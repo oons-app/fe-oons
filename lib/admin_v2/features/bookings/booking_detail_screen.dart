@@ -66,7 +66,7 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen> {
       context,
       title: lang == 'ar' ? 'فرض الحالة' : 'Force status',
       body: lang == 'ar'
-          ? 'تغيير حالة الحجز إلى «$label»؟'
+          ? 'تغيير حالة الحجز ${bookingRefOf()} إلى «$label»؟'
           : 'Force booking ${bookingRefOf()} to "$label"?',
       confirmLabel: label,
       roleLabel: roleLabel(ref.read(staffSessionProvider).effectiveRole),
@@ -87,10 +87,11 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen> {
 
   Future<void> _resolveDispute(String outcome, String title, String detail, {bool danger = false}) async {
     final lang = ref.read(localeCodeProvider);
+    final refLabel = bookingRefOf();
     final ok = await v2Confirm(
       context,
       title: title,
-      body: detail,
+      body: refLabel.isEmpty ? detail : '${lang == 'ar' ? 'حجز' : 'Booking'} $refLabel · $detail',
       confirmLabel: title.split('—').last.trim(),
       danger: danger,
       roleLabel: roleLabel(ref.read(staffSessionProvider).effectiveRole),

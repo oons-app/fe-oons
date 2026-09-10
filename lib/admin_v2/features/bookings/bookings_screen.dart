@@ -609,12 +609,15 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> with WidgetsBin
                 ],
               ),
               const SizedBox(height: 12),
-              if (loading && bookings.isEmpty)
-                const Padding(padding: EdgeInsets.only(top: 60), child: V2Loading())
-              else if (error != null)
+              if (error != null && bookings.isEmpty)
                 V2ErrorBanner(message: error!, onRetry: _load)
-              else
+              else ...[
+                if (error != null) ...[
+                  V2ErrorBanner(message: error!, onRetry: _load),
+                  const SizedBox(height: 12),
+                ],
                 V2GridTable(
+                  loading: loading,
                   bulkMode: bulkMode,
                   actionsWidth: widget.live ? 150 : 96,
                   emptyText: lang == 'ar'
@@ -668,6 +671,7 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> with WidgetsBin
                       ),
                   ],
                 ),
+              ],
               if (!loading && error == null && _hasMore) ...[
                 const SizedBox(height: 14),
                 Center(

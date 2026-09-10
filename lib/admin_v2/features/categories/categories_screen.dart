@@ -67,9 +67,13 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
     }
   }
 
+  /// The server encodes state in `status`: `active` | `locked_teaser` | `archived`.
+  bool _isLocked(Map c) => '${c['status']}'.toLowerCase().contains('lock') || c['locked'] == true;
+
   String _status(Map c) {
-    if (c['locked'] == true || '${c['status']}'.contains('lock')) return 'Locked';
-    if ('${c['status']}'.toLowerCase() == 'draft' || c['active'] == false) return 'Draft';
+    final s = '${c['status']}'.toLowerCase();
+    if (_isLocked(c)) return 'Locked';
+    if (s == 'archived' || s == 'draft' || c['active'] == false) return 'Draft';
     return 'Active';
   }
 
@@ -149,17 +153,27 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
   }
 
   Future<void> _toggleLock(Map c) async {
+    // Server state lives in `status`: flip active <-> locked_teaser.
+    final next = _isLocked(c) ? 'active' : 'locked_teaser';
     try {
-      await staffClient.patch('/admin/categories/${idOf(c)}', data: {'locked': !(c['locked'] == true)});
+      await staffClient.patch('/admin/categories/${idOf(c)}', data: {'status': next});
       _load();
     } on ApiException catch (e) {
       if (mounted) v2Toast(context, e.message, error: true);
     }
   }
 
-  Future<void> _reorder(Map c, bool up) async {
+  Future<void> _reorder(List<Map<String, dynamic>> ordered, int i, {required bool up}) async {
+    final j = up ? i - 1 : i + 1;
+    if (j < 0 || j >= ordered.length) return;
+    final next = [...ordered];
+    final tmp = next[i];
+    next[i] = next[j];
+    next[j] = tmp;
+    // Server contract: the full list with explicit sortOrder values.
+    final order = [for (var k = 0; k < next.length; k++) {'id': idOf(next[k]), 'sortOrder': k}];
     try {
-      await staffClient.post('/admin/categories/reorder', data: {'categoryId': idOf(c), 'direction': up ? 'up' : 'down'});
+      await staffClient.post('/admin/categories/reorder', data: {'order': order});
       _load();
     } on ApiException catch (e) {
       if (mounted) v2Toast(context, e.message, error: true);
@@ -192,6 +206,9 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
     if (!staffCan(role, 'categories.write')) return const V2Gate(allowed: false, child: SizedBox.shrink());
     ref.listen(v2QueryProvider, (_, n) => setState(() => q = n.trim()));
     final visible = _rows;
+    // Reordering writes explicit sortOrder for the whole list — only safe when
+    // nothing is filtered out.
+    final canReorder = filter == 'All' && q.isEmpty;
 
     return V2ListView(
       loading: loading,
@@ -227,11 +244,11 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
             ],
             actions: [
               V2Btn(
-                  label: (visible[i]['locked'] == true) ? (lang == 'ar' ? 'فتح' : 'Unlock') : (lang == 'ar' ? 'قفل' : 'Lock'),
+                  label: _isLocked(visible[i]) ? (lang == 'ar' ? 'فتح' : 'Unlock') : (lang == 'ar' ? 'قفل' : 'Lock'),
                   onPressed: () => _toggleLock(visible[i]),
                   size: V2BtnSize.row),
-              V2Btn(label: '↑', onPressed: i == 0 ? null : () => _reorder(visible[i], true), size: V2BtnSize.row),
-              V2Btn(label: '↓', onPressed: i == visible.length - 1 ? null : () => _reorder(visible[i], false), size: V2BtnSize.row),
+              V2Btn(label: '↑', onPressed: (!canReorder || i == 0) ? null : () => _reorder(visible, i, up: true), size: V2BtnSize.row),
+              V2Btn(label: '↓', onPressed: (!canReorder || i == visible.length - 1) ? null : () => _reorder(visible, i, up: false), size: V2BtnSize.row),
               V2Btn.ghost(lang == 'ar' ? 'تعديل' : 'Edit', onPressed: () => _edit(visible[i]), size: V2BtnSize.row),
               V2Btn.danger(lang == 'ar' ? 'حذف' : 'Delete', onPressed: () => _delete(visible[i]), size: V2BtnSize.row),
             ],

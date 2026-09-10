@@ -81,12 +81,24 @@ class _RefundsScreenState extends ConsumerState<RefundsScreen> {
     final lang = ref.read(localeCodeProvider);
     var note = '';
     var status = 'closed';
+    final ref0 = '${r['ref'] ?? '#${shortId(idOf(r))}'}';
     final ok = await v2Form(
       context,
-      title: lang == 'ar' ? 'حل المرتجع' : 'Resolve refund',
+      title: lang == 'ar' ? 'حل المرتجع $ref0' : 'Resolve refund $ref0',
       bodyBuilder: (ctx, setLocal) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Container(
+            padding: const EdgeInsets.all(11),
+            decoration: BoxDecoration(color: Ops.wellSand, borderRadius: BorderRadius.circular(10), border: Border.all(color: Ops.borderSoft)),
+            child: Text(
+              lang == 'ar'
+                  ? 'حجز $ref0 · مرتجع ${money(asInt(r['refundAmount']), lang)} من إجمالي ${money(asInt(r['total']), lang)}'
+                  : 'Booking $ref0 · refund ${money(asInt(r['refundAmount']), lang)} of ${money(asInt(r['total']), lang)} client total',
+              style: const TextStyle(fontSize: 12.5, color: Ops.inkSoft, height: 1.5),
+            ),
+          ),
+          const SizedBox(height: 12),
           V2FormField(label: lang == 'ar' ? 'ملاحظة (مطلوبة)' : 'Note (required)', child: TextField(onChanged: (v) => note = v, maxLines: 3)),
           const SizedBox(height: 12),
           V2FormField(

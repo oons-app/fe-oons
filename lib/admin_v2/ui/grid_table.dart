@@ -42,6 +42,8 @@ class V2GridTable extends StatelessWidget {
     this.actionsWidth = 190,
     this.bulkMode = false,
     this.emptyText,
+    this.loading = false,
+    this.skeletonRows = 6,
   });
 
   final List<V2Col> columns;
@@ -50,6 +52,11 @@ class V2GridTable extends StatelessWidget {
   final double actionsWidth;
   final bool bulkMode;
   final String? emptyText;
+
+  /// When true and there are no [rows] yet, render shimmer skeleton rows
+  /// instead of the empty-state text.
+  final bool loading;
+  final int skeletonRows;
 
   static const _checkW = 34.0;
   static const _gap = 11.0;
@@ -117,7 +124,10 @@ class V2GridTable extends StatelessWidget {
                       ]),
                     ),
                   ),
-                  if (rows.isEmpty)
+                  if (rows.isEmpty && loading)
+                    for (var i = 0; i < skeletonRows; i++)
+                      _SkeletonRow(key: ValueKey('v2-skeleton-$i'), track: _track, dense: dense, bulkMode: bulkMode, seed: i)
+                  else if (rows.isEmpty)
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 50, horizontal: 20),
                       child: Center(
@@ -182,6 +192,59 @@ class _V2RowState extends State<_V2Row> {
               ),
             ]),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A shimmering placeholder row shown while the first page loads.
+class _SkeletonRow extends StatefulWidget {
+  const _SkeletonRow({super.key, required this.track, required this.dense, required this.bulkMode, required this.seed});
+  final List<Widget> Function(List<Widget> cells) track;
+  final bool dense;
+  final bool bulkMode;
+  final int seed;
+
+  @override
+  State<_SkeletonRow> createState() => _SkeletonRowState();
+}
+
+class _SkeletonRowState extends State<_SkeletonRow> with SingleTickerProviderStateMixin {
+  late final AnimationController _c =
+      AnimationController(vsync: this, duration: const Duration(milliseconds: 1100))..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  Widget _bar(double widthFactor) => FractionallySizedBox(
+        alignment: AlignmentDirectional.centerStart,
+        widthFactor: widthFactor,
+        child: Container(
+          height: 11,
+          decoration: BoxDecoration(color: Ops.rowBorder, borderRadius: BorderRadius.circular(4)),
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    // Deterministic pseudo-random widths so rows don't look identical.
+    final widths = [0.7, 0.55, 0.62, 0.4, 0.5, 0.45, 0.6];
+    double w(int i) => widths[(i + widget.seed) % widths.length];
+    return FadeTransition(
+      opacity: Tween(begin: 0.45, end: 0.9).animate(_c),
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 15, vertical: widget.dense ? 12 : 15),
+        decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Ops.rowBorder))),
+        child: Row(
+          children: widget.track([
+            if (widget.bulkMode) _bar(0.5),
+            for (var i = 0; i < 6; i++) _bar(w(i)),
+            const SizedBox(),
+          ]),
         ),
       ),
     );
