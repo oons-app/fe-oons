@@ -4,10 +4,12 @@ import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:oons/admin_v2/app.dart';
+import 'package:oons/admin_v2/data/error_reporter.dart';
 import 'package:oons/core/analytics.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  OpsErrorReporter.install();
   usePathUrlStrategy();
   await initializeDateFormatting('ar');
   await initializeDateFormatting('en');
