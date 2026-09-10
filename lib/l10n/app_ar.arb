@@ -1,0 +1,11 @@
+{
+  "@@locale": "ar",
+  "appName": "أنس",
+  "amana": "أمانة",
+  "escrowHeld": "واقفة",
+  "timelineBooked": "اتحجز",
+  "timelineConfirmed": "الدفع تمام",
+  "timelineOnTheWay": "في الطريق",
+  "timelineCheckedIn": "وصلت",
+  "timelineCheckedOut": "خلصت"
+}

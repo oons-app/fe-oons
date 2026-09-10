@@ -1,0 +1,11 @@
+{
+  "@@locale": "en",
+  "appName": "Oons",
+  "amana": "Amana",
+  "escrowHeld": "Held in escrow",
+  "timelineBooked": "Booked",
+  "timelineConfirmed": "Confirmed",
+  "timelineOnTheWay": "On the way",
+  "timelineCheckedIn": "Checked in",
+  "timelineCheckedOut": "Checked out"
+}
