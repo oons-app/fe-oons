@@ -67,6 +67,7 @@ class _StaffScreenState extends ConsumerState<StaffScreen> {
     final email = TextEditingController();
     final pass = TextEditingController();
     final areasCtl = TextEditingController();
+    final waCtl = TextEditingController();
     var role = roleOps;
     try {
       final ok = await v2Form(
@@ -97,6 +98,10 @@ class _StaffScreenState extends ConsumerState<StaffScreen> {
             ),
             const SizedBox(height: 12),
             V2FormField(label: lang == 'ar' ? 'مناطق مدير الحساب' : 'AM areas', child: TextField(controller: areasCtl)),
+            const SizedBox(height: 12),
+            V2FormField(
+                label: lang == 'ar' ? 'واتساب العمليات (اختياري)' : 'Ops WhatsApp (optional)',
+                child: TextField(controller: waCtl, keyboardType: TextInputType.phone, decoration: const InputDecoration(hintText: '01XXXXXXXXX'))),
           ],
         ),
         onValidate: () {
@@ -115,6 +120,7 @@ class _StaffScreenState extends ConsumerState<StaffScreen> {
           'staffRole': role,
           if (name.text.trim().isNotEmpty) 'name': name.text.trim(),
           if (areasCtl.text.trim().isNotEmpty) 'assignedAreas': areasCtl.text.trim(),
+          if (waCtl.text.trim().isNotEmpty) 'whatsapp': waCtl.text.trim(),
         });
         if (mounted) {
           v2Toast(context, lang == 'ar' ? 'تمت الإضافة' : 'Staff added');
@@ -128,6 +134,45 @@ class _StaffScreenState extends ConsumerState<StaffScreen> {
       email.dispose();
       pass.dispose();
       areasCtl.dispose();
+      waCtl.dispose();
+    }
+  }
+
+  Future<void> _setWhatsApp(Map m) async {
+    final lang = ref.read(localeCodeProvider);
+    final ctl = TextEditingController(text: '${m['whatsapp'] ?? ''}');
+    try {
+      final ok = await v2Form(
+        context,
+        title: lang == 'ar' ? 'واتساب العمليات' : 'Ops WhatsApp',
+        bodyBuilder: (ctx, _) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              lang == 'ar'
+                  ? 'الرقم المصرّح له باستخدام مساعد واتساب للعمليات لهذا العضو. اتركيه فارغاً للإلغاء.'
+                  : "The number allowed to run the WhatsApp ops helper as this staff member. Leave blank to revoke.",
+              style: const TextStyle(fontSize: 12.5, color: Ops.mutedSoft, height: 1.5),
+            ),
+            const SizedBox(height: 12),
+            V2FormField(
+                label: lang == 'ar' ? 'الرقم' : 'Number',
+                child: TextField(controller: ctl, keyboardType: TextInputType.phone, decoration: const InputDecoration(hintText: '01XXXXXXXXX'))),
+          ],
+        ),
+      );
+      if (!ok) return;
+      try {
+        await staffClient.patch('/admin/staff/${idOf(m)}', data: {'whatsapp': ctl.text.trim()});
+        if (mounted) {
+          v2Toast(context, lang == 'ar' ? 'تم التحديث' : 'Updated');
+          _load();
+        }
+      } on ApiException catch (e) {
+        if (mounted) v2Toast(context, e.message, error: true);
+      }
+    } finally {
+      ctl.dispose();
     }
   }
 
@@ -164,7 +209,7 @@ class _StaffScreenState extends ConsumerState<StaffScreen> {
       onRetry: _load,
       resultLabel: '${_rows.length} ${lang == 'ar' ? 'نتيجة' : 'results'}',
       emptyText: lang == 'ar' ? 'لا أعضاء' : 'Nothing here yet',
-      actionsWidth: isSuper ? 100 : 8,
+      actionsWidth: isSuper ? 190 : 8,
       trailingActions: [
         V2Btn.ghost(lang == 'ar' ? 'مصفوفة الأدوار' : 'Role matrix',
             onPressed: () => context.go(V2Paths.matrix), size: V2BtnSize.sm),
@@ -183,8 +228,16 @@ class _StaffScreenState extends ConsumerState<StaffScreen> {
             cells: [
               Text('${m['name'] ?? ''}'.isEmpty ? shortId(idOf(m)) : '${m['name']}',
                   maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-              Text('${m['email'] ?? ''}',
-                  maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12.5, fontFamily: Ops.mono, color: Ops.inkSoft)),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('${m['email'] ?? ''}',
+                      maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12.5, fontFamily: Ops.mono, color: Ops.inkSoft)),
+                  if ('${m['whatsapp'] ?? ''}'.isNotEmpty)
+                    Text('WA ${m['whatsapp']}', style: const TextStyle(fontSize: 10.5, fontFamily: Ops.mono, color: Ops.mutedSoft)),
+                ],
+              ),
               Align(alignment: AlignmentDirectional.centerStart, child: V2StatusPill(label: roleLabel(staffRoleOf(m)), tone: V2Tone.plum)),
               Align(
                 alignment: AlignmentDirectional.centerStart,
@@ -195,11 +248,13 @@ class _StaffScreenState extends ConsumerState<StaffScreen> {
                   maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: Ops.muted)),
             ],
             actions: [
-              if (isSuper)
+              if (isSuper) ...[
+                V2Btn(label: lang == 'ar' ? 'واتساب' : 'WhatsApp', onPressed: () => _setWhatsApp(m), size: V2BtnSize.row),
                 V2Btn(
                     label: staffEnabled(m) ? (lang == 'ar' ? 'تعطيل' : 'Disable') : (lang == 'ar' ? 'تفعيل' : 'Enable'),
                     onPressed: () => _toggle(m),
                     size: V2BtnSize.row),
+              ],
             ],
           ),
       ],
