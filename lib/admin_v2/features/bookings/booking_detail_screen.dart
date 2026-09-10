@@ -169,7 +169,8 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen> {
                 _fact(lang == 'ar' ? 'التاريخ' : 'Date', formatDayOnly(b['slotStart'])),
                 _fact(lang == 'ar' ? 'الوقت' : 'Time', formatTimeOnly(b['slotStart'])),
                 _fact(lang == 'ar' ? 'الخدمة' : 'Service', serviceLabel(b, lang)),
-                _fact(lang == 'ar' ? 'الفئة' : 'Category', '${b['service'] ?? b['categoryName'] ?? b['category'] ?? ''}'),
+                _fact(lang == 'ar' ? 'الفئة' : 'Category',
+                    verticalLabel(b['service'] ?? b['vertical'] ?? b['categoryName'] ?? b['category'], lang)),
                 _fact(lang == 'ar' ? 'المنطقة' : 'Area', area),
                 _fact(lang == 'ar' ? 'الدفع للمهنية' : 'Payout', b['opsPaid'] == true ? (lang == 'ar' ? 'مسوّاة' : 'Settled') : (lang == 'ar' ? 'معلقة' : 'Pending')),
               ],
@@ -189,9 +190,12 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen> {
                   Text(lang == 'ar' ? 'العنوان' : 'Address', style: const TextStyle(fontSize: 11.5, color: Ops.muted)),
                   const SizedBox(height: 4),
                   Text(
-                    [addr?['street'], addr?['building'], area, addr?['city']]
-                        .where((e) => '${e ?? ''}'.trim().isNotEmpty)
-                        .join(' · '),
+                    [
+                      locName(addr?['street'] ?? addr?['line1'], lang),
+                      locName(addr?['building'], lang),
+                      area,
+                      areaLabel(addr?['city'] ?? addr?['cityName'], lang),
+                    ].where((e) => e.trim().isNotEmpty).toSet().join(' · '),
                     style: const TextStyle(fontSize: 13, height: 1.6),
                   ),
                 ],
@@ -242,15 +246,28 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen> {
               for (final e in timeline)
                 Builder(builder: (_) {
                   final m = asMap(e) ?? {};
+                  final label = timelineLabel(m['key'] ?? m['event'] ?? m['status'], lang);
+                  if (label.isEmpty) return const SizedBox.shrink();
+                  final done = m['done'] == true || !isZeroTime(m['at'] ?? m['timestamp'] ?? m['createdAt']);
                   return Padding(
                     padding: const EdgeInsets.symmetric(vertical: 7),
                     child: Row(
                       children: [
-                        Container(width: 9, height: 9, decoration: const BoxDecoration(color: Ops.barConfirmed, shape: BoxShape.circle)),
+                        Container(
+                          width: 9,
+                          height: 9,
+                          decoration: BoxDecoration(
+                            color: done ? Ops.barCompleted : Ops.borderStrong,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
                         const SizedBox(width: 11),
                         Expanded(
-                          child: Text('${m['label'] ?? m['status'] ?? m['event'] ?? m['description'] ?? e}',
-                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                          child: Text(label,
+                              style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                  color: done ? Ops.ink : Ops.mutedSoft)),
                         ),
                         Text(formatDay(m['at'] ?? m['timestamp'] ?? m['createdAt'], lang),
                             style: const TextStyle(fontSize: 11.5, color: Ops.muted, fontFamily: Ops.mono)),

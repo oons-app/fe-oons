@@ -415,19 +415,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
             decoration: BoxDecoration(color: Ops.borderSoft, borderRadius: BorderRadius.circular(11)),
             clipBehavior: Clip.antiAlias,
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 for (var i = 0; i < kpis.length; i += 2)
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Expanded(child: V2KpiCell(label: kpis[i].$1, value: kpis[i].$2, note: kpis[i].$3)),
-                      Container(width: 1, color: Ops.borderSoft),
-                      Expanded(
-                        child: i + 1 < kpis.length
-                            ? V2KpiCell(label: kpis[i + 1].$1, value: kpis[i + 1].$2, note: kpis[i + 1].$3)
-                            : const SizedBox(),
+                  Padding(
+                    padding: EdgeInsets.only(top: i == 0 ? 0 : 1),
+                    child: IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(child: V2KpiCell(label: kpis[i].$1, value: kpis[i].$2, note: kpis[i].$3)),
+                          const SizedBox(width: 1),
+                          Expanded(
+                            child: i + 1 < kpis.length
+                                ? V2KpiCell(label: kpis[i + 1].$1, value: kpis[i + 1].$2, note: kpis[i + 1].$3)
+                                : const ColoredBox(color: Ops.cardAlt),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
               ],
             ),
@@ -485,7 +491,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   }
 
   Widget _liveRow(Map b, int i, String lang) {
-    final pct = ((28 + i * 34) % 100) / 100.0;
+    // Elapsed fraction of the visit, capped; falls back to a nominal value.
+    final start = parseTime(b['providerCheckIn'] ?? b['slotStart']);
+    final dur = asInt(b['durationMin']);
+    final pct = (start != null && dur > 0)
+        ? (DateTime.now().difference(start).inMinutes / dur).clamp(0.03, 1.0)
+        : 0.25;
+    final meta = [
+      providerNameOf(b, lang),
+      areaLabel(b['areaName'] ?? b['area'], lang),
+      bookingRef(b),
+    ].where((s) => s.trim().isNotEmpty).join('  ·  ');
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: const BoxDecoration(border: Border(top: BorderSide(color: Ops.rowBorder))),
@@ -503,8 +519,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
             ],
           ),
           const SizedBox(height: 6),
-          Text('${providerNameOf(b, lang)}  ·  ${areaLabel(b['areaName'] ?? b['area'], lang)}  ·  ${bookingRef(b)}',
-              style: const TextStyle(fontSize: 12.5, color: Ops.inkSoft)),
+          Text(meta, style: const TextStyle(fontSize: 12.5, color: Ops.inkSoft)),
           const SizedBox(height: 8),
           ClipRRect(
             borderRadius: BorderRadius.circular(Ops.radiusPill),
@@ -513,7 +528,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
               color: Ops.track,
               child: FractionallySizedBox(
                 alignment: AlignmentDirectional.centerStart,
-                widthFactor: pct.clamp(0.05, 1),
+                widthFactor: pct,
                 child: Container(color: i.isEven ? Ops.green : Ops.barPending),
               ),
             ),

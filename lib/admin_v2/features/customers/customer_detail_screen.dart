@@ -90,6 +90,163 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
     }
   }
 
+  Future<void> _bookForThem() async {
+    final lang = ref.read(localeCodeProvider);
+    if (addresses.isEmpty) {
+      v2Toast(context, lang == 'ar' ? 'أضيفي عنواناً أولاً' : 'Add an address first', error: true);
+      return;
+    }
+    List<Map<String, dynamic>> providers = [];
+    try {
+      final data = await staffClient.get('/admin/providers', query: {'limit': 100, 'vetted': '1'});
+      providers = asMapList(data['providers']);
+    } on ApiException catch (e) {
+      if (mounted) v2Toast(context, e.message, error: true);
+      return;
+    }
+    if (providers.isEmpty) {
+      if (mounted) v2Toast(context, lang == 'ar' ? 'لا مهنيات موثّقات' : 'No vetted professionals', error: true);
+      return;
+    }
+
+    Map<String, dynamic>? provider;
+    List<Map<String, dynamic>> services = [];
+    String? serviceId;
+    var addressId = idOf(addresses.firstWhere((a) => a['isDefault'] == true, orElse: () => addresses.first));
+    DateTime slot = DateTime.now().add(const Duration(days: 1, hours: 2));
+    var notes = '';
+
+    final ok = await v2Form(
+      context,
+      title: lang == 'ar' ? 'حجز لهذه العميلة' : 'Book for this customer',
+      confirmLabel: lang == 'ar' ? 'إنشاء الحجز' : 'Create booking',
+      bodyBuilder: (ctx, setLocal) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          V2FormField(
+            label: lang == 'ar' ? 'المهنية' : 'Professional',
+            child: Autocomplete<Map<String, dynamic>>(
+              displayStringForOption: (p) => personName(p, lang, fallbackId: idOf(p)),
+              optionsBuilder: (t) {
+                final q = t.text.trim().toLowerCase();
+                final all = providers;
+                if (q.isEmpty) return all.take(25);
+                return all.where((p) =>
+                    personName(p, lang, fallbackId: idOf(p)).toLowerCase().contains(q) ||
+                    '${p['phone'] ?? ''}'.contains(q));
+              },
+              onSelected: (p) async {
+                provider = p;
+                serviceId = null;
+                setLocal(() {});
+                try {
+                  final d = await staffClient.get('/admin/providers/${idOf(p)}');
+                  final prov = unwrapEntity(d, const ['provider']);
+                  setLocal(() => services = asMapList(prov['items']));
+                } catch (_) {}
+              },
+              fieldViewBuilder: (context, controller, focus, onSubmit) => TextField(
+                controller: controller,
+                focusNode: focus,
+                decoration: InputDecoration(hintText: lang == 'ar' ? 'ابحثي بالاسم' : 'Search by name'),
+              ),
+            ),
+          ),
+          if (provider != null) ...[
+            const SizedBox(height: 12),
+            V2FormField(
+              label: lang == 'ar' ? 'الخدمة' : 'Service',
+              child: DropdownButtonFormField<String>(
+                initialValue: serviceId,
+                isExpanded: true,
+                hint: Text(services.isEmpty ? (lang == 'ar' ? 'لا خدمات' : 'no services') : '—'),
+                items: [
+                  for (final s in services)
+                    DropdownMenuItem(
+                      value: idOf(s),
+                      child: Text('${locName(s['name'], lang)} · ${money(asInt(s['price']), lang)}',
+                          overflow: TextOverflow.ellipsis),
+                    ),
+                ],
+                onChanged: (v) => setLocal(() => serviceId = v),
+              ),
+            ),
+          ],
+          const SizedBox(height: 12),
+          V2FormField(
+            label: lang == 'ar' ? 'العنوان' : 'Address',
+            child: DropdownButtonFormField<String>(
+              initialValue: addressId,
+              isExpanded: true,
+              items: [
+                for (final a in addresses)
+                  DropdownMenuItem(
+                    value: idOf(a),
+                    child: Text(_addrBody(a, lang), overflow: TextOverflow.ellipsis),
+                  ),
+              ],
+              onChanged: (v) => setLocal(() => addressId = v ?? addressId),
+            ),
+          ),
+          const SizedBox(height: 12),
+          V2FormField(
+            label: lang == 'ar' ? 'الموعد' : 'When',
+            child: Row(children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () async {
+                    final d = await showDatePicker(
+                        context: ctx, initialDate: slot, firstDate: DateTime.now(), lastDate: DateTime.now().add(const Duration(days: 90)));
+                    if (d != null) setLocal(() => slot = DateTime(d.year, d.month, d.day, slot.hour, slot.minute));
+                  },
+                  child: Text(formatDayOnly(slot.toIso8601String())),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () async {
+                    final tm = await showTimePicker(context: ctx, initialTime: TimeOfDay.fromDateTime(slot));
+                    if (tm != null) setLocal(() => slot = DateTime(slot.year, slot.month, slot.day, tm.hour, tm.minute));
+                  },
+                  child: Text('${slot.hour.toString().padLeft(2, '0')}:${slot.minute.toString().padLeft(2, '0')}'),
+                ),
+              ),
+            ]),
+          ),
+          const SizedBox(height: 12),
+          V2FormField(
+              label: lang == 'ar' ? 'ملاحظات (اختياري)' : 'Notes (optional)',
+              child: TextField(onChanged: (v) => notes = v, maxLines: 2)),
+        ],
+      ),
+      onValidate: () {
+        if (provider == null || (serviceId ?? '').isEmpty || addressId.isEmpty) {
+          v2Toast(context, lang == 'ar' ? 'أكملي الحقول' : 'Pick a professional, service and address', error: true);
+          return false;
+        }
+        return true;
+      },
+    );
+    if (!ok) return;
+    try {
+      final r = await staffClient.post('/admin/users/${widget.customerId}/book', data: {
+        'providerId': idOf(provider!),
+        'addressId': addressId,
+        'serviceItemId': serviceId,
+        'slotStart': slot.toUtc().toIso8601String(),
+        if (notes.trim().isNotEmpty) 'notes': notes.trim(),
+      });
+      final bid = idOf(unwrapEntity(r, const ['booking']));
+      if (mounted) {
+        v2Toast(context, lang == 'ar' ? 'تم إنشاء الحجز' : 'Booking created');
+        bid.isNotEmpty ? context.go(V2Paths.booking(bid)) : _load();
+      }
+    } on ApiException catch (e) {
+      if (mounted) v2Toast(context, e.message, error: true);
+    }
+  }
+
   Future<void> _edit() async {
     final lang = ref.read(localeCodeProvider);
     final c = customer ?? {};
@@ -435,8 +592,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
               if (staffCan(role, 'users.impersonate')) V2Btn.imp('Impersonate', onPressed: _impersonate),
               if (canWrite) V2Btn.ghost(lang == 'ar' ? 'تعديل' : 'Edit', onPressed: _edit),
               if (staffCan(role, 'bookings.write'))
-                V2Btn.ghost(lang == 'ar' ? 'حجز لها' : 'Book for them',
-                    onPressed: () => context.go('${V2Paths.bookings}?customerId=${widget.customerId}')),
+                V2Btn.ghost(lang == 'ar' ? 'حجز لها' : 'Book for them', onPressed: _bookForThem),
             ],
           ),
           const SizedBox(height: 16),

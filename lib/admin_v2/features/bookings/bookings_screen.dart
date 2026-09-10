@@ -157,12 +157,20 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> with WidgetsBin
 
   int get _totalAll => statusCounts.isEmpty ? bookings.length : statusCounts.values.fold(0, (a, b) => a + b);
 
+  /// Chip key -> the real enum keys it groups (must match the backend
+  /// `bookingStatusFilter`).
+  static const _statusGroups = <String, List<String>>{
+    'confirmed': ['paid', 'on_the_way'],
+    'in_progress': ['in_progress'],
+    'completed': ['completed', 'released'],
+    'pending': ['pending_payment'],
+    'cancelled': ['cancelled_client', 'cancelled_provider'],
+  };
+
   int _countFor(String key) {
     if (key.isEmpty) return _totalAll;
-    if (key == 'confirmed') return (statusCounts['confirmed'] ?? 0) + (statusCounts['paid'] ?? 0);
-    if (key == 'pending') return (statusCounts['pending'] ?? 0) + (statusCounts['pending_payment'] ?? 0);
-    if (key == 'cancelled') return (statusCounts['cancelled'] ?? 0) + (statusCounts['canceled'] ?? 0);
-    return statusCounts[key] ?? 0;
+    final group = _statusGroups[key] ?? [key];
+    return group.fold(0, (a, k) => a + (statusCounts[k] ?? 0));
   }
 
   Future<void> _exportCsv() async {

@@ -182,6 +182,46 @@ int areaCountOf(Map p) {
   return 0;
 }
 
+/// Human label for a service vertical slug (`beauty` / `cleaning` / `chef` / …).
+String verticalLabel(dynamic slug, String lang) {
+  final s = '${slug ?? ''}'.trim().toLowerCase();
+  const en = {
+    'beauty': 'Beauty', 'cleaning': 'Home', 'home': 'Home',
+    'chef': 'Food', 'food': 'Food', 'childcare': 'Childcare', 'wellness': 'Wellness',
+  };
+  const ar = {
+    'beauty': 'تجميل', 'cleaning': 'المنزل', 'home': 'المنزل',
+    'chef': 'طعام', 'food': 'طعام', 'childcare': 'رعاية أطفال', 'wellness': 'عافية',
+  };
+  if (s.isEmpty) return '';
+  final m = lang == 'ar' ? ar : en;
+  return m[s] ?? (s[0].toUpperCase() + s.substring(1));
+}
+
+/// Human label for a booking timeline `key` (`booked` / `on_the_way` / …).
+String timelineLabel(dynamic key, String lang) {
+  final s = '${key ?? ''}'.trim().toLowerCase();
+  const en = {
+    'booked': 'Booked', 'created': 'Booked', 'paid': 'Payment authorised',
+    'confirmed': 'Confirmed', 'on_the_way': 'On the way', 'arrived': 'Arrived',
+    'checked_in': 'Checked in', 'in_progress': 'In progress', 'checked_out': 'Visit closed',
+    'completed': 'Completed', 'released': 'Payout released', 'cancelled': 'Cancelled',
+    'disputed': 'Disputed', 'refunded': 'Refunded', 'rescheduled': 'Rescheduled',
+    'no_show_client': 'Client no-show',
+  };
+  const ar = {
+    'booked': 'تم الحجز', 'created': 'تم الحجز', 'paid': 'تم تفويض الدفع',
+    'confirmed': 'مؤكد', 'on_the_way': 'في الطريق', 'arrived': 'وصلت',
+    'checked_in': 'تم الحضور', 'in_progress': 'جارية', 'checked_out': 'انتهت الزيارة',
+    'completed': 'مكتملة', 'released': 'تم صرف المستحق', 'cancelled': 'ملغاة',
+    'disputed': 'نزاع', 'refunded': 'مسترد', 'rescheduled': 'أُعيد جدولتها',
+    'no_show_client': 'العميلة لم تحضر',
+  };
+  if (s.isEmpty) return '';
+  final m = lang == 'ar' ? ar : en;
+  return m[s] ?? s.replaceAll('_', ' ');
+}
+
 DateTime? parseTime(dynamic v) {
   if (v == null) return null;
   if (v is DateTime) return v;
