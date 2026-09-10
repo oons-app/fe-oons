@@ -11,13 +11,13 @@ import 'package:oons/admin_v2/data/staff_client.dart';
 import 'package:oons/admin_v2/l10n/copy.dart';
 import 'package:oons/admin_v2/theme/tokens.dart';
 import 'package:oons/admin_v2/ui/atoms.dart';
+import 'package:oons/admin_v2/ui/buttons.dart';
 import 'package:oons/core/format.dart';
 import 'package:oons/data/api.dart';
 
 class CustomerDetailScreen extends ConsumerStatefulWidget {
-  final String customerId;
-
   const CustomerDetailScreen({super.key, required this.customerId});
+  final String customerId;
 
   @override
   ConsumerState<CustomerDetailScreen> createState() => _CustomerDetailScreenState();
@@ -29,23 +29,14 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
   List<Map<String, dynamic>> addresses = [];
   bool loading = true;
   String? error;
-  String notes = '';
-  late final TextEditingController _notesCtrl;
 
   @override
   void initState() {
     super.initState();
-    _notesCtrl = TextEditingController();
-    _loadCustomer();
+    _load();
   }
 
-  @override
-  void dispose() {
-    _notesCtrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _loadCustomer() async {
+  Future<void> _load() async {
     try {
       setState(() {
         loading = true;
@@ -53,13 +44,10 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
       });
       final data = await staffClient.get('/admin/users/${widget.customerId}');
       final user = unwrapEntity(data, const ['user', 'customer', 'client']);
-      final nextNotes = '${user['staffNotes'] ?? user['notes'] ?? ''}';
       setState(() {
         customer = user;
         bookings = asMapList(data['bookings']);
         addresses = asMapList(user['addresses'] ?? data['addresses'] ?? []);
-        notes = nextNotes;
-        _notesCtrl.text = nextNotes;
         loading = false;
       });
     } on ApiException catch (e) {
@@ -70,33 +58,62 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
     }
   }
 
-  Future<void> _saveNotes() async {
-    final lang = ref.read(localeCodeProvider);
+  String get _roleLabel => roleLabel(ref.read(staffSessionProvider).effectiveRole);
+
+  Future<void> _appendNote(String text) async {
+    final c = customer ?? {};
+    final existing = '${c['staffNotes'] ?? c['notes'] ?? ''}'.trim();
+    final stamp = DateTime.now().toIso8601String().substring(0, 16).replaceFirst('T', ' ');
+    final next = existing.isEmpty ? '$text  — $_roleLabel · $stamp' : '$existing\n$text  — $_roleLabel · $stamp';
     try {
-      await staffClient.patch('/admin/users/${widget.customerId}/notes', data: {'notes': notes});
+      await staffClient.patch('/admin/users/${widget.customerId}/notes', data: {'notes': next});
       if (mounted) {
-        v2Toast(context, t(V2Copy.saved, lang));
-        _loadCustomer();
+        v2Toast(context, ref.read(localeCodeProvider) == 'ar' ? 'تم حفظ الملاحظة' : 'Note saved');
+        _load();
       }
     } on ApiException catch (e) {
       if (mounted) v2Toast(context, e.message, error: true);
     }
   }
 
-  Future<void> _impersonateCustomer() async {
+  Future<void> _impersonate() async {
     final lang = ref.read(localeCodeProvider);
     try {
-      final response = await staffClient.post('/admin/users/${widget.customerId}/impersonate');
-      final token = '${response['accessToken'] ?? response['impersonateToken'] ?? ''}';
-      final name = personName(customer, lang, fallbackId: widget.customerId);
-      if (token.isNotEmpty) {
-        ref.read(staffSessionProvider.notifier).startImpersonation(
-              id: widget.customerId,
-              name: name,
-              token: token,
-              kind: 'customer',
-            );
-        if (mounted) context.go(V2Paths.impersonateSubject(widget.customerId, kind: 'customer'));
+      final r = await staffClient.post('/admin/users/${widget.customerId}/impersonate');
+      final token = '${r['accessToken'] ?? r['impersonateToken'] ?? ''}';
+      if (token.isEmpty) return;
+      ref.read(staffSessionProvider.notifier).startImpersonation(
+          id: widget.customerId, name: personName(customer, lang, fallbackId: widget.customerId), token: token, kind: 'customer');
+      if (mounted) context.go(V2Paths.impersonateSubject(widget.customerId, kind: 'customer'));
+    } on ApiException catch (e) {
+      if (mounted) v2Toast(context, e.message, error: true);
+    }
+  }
+
+  Future<void> _edit() async {
+    final lang = ref.read(localeCodeProvider);
+    final c = customer ?? {};
+    final name = TextEditingController(text: personName(c, lang, fallbackId: idOf(c)));
+    final phone = TextEditingController(text: '${c['phone'] ?? ''}');
+    final ok = await v2Form(
+      context,
+      title: lang == 'ar' ? 'تعديل العميلة' : 'Edit customer',
+      bodyBuilder: (ctx, _) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          V2FormField(label: lang == 'ar' ? 'الاسم' : 'Full name', child: TextField(controller: name)),
+          const SizedBox(height: 12),
+          V2FormField(label: lang == 'ar' ? 'الهاتف' : 'Phone', child: TextField(controller: phone)),
+        ],
+      ),
+    );
+    if (!ok) return;
+    try {
+      await staffClient.patch('/admin/users/${widget.customerId}',
+          data: {'name': name.text.trim(), 'phone': phone.text.trim()});
+      if (mounted) {
+        v2Toast(context, lang == 'ar' ? 'تم التحديث' : 'Customer updated');
+        _load();
       }
     } on ApiException catch (e) {
       if (mounted) v2Toast(context, e.message, error: true);
@@ -105,469 +122,398 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
 
   Future<void> _addAddress() async {
     final lang = ref.read(localeCodeProvider);
-    String label = '';
-    String line1 = '';
-    String area = 'zamalek';
-    String city = '';
-    bool isDefault = false;
-    final confirmed = await v2Form(
+    final label = TextEditingController();
+    final line1 = TextEditingController();
+    final city = TextEditingController();
+    var area = 'zamalek';
+    var isDefault = false;
+    final ok = await v2Form(
       context,
       title: lang == 'ar' ? 'إضافة عنوان' : 'Add address',
       confirmLabel: lang == 'ar' ? 'إضافة' : 'Add',
       bodyBuilder: (ctx, setLocal) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          V2FormField(
-            label: lang == 'ar' ? 'التسمية' : 'Label',
-            child: TextField(onChanged: (v) => label = v, decoration: const InputDecoration(border: OutlineInputBorder())),
-          ),
+          V2FormField(label: lang == 'ar' ? 'التسمية' : 'Label', child: TextField(controller: label)),
           const SizedBox(height: 12),
-          V2FormField(
-            label: lang == 'ar' ? 'العنوان' : 'Line 1',
-            child: TextField(onChanged: (v) => line1 = v, decoration: const InputDecoration(border: OutlineInputBorder())),
-          ),
+          V2FormField(label: lang == 'ar' ? 'العنوان' : 'Line 1', child: TextField(controller: line1)),
           const SizedBox(height: 12),
           V2FormField(
             label: lang == 'ar' ? 'المنطقة' : 'Area',
             child: DropdownButtonFormField<String>(
-              value: area,
-              decoration: const InputDecoration(border: OutlineInputBorder()),
+              initialValue: area,
               items: [
-                for (final a in ['zamalek', 'dokki', 'mohandeseen', 'maadi', 'nasr_city', 'heliopolis', 'garden_city', 'downtown'])
+                for (final a in const ['zamalek', 'dokki', 'mohandeseen', 'maadi', 'nasr_city', 'heliopolis', 'new_cairo'])
                   DropdownMenuItem(value: a, child: Text(areaName(a, lang))),
               ],
-              onChanged: (v) => setLocal(() => area = v ?? area),
+              onChanged: (v) => area = v ?? area,
             ),
           ),
           const SizedBox(height: 12),
-          V2FormField(
-            label: lang == 'ar' ? 'المدينة' : 'City',
-            child: TextField(onChanged: (v) => city = v, decoration: const InputDecoration(border: OutlineInputBorder())),
-          ),
-          const SizedBox(height: 12),
+          V2FormField(label: lang == 'ar' ? 'المدينة' : 'City', child: TextField(controller: city)),
+          const SizedBox(height: 4),
           CheckboxListTile(
             contentPadding: EdgeInsets.zero,
-            title: Text(lang == 'ar' ? 'افتراضي' : 'Default'),
+            title: Text(lang == 'ar' ? 'افتراضي' : 'Set as default'),
             value: isDefault,
             onChanged: (v) => setLocal(() => isDefault = v ?? false),
           ),
         ],
       ),
-      onValidate: () => line1.trim().isNotEmpty,
+      onValidate: () {
+        if (line1.text.trim().isEmpty) {
+          v2Toast(context, lang == 'ar' ? 'العنوان مطلوب' : 'Address is required', error: true);
+          return false;
+        }
+        return true;
+      },
     );
-    if (!confirmed) return;
+    if (!ok) return;
     try {
       await staffClient.post('/admin/users/${widget.customerId}/addresses', data: {
-        'label': label.trim().isEmpty ? 'Home' : label.trim(),
-        'line1': line1.trim(),
+        'label': label.text.trim().isEmpty ? 'Home' : label.text.trim(),
+        'line1': line1.text.trim(),
         'area': area,
-        if (city.trim().isNotEmpty) 'city': city.trim(),
+        if (city.text.trim().isNotEmpty) 'city': city.text.trim(),
         'isDefault': isDefault,
       });
       if (mounted) {
         v2Toast(context, lang == 'ar' ? 'تمت الإضافة' : 'Address added');
-        _loadCustomer();
+        _load();
       }
     } on ApiException catch (e) {
       if (mounted) v2Toast(context, e.message, error: true);
     }
   }
 
-  Future<void> _setDefaultAddress(String aid) async {
+  Future<void> _removeAddress(Map a) async {
     final lang = ref.read(localeCodeProvider);
-    try {
-      await staffClient.patch('/admin/users/${widget.customerId}/addresses/$aid', data: {'isDefault': true});
-      if (mounted) {
-        v2Toast(context, lang == 'ar' ? 'تم التعيين' : 'Default set');
-        _loadCustomer();
-      }
-    } on ApiException catch (e) {
-      if (mounted) v2Toast(context, e.message, error: true);
-    }
-  }
-
-  Future<void> _deleteAddress(String aid) async {
-    final lang = ref.read(localeCodeProvider);
-    final ok = await v2Confirm(
-      context,
-      title: lang == 'ar' ? 'حذف العنوان' : 'Delete address',
-      body: lang == 'ar' ? 'حذف هذا العنوان؟' : 'Delete this address?',
-      confirmLabel: t(V2Copy.delete, lang),
-      danger: true,
-    );
+    final ok = await v2Confirm(context,
+        title: lang == 'ar' ? 'حذف العنوان؟' : 'Delete address?',
+        body: _addrBody(a, lang),
+        confirmLabel: t(V2Copy.delete, lang),
+        danger: true);
     if (!ok) return;
     try {
-      await staffClient.delete('/admin/users/${widget.customerId}/addresses/$aid');
+      await staffClient.delete('/admin/users/${widget.customerId}/addresses/${idOf(a)}');
       if (mounted) {
-        v2Toast(context, lang == 'ar' ? 'تم الحذف' : 'Deleted');
-        _loadCustomer();
+        v2Toast(context, lang == 'ar' ? 'تم الحذف' : 'Address removed');
+        _load();
       }
     } on ApiException catch (e) {
       if (mounted) v2Toast(context, e.message, error: true);
     }
   }
 
-  Future<void> _bookForThem() async {
-    final lang = ref.read(localeCodeProvider);
-    List<Map<String, dynamic>> providers = [];
+  Future<void> _setDefault(Map a) async {
     try {
-      final data = await staffClient.get('/admin/providers', query: {'limit': 50, 'vetted': '1'});
-      providers = asMapList(data['providers']);
-    } on ApiException catch (e) {
-      if (mounted) v2Toast(context, e.message, error: true);
-      return;
-    }
-    if (providers.isEmpty) {
-      if (mounted) v2Toast(context, lang == 'ar' ? 'لا توجد مهنيات' : 'No vetted providers', error: true);
-      return;
-    }
-    if (addresses.isEmpty) {
-      if (mounted) v2Toast(context, lang == 'ar' ? 'أضيفي عنواناً أولاً' : 'Add an address first', error: true);
-      return;
-    }
-
-    String? providerId;
-    String providerLabel = '';
-    String? addressId = idOf(addresses.firstWhere((a) => a['isDefault'] == true, orElse: () => addresses.first));
-    String slotStart = '';
-    String serviceItemId = '';
-    String bookNotes = '';
-
-    final confirmed = await v2Form(
-      context,
-      title: lang == 'ar' ? 'حجز للعميلة' : 'Book for them',
-      confirmLabel: lang == 'ar' ? 'إنشاء حجز' : 'Create booking',
-      bodyBuilder: (ctx, setLocal) => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          V2FormField(
-            label: lang == 'ar' ? 'المهنية' : 'Provider',
-            child: Autocomplete<Map<String, dynamic>>(
-              displayStringForOption: (p) => personName(p, lang, fallbackId: idOf(p)),
-              optionsBuilder: (text) {
-                final q = text.text.trim().toLowerCase();
-                if (q.isEmpty) return providers.take(20);
-                return providers.where((p) {
-                  final n = personName(p, lang, fallbackId: idOf(p)).toLowerCase();
-                  final phone = '${p['phone'] ?? ''}'.toLowerCase();
-                  return n.contains(q) || phone.contains(q);
-                }).take(20);
-              },
-              onSelected: (p) {
-                providerId = idOf(p);
-                providerLabel = personName(p, lang, fallbackId: idOf(p));
-                setLocal(() {});
-              },
-              fieldViewBuilder: (context, controller, focus, onSubmit) {
-                if (providerLabel.isNotEmpty && controller.text.isEmpty) {
-                  controller.text = providerLabel;
-                }
-                return TextField(
-                  controller: controller,
-                  focusNode: focus,
-                  onSubmitted: (_) => onSubmit(),
-                  decoration: InputDecoration(
-                    border: const OutlineInputBorder(),
-                    hintText: lang == 'ar' ? 'ابحثي بالاسم' : 'Search by name',
-                  ),
-                );
-              },
-            ),
-          ),
-          const SizedBox(height: 12),
-          V2FormField(
-            label: lang == 'ar' ? 'العنوان' : 'Address',
-            child: DropdownButtonFormField<String>(
-              value: addressId,
-              decoration: const InputDecoration(border: OutlineInputBorder()),
-              items: [
-                for (final a in addresses)
-                  DropdownMenuItem(
-                    value: idOf(a),
-                    child: Text(
-                      [
-                        if ('${a['label'] ?? ''}'.trim().isNotEmpty) locName(a['label'], lang),
-                        locName(a['line1'] ?? a['address'], lang),
-                      ].where((s) => s.trim().isNotEmpty).join(' · '),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-              ],
-              onChanged: (v) => setLocal(() => addressId = v),
-            ),
-          ),
-          const SizedBox(height: 12),
-          V2FormField(
-            label: lang == 'ar' ? 'موعد البداية (ISO)' : 'Slot start (ISO)',
-            child: TextField(
-              onChanged: (v) => slotStart = v,
-              decoration: InputDecoration(
-                border: const OutlineInputBorder(),
-                hintText: '2026-09-15T10:00:00+03:00',
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          V2FormField(
-            label: lang == 'ar' ? 'معرف الخدمة' : 'Service item ID',
-            child: TextField(
-              onChanged: (v) => serviceItemId = v,
-              decoration: const InputDecoration(border: OutlineInputBorder()),
-            ),
-          ),
-          const SizedBox(height: 12),
-          V2FormField(
-            label: lang == 'ar' ? 'ملاحظات (اختياري)' : 'Notes (optional)',
-            child: TextField(
-              onChanged: (v) => bookNotes = v,
-              maxLines: 2,
-              decoration: const InputDecoration(border: OutlineInputBorder()),
-            ),
-          ),
-        ],
-      ),
-      onValidate: () =>
-          (providerId ?? '').isNotEmpty &&
-          (addressId ?? '').isNotEmpty &&
-          slotStart.trim().isNotEmpty &&
-          serviceItemId.trim().isNotEmpty,
-    );
-    if (!confirmed) return;
-    try {
-      final response = await staffClient.post('/admin/users/${widget.customerId}/book', data: {
-        'providerId': providerId,
-        'addressId': addressId,
-        'slotStart': slotStart.trim(),
-        'serviceItemId': serviceItemId.trim(),
-        if (bookNotes.trim().isNotEmpty) 'notes': bookNotes.trim(),
-      });
-      final booking = unwrapEntity(response, const ['booking']);
-      final bid = idOf(booking.isNotEmpty ? booking : response);
-      if (mounted) {
-        v2Toast(context, lang == 'ar' ? 'تم إنشاء الحجز' : 'Booking created');
-        if (bid.isNotEmpty) {
-          context.go(V2Paths.booking(bid));
-        } else {
-          _loadCustomer();
-        }
-      }
+      await staffClient.patch('/admin/users/${widget.customerId}/addresses/${idOf(a)}', data: {'isDefault': true});
+      _load();
     } on ApiException catch (e) {
       if (mounted) v2Toast(context, e.message, error: true);
     }
   }
 
-  String _addrLine(Map address, String lang) {
-    final line = locName(address['line1'] ?? address['address'], lang);
-    if (line.isNotEmpty) return line;
-    return '${address['line1'] ?? address['address'] ?? ''}';
+  String _addrBody(Map a, String lang) => [
+        locName(a['line1'] ?? a['address'], lang),
+        areaLabel(a['area'], lang),
+        locName(a['city'], lang),
+      ].where((s) => s.trim().isNotEmpty).join(' · ');
+
+  List<String> _instructions(Map c) {
+    final raw = c['instructions'] ?? c['savedInstructions'];
+    if (raw is List) return raw.map((e) => '$e').where((s) => s.trim().isNotEmpty).toList();
+    final s = '${raw ?? ''}'.trim();
+    if (s.isEmpty) return const [];
+    return s.split(RegExp(r'[\n•]')).map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
   }
 
   @override
   Widget build(BuildContext context) {
     final lang = ref.watch(localeCodeProvider);
-    final staffState = ref.watch(staffSessionProvider);
-    if (!staffCan(staffState.effectiveRole, 'users.read')) {
-      return const V2Gate(allowed: false, child: SizedBox.shrink());
-    }
-
-    if (loading) return const V2Loading();
+    final role = ref.watch(staffSessionProvider).effectiveRole;
+    if (!staffCan(role, 'users.read')) return const V2Gate(allowed: false, child: SizedBox.shrink());
+    if (loading) return const Padding(padding: EdgeInsets.only(top: 60), child: V2Loading());
     if (error != null) {
-      return Center(child: V2ErrorBanner(message: error!, onRetry: _loadCustomer));
+      return Padding(padding: const EdgeInsets.all(Ops.gutter), child: V2ErrorBanner(message: error!, onRetry: _load));
     }
     final c = customer;
     if (c == null) return const V2Empty();
+    final canWrite = staffCan(role, 'users.write');
+    final canNotes = staffCan(role, 'notes.write');
     final name = personName(c, lang, fallbackId: idOf(c));
-    final canWrite = staffCan(staffState.effectiveRole, 'users.write');
-    final canBook = staffCan(staffState.effectiveRole, 'bookings.write');
+    final notes = '${c['staffNotes'] ?? c['notes'] ?? ''}'.trim();
+    final instructions = _instructions(c);
+
+    final left = <Widget>[
+      V2SectionCard(
+        title: lang == 'ar' ? 'الملف' : 'Profile',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _kv(lang == 'ar' ? 'الهاتف' : 'Phone', '${c['phone'] ?? ''}', mono: true),
+            _kv(lang == 'ar' ? 'المنطقة' : 'Area', areaLabel(c['area'], lang)),
+            _kv(lang == 'ar' ? 'انضمّت' : 'Joined', formatDayOnly(c['createdAt'])),
+            _kv(lang == 'ar' ? 'الحجوزات' : 'Bookings', '${bookings.length}'),
+            _kv(lang == 'ar' ? 'الوسم' : 'Tag', '${c['tag'] ?? '—'}', last: true),
+          ],
+        ),
+      ),
+      V2SectionCard(
+        title: lang == 'ar' ? 'العناوين' : 'Addresses',
+        trailing: [
+          if (canWrite) V2Btn.ghost(lang == 'ar' ? '+ إضافة' : '+ Add', onPressed: _addAddress, size: V2BtnSize.sm),
+        ],
+        child: Column(
+          children: [
+            if (addresses.isEmpty)
+              Text(lang == 'ar' ? 'لا عناوين بعد' : 'No addresses yet', style: const TextStyle(fontSize: 13, color: Ops.muted))
+            else
+              for (final a in addresses)
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: const BoxDecoration(border: Border(top: BorderSide(color: Ops.rowBorder))),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${locName(a['label'], lang).isEmpty ? (lang == 'ar' ? 'عنوان' : 'Address') : locName(a['label'], lang)}'
+                              '${a['isDefault'] == true ? (lang == 'ar' ? ' · افتراضي' : ' · default') : ''}',
+                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(_addrBody(a, lang), style: const TextStyle(fontSize: 12, color: Ops.muted, height: 1.6)),
+                          ],
+                        ),
+                      ),
+                      if (canWrite) ...[
+                        if (a['isDefault'] != true)
+                          V2Btn.ghost(lang == 'ar' ? 'افتراضي' : 'Default', onPressed: () => _setDefault(a), size: V2BtnSize.row),
+                        const SizedBox(width: 6),
+                        V2Btn.danger(lang == 'ar' ? 'حذف' : 'Remove', onPressed: () => _removeAddress(a), size: V2BtnSize.row),
+                      ],
+                    ],
+                  ),
+                ),
+          ],
+        ),
+      ),
+      V2SectionCard(
+        title: lang == 'ar' ? 'التعليمات المحفوظة' : 'Saved instructions',
+        subtitle: lang == 'ar' ? 'تُعرض للمهنية قبل كل زيارة' : 'Shown to the pro before every visit',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (instructions.isEmpty)
+              const Text('—', style: TextStyle(fontSize: 13, color: Ops.muted))
+            else
+              for (final i in instructions)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 5,
+                        height: 5,
+                        margin: const EdgeInsets.only(top: 7),
+                        decoration: const BoxDecoration(color: Ops.barConfirmed, shape: BoxShape.circle),
+                      ),
+                      const SizedBox(width: 9),
+                      Expanded(child: Text(i, style: const TextStyle(fontSize: 13, height: 1.6))),
+                    ],
+                  ),
+                ),
+          ],
+        ),
+      ),
+    ];
+
+    final right = <Widget>[
+      Container(
+        decoration: BoxDecoration(
+          color: Ops.card,
+          borderRadius: BorderRadius.circular(Ops.radiusCard),
+          border: Border.all(color: Ops.border),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Ops.borderSoft))),
+              child: Row(
+                children: [
+                  Text(lang == 'ar' ? 'الحجوزات' : 'Bookings',
+                      style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700)),
+                  const SizedBox(width: 8),
+                  Text('${bookings.length} ${lang == 'ar' ? 'إجمالاً' : 'total'}',
+                      style: const TextStyle(fontSize: 12.5, color: Ops.muted)),
+                ],
+              ),
+            ),
+            if (bookings.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 38),
+                child: Center(child: Text(lang == 'ar' ? 'لا حجوزات بعد' : 'No bookings yet', style: const TextStyle(fontSize: 13, color: Ops.muted))),
+              )
+            else
+              for (final b in bookings)
+                InkWell(
+                  onTap: () => context.go(V2Paths.booking(idOf(b))),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: const BoxDecoration(border: Border(top: BorderSide(color: Ops.rowBorder))),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(serviceLabel(b, lang), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                              Text('${formatDayOnly(b['slotStart'])} · ${providerNameOf(b, lang)} · ${bookingRef(b)}',
+                                  style: const TextStyle(fontSize: 11.5, color: Ops.mutedSoft)),
+                            ],
+                          ),
+                        ),
+                        V2StatusPill(label: statusLabel('${b['status']}', lang), tone: statusTone('${b['status']}')),
+                        const SizedBox(width: 10),
+                        Text(money(asInt(b['total']), lang),
+                            style: const TextStyle(fontSize: 13, fontFamily: Ops.mono, fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                  ),
+                ),
+          ],
+        ),
+      ),
+      V2SectionCard(
+        title: lang == 'ar' ? 'ملاحظات الفريق' : 'Staff notes',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (notes.isNotEmpty)
+              for (final line in notes.split('\n'))
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 9),
+                  decoration: const BoxDecoration(border: Border(top: BorderSide(color: Ops.rowBorder))),
+                  child: Text(line, style: const TextStyle(fontSize: 13, height: 1.6)),
+                )
+            else
+              const Text('—', style: TextStyle(fontSize: 13, color: Ops.muted)),
+            if (canNotes) _NoteComposer(onSave: _appendNote, lang: lang),
+          ],
+        ),
+      ),
+    ];
 
     return ColoredBox(
       color: Ops.page,
       child: ListView(
-        padding: const EdgeInsetsDirectional.fromSTEB(20, 12, 20, 28),
+        padding: const EdgeInsets.fromLTRB(Ops.gutter, 20, Ops.gutter, 60),
         children: [
-          Row(
+          Wrap(
+            spacing: 10,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              IconButton(onPressed: () => context.go(V2Paths.customers), icon: const Icon(Icons.arrow_back)),
-              Expanded(
-                child: Text(name, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
-              ),
-              if (staffCan(staffState.effectiveRole, 'users.impersonate'))
-                TextButton.icon(
-                  onPressed: _impersonateCustomer,
-                  icon: const Icon(Icons.login, size: 16),
-                  label: Text(lang == 'ar' ? 'تسجيل دخول كـ' : 'Impersonate'),
-                ),
-              if (canBook)
-                TextButton.icon(
-                  onPressed: _bookForThem,
-                  icon: const Icon(Icons.event_available, size: 16),
-                  label: Text(lang == 'ar' ? 'حجز للعميلة' : 'Book for them'),
-                ),
+              V2Btn(label: lang == 'ar' ? '→ العميلات' : '← Customers', onPressed: () => context.go(V2Paths.customers)),
+              Text(name, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+              V2StatusPill.forLabel('${c['status'] ?? ''}'.toLowerCase().contains('hold') ? 'On hold' : 'Active', large: true),
+              Text('${c['phone'] ?? ''}', style: const TextStyle(fontSize: 13, color: Ops.muted, fontFamily: Ops.mono)),
+              const SizedBox(width: 1),
+              if (staffCan(role, 'users.impersonate')) V2Btn.imp('Impersonate', onPressed: _impersonate),
+              if (canWrite) V2Btn.ghost(lang == 'ar' ? 'تعديل' : 'Edit', onPressed: _edit),
+              if (staffCan(role, 'bookings.write'))
+                V2Btn.ghost(lang == 'ar' ? 'حجز لها' : 'Book for them',
+                    onPressed: () => context.go('${V2Paths.bookings}?customerId=${widget.customerId}')),
             ],
-          ),
-          const SizedBox(height: 8),
-          V2Card(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(lang == 'ar' ? 'الحقائق' : 'Facts', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-                const SizedBox(height: 12),
-                V2FactRow(label: lang == 'ar' ? 'المعرف' : 'ID', value: idOf(c)),
-                V2FactRow(label: lang == 'ar' ? 'الهاتف' : 'Phone', value: '${c['phone'] ?? ''}'),
-                V2FactRow(label: lang == 'ar' ? 'المنطقة' : 'Area', value: areaLabel(c['area'], lang)),
-                V2FactRow(label: lang == 'ar' ? 'التسجيل' : 'Joined', value: formatDay(c['createdAt'], lang)),
-                V2FactRow(label: lang == 'ar' ? 'التقييم' : 'Rating', value: asDouble(c['rating']).toStringAsFixed(1)),
-                if (c['instructions'] != null && '${c['instructions']}'.trim().isNotEmpty)
-                  V2FactRow(label: lang == 'ar' ? 'التعليمات' : 'Instructions', value: '${c['instructions']}'),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          V2Card(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(lang == 'ar' ? 'العناوين' : 'Addresses',
-                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-                    ),
-                    if (canWrite)
-                      TextButton.icon(
-                        onPressed: _addAddress,
-                        icon: const Icon(Icons.add, size: 16),
-                        label: Text(lang == 'ar' ? 'إضافة' : 'Add'),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                if (addresses.isEmpty)
-                  Text(lang == 'ar' ? 'لا عناوين بعد' : 'No addresses yet', style: const TextStyle(color: Ops.muted, fontSize: 13))
-                else
-                  ...addresses.map((address) {
-                    final aid = idOf(address);
-                    final isDefault = address['isDefault'] == true;
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Ops.border),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  locName(address['label'], lang).isNotEmpty
-                                      ? locName(address['label'], lang)
-                                      : (lang == 'ar' ? 'عنوان' : 'Address'),
-                                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                                ),
-                              ),
-                              if (isDefault)
-                                V2StatusPill(label: lang == 'ar' ? 'افتراضي' : 'Default', tone: V2Tone.ok),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Text(_addrLine(address, lang), style: const TextStyle(fontSize: 13)),
-                          if (address['line2'] != null && '${address['line2']}'.trim().isNotEmpty)
-                            Text('${address['line2']}', style: const TextStyle(fontSize: 13, color: Ops.muted)),
-                          if (address['city'] != null || address['area'] != null)
-                            Text(
-                              '${areaLabel(address['area'], lang)} ${locName(address['city'], lang)}'.trim(),
-                              style: const TextStyle(fontSize: 12, color: Ops.muted),
-                            ),
-                          if (canWrite) ...[
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                if (!isDefault)
-                                  TextButton(
-                                    onPressed: aid.isEmpty ? null : () => _setDefaultAddress(aid),
-                                    child: Text(lang == 'ar' ? 'تعيين افتراضي' : 'Set default'),
-                                  ),
-                                TextButton(
-                                  onPressed: aid.isEmpty ? null : () => _deleteAddress(aid),
-                                  style: TextButton.styleFrom(foregroundColor: Ops.terracottaInk),
-                                  child: Text(lang == 'ar' ? 'حذف' : 'Delete'),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ],
-                      ),
-                    );
-                  }),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          V2Card(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(lang == 'ar' ? 'ملاحظات الفريق' : 'Staff notes',
-                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-                    ),
-                    if (staffCan(staffState.effectiveRole, 'notes.write'))
-                      TextButton(onPressed: _saveNotes, child: Text(t(V2Copy.save, lang))),
-                  ],
-                ),
-                TextField(
-                  controller: _notesCtrl,
-                  onChanged: (v) => notes = v,
-                  maxLines: 4,
-                  decoration: const InputDecoration(border: OutlineInputBorder()),
-                ),
-              ],
-            ),
           ),
           const SizedBox(height: 16),
-          Row(
-            children: [
-              Text(lang == 'ar' ? 'الحجوزات' : 'Bookings', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
-              const Spacer(),
-              TextButton.icon(
-                onPressed: () => context.go('${V2Paths.bookings}?customerId=${widget.customerId}'),
-                icon: const Icon(Icons.open_in_new, size: 16),
-                label: Text(lang == 'ar' ? 'تاريخ كامل' : 'Full history'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          if (bookings.isEmpty)
-            const V2Empty()
-          else
-            V2Card(
-              padding: EdgeInsets.zero,
-              child: V2DataTable(
-                minWidth: 720,
-                headers: [
-                  lang == 'ar' ? 'الحجز' : 'Booking',
-                  lang == 'ar' ? 'الحالة' : 'Status',
-                  lang == 'ar' ? 'المبلغ' : 'Amount',
-                  lang == 'ar' ? 'الموعد' : 'When',
-                ],
-                rows: [
-                  for (final b in bookings)
-                    [
-                      Text(bookingRef(b), style: const TextStyle(fontFamily: Ops.mono, fontWeight: FontWeight.w600)),
-                      V2StatusPill(label: statusLabel('${b['status']}', lang), tone: statusTone('${b['status']}')),
-                      Text(money(asInt(b['total']), lang), style: const TextStyle(fontFamily: Ops.mono)),
-                      Text(formatWhen(b['slotStart'], lang), style: const TextStyle(fontSize: 12, color: Ops.muted)),
-                    ],
-                ],
-                onRowTap: (i) => context.go(V2Paths.booking(idOf(bookings[i]))),
-              ),
-            ),
+          LayoutBuilder(builder: (context, box) {
+            Widget stack(List<Widget> ws) =>
+                Column(children: [for (final w in ws) Padding(padding: const EdgeInsets.only(bottom: Ops.gap), child: w)]);
+            if (box.maxWidth < 940) return stack([...left, ...right]);
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(flex: 20, child: stack(left)),
+                const SizedBox(width: Ops.gap),
+                Expanded(flex: 27, child: stack(right)),
+              ],
+            );
+          }),
         ],
       ),
+    );
+  }
+
+  Widget _kv(String k, String v, {bool mono = false, bool last = false}) {
+    return Container(
+      padding: EdgeInsets.only(bottom: last ? 0 : 8),
+      margin: EdgeInsets.only(bottom: last ? 0 : 8),
+      decoration: last ? null : const BoxDecoration(border: Border(bottom: BorderSide(color: Ops.rowBorder))),
+      child: Row(
+        children: [
+          Expanded(child: Text(k, style: const TextStyle(fontSize: 12.5, color: Ops.muted))),
+          const SizedBox(width: 12),
+          Flexible(
+            child: Text(v.isEmpty ? '—' : v,
+                textAlign: TextAlign.end,
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, fontFamily: mono ? Ops.mono : Ops.sans)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NoteComposer extends StatefulWidget {
+  const _NoteComposer({required this.onSave, required this.lang});
+  final Future<void> Function(String) onSave;
+  final String lang;
+
+  @override
+  State<_NoteComposer> createState() => _NoteComposerState();
+}
+
+class _NoteComposerState extends State<_NoteComposer> {
+  final _c = TextEditingController();
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ar = widget.lang == 'ar';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 10),
+        TextField(
+          controller: _c,
+          maxLines: 3,
+          decoration: InputDecoration(hintText: ar ? 'أضيفي ملاحظة تبقى على هذا الملف' : 'Add a note that stays on this record'),
+        ),
+        const SizedBox(height: 10),
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: V2Btn.primary(ar ? 'حفظ الملاحظة' : 'Save note', onPressed: () {
+            final t = _c.text.trim();
+            if (t.isEmpty) return;
+            widget.onSave(t);
+            _c.clear();
+          }),
+        ),
+      ],
     );
   }
 }
