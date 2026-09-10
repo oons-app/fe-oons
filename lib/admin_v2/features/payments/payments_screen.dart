@@ -69,16 +69,20 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
   Future<void> _editKey(String field, String label) async {
     final lang = ref.read(localeCodeProvider);
     final ctl = TextEditingController();
-    final ok = await v2Form(
-      context,
-      title: '${lang == 'ar' ? 'تعديل' : 'Edit'} $label',
-      bodyBuilder: (ctx, _) => V2FormField(
-        label: label,
-        child: TextField(controller: ctl, obscureText: field.contains('Key')),
-      ),
-    );
-    if (ok && ctl.text.trim().isNotEmpty) {
-      _patch({field: ctl.text.trim()}, lang == 'ar' ? 'تم الحفظ' : 'Saved');
+    try {
+      final ok = await v2Form(
+        context,
+        title: '${lang == 'ar' ? 'تعديل' : 'Edit'} $label',
+        bodyBuilder: (ctx, _) => V2FormField(
+          label: label,
+          child: TextField(controller: ctl, obscureText: field.contains('Key')),
+        ),
+      );
+      if (ok && ctl.text.trim().isNotEmpty) {
+        _patch({field: ctl.text.trim()}, lang == 'ar' ? 'تم الحفظ' : 'Saved');
+      }
+    } finally {
+      ctl.dispose();
     }
   }
 

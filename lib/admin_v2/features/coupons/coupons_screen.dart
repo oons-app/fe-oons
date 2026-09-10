@@ -97,73 +97,79 @@ class _CouponsScreenState extends ConsumerState<CouponsScreen> {
                 ? '${asInt(c['amount'] ?? c['discountValue'])}'
                 : '${asInt(c['amount'] ?? c['discountValue']) / 100}');
     final limit = TextEditingController(text: '${c?['maxRedemptions'] ?? c?['limit'] ?? ''}');
-    final ok = await v2Form(
-      context,
-      title: c == null ? (lang == 'ar' ? 'كوبون جديد' : 'New coupon') : (lang == 'ar' ? 'تعديل الكوبون' : 'Edit coupon'),
-      bodyBuilder: (ctx, setLocal) => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          V2FormField(label: lang == 'ar' ? 'الكود' : 'Code', child: TextField(controller: code)),
-          const SizedBox(height: 12),
-          V2FormField(
-            label: lang == 'ar' ? 'النطاق' : 'Scope',
-            child: DropdownButtonFormField<String>(
-              initialValue: scope,
-              items: const [DropdownMenuItem(value: 'Platform', child: Text('Platform')), DropdownMenuItem(value: 'Provider', child: Text('Provider'))],
-              onChanged: (v) => scope = v ?? 'Platform',
-            ),
-          ),
-          const SizedBox(height: 12),
-          V2FormField(
-            label: lang == 'ar' ? 'النوع' : 'Type',
-            child: DropdownButtonFormField<String>(
-              initialValue: type,
-              items: const [DropdownMenuItem(value: 'percent', child: Text('Percent')), DropdownMenuItem(value: 'fixed', child: Text('Fixed'))],
-              onChanged: (v) => setLocal(() => type = v ?? 'percent'),
-            ),
-          ),
-          const SizedBox(height: 12),
-          V2FormField(
-            label: type == 'fixed' ? (lang == 'ar' ? 'القيمة (ج.م)' : 'Value (EGP)') : (lang == 'ar' ? 'النسبة %' : 'Percent %'),
-            child: TextField(controller: value, keyboardType: TextInputType.number),
-          ),
-          const SizedBox(height: 12),
-          V2FormField(
-              label: lang == 'ar' ? 'حد الاستخدام' : 'Redemption limit',
-              child: TextField(controller: limit, keyboardType: TextInputType.number)),
-        ],
-      ),
-      onValidate: () {
-        if (code.text.trim().isEmpty) {
-          v2Toast(context, lang == 'ar' ? 'الكود مطلوب' : 'Code is required', error: true);
-          return false;
-        }
-        return true;
-      },
-    );
-    if (!ok) return;
-    final raw = double.tryParse(value.text.trim()) ?? 0;
-    final amount = type == 'fixed' ? (raw * 100).round() : raw.round();
-    final payload = {
-      'code': code.text.trim(),
-      'scope': scope,
-      'discountType': type,
-      'amount': amount,
-      if (limit.text.trim().isNotEmpty) 'maxRedemptions': int.tryParse(limit.text.trim()),
-      if (c == null) 'active': true,
-    };
     try {
-      if (c == null) {
-        await staffClient.post('/admin/coupons', data: payload);
-      } else {
-        await staffClient.patch('/admin/coupons/${idOf(c)}', data: payload);
+      final ok = await v2Form(
+        context,
+        title: c == null ? (lang == 'ar' ? 'كوبون جديد' : 'New coupon') : (lang == 'ar' ? 'تعديل الكوبون' : 'Edit coupon'),
+        bodyBuilder: (ctx, setLocal) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            V2FormField(label: lang == 'ar' ? 'الكود' : 'Code', child: TextField(controller: code)),
+            const SizedBox(height: 12),
+            V2FormField(
+              label: lang == 'ar' ? 'النطاق' : 'Scope',
+              child: DropdownButtonFormField<String>(
+                initialValue: scope,
+                items: const [DropdownMenuItem(value: 'Platform', child: Text('Platform')), DropdownMenuItem(value: 'Provider', child: Text('Provider'))],
+                onChanged: (v) => scope = v ?? 'Platform',
+              ),
+            ),
+            const SizedBox(height: 12),
+            V2FormField(
+              label: lang == 'ar' ? 'النوع' : 'Type',
+              child: DropdownButtonFormField<String>(
+                initialValue: type,
+                items: const [DropdownMenuItem(value: 'percent', child: Text('Percent')), DropdownMenuItem(value: 'fixed', child: Text('Fixed'))],
+                onChanged: (v) => setLocal(() => type = v ?? 'percent'),
+              ),
+            ),
+            const SizedBox(height: 12),
+            V2FormField(
+              label: type == 'fixed' ? (lang == 'ar' ? 'القيمة (ج.م)' : 'Value (EGP)') : (lang == 'ar' ? 'النسبة %' : 'Percent %'),
+              child: TextField(controller: value, keyboardType: TextInputType.number),
+            ),
+            const SizedBox(height: 12),
+            V2FormField(
+                label: lang == 'ar' ? 'حد الاستخدام' : 'Redemption limit',
+                child: TextField(controller: limit, keyboardType: TextInputType.number)),
+          ],
+        ),
+        onValidate: () {
+          if (code.text.trim().isEmpty) {
+            v2Toast(context, lang == 'ar' ? 'الكود مطلوب' : 'Code is required', error: true);
+            return false;
+          }
+          return true;
+        },
+      );
+      if (!ok) return;
+      final raw = double.tryParse(value.text.trim()) ?? 0;
+      final amount = type == 'fixed' ? (raw * 100).round() : raw.round();
+      final payload = {
+        'code': code.text.trim(),
+        'scope': scope,
+        'discountType': type,
+        'amount': amount,
+        if (limit.text.trim().isNotEmpty) 'maxRedemptions': int.tryParse(limit.text.trim()),
+        if (c == null) 'active': true,
+      };
+      try {
+        if (c == null) {
+          await staffClient.post('/admin/coupons', data: payload);
+        } else {
+          await staffClient.patch('/admin/coupons/${idOf(c)}', data: payload);
+        }
+        if (mounted) {
+          v2Toast(context, c == null ? (lang == 'ar' ? 'تم إنشاء الكوبون' : 'Coupon created') : (lang == 'ar' ? 'تم تحديث الكوبون' : 'Coupon updated'));
+          _load();
+        }
+      } on ApiException catch (e) {
+        if (mounted) v2Toast(context, e.message, error: true);
       }
-      if (mounted) {
-        v2Toast(context, c == null ? (lang == 'ar' ? 'تم إنشاء الكوبون' : 'Coupon created') : (lang == 'ar' ? 'تم تحديث الكوبون' : 'Coupon updated'));
-        _load();
-      }
-    } on ApiException catch (e) {
-      if (mounted) v2Toast(context, e.message, error: true);
+    } finally {
+      code.dispose();
+      value.dispose();
+      limit.dispose();
     }
   }
 

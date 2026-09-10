@@ -77,7 +77,9 @@ class _ProviderDetailScreenState extends ConsumerState<ProviderDetailScreen> {
     try {
       final data = await staffClient.get('/admin/areas');
       setState(() => areas = asMapList(data['areas']));
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('provider detail: coverage areas fetch failed: $e');
+    }
   }
 
   String get _role => ref.read(staffSessionProvider).effectiveRole;
@@ -143,24 +145,30 @@ class _ProviderDetailScreenState extends ConsumerState<ProviderDetailScreen> {
     final first = TextEditingController(text: '${prov['firstName'] ?? ''}');
     final phone = TextEditingController(text: '${prov['phone'] ?? ''}');
     final bio = TextEditingController(text: '${prov['bio'] ?? ''}');
-    final ok = await v2Form(
-      context,
-      title: lang == 'ar' ? 'تعديل الملف' : 'Edit profile',
-      bodyBuilder: (ctx, _) => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          V2FormField(label: lang == 'ar' ? 'الاسم' : 'Name', child: TextField(controller: first)),
-          const SizedBox(height: 12),
-          V2FormField(label: lang == 'ar' ? 'الهاتف' : 'Phone', child: TextField(controller: phone)),
-          const SizedBox(height: 12),
-          V2FormField(label: lang == 'ar' ? 'نبذة' : 'Bio', child: TextField(controller: bio, maxLines: 3)),
-        ],
-      ),
-    );
-    if (ok) {
-      _patch('/admin/providers/${widget.providerId}',
-          {'firstName': first.text.trim(), 'phone': phone.text.trim(), 'bio': bio.text.trim()},
-          lang == 'ar' ? 'تم تحديث الملف' : 'Profile updated');
+    try {
+      final ok = await v2Form(
+        context,
+        title: lang == 'ar' ? 'تعديل الملف' : 'Edit profile',
+        bodyBuilder: (ctx, _) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            V2FormField(label: lang == 'ar' ? 'الاسم' : 'Name', child: TextField(controller: first)),
+            const SizedBox(height: 12),
+            V2FormField(label: lang == 'ar' ? 'الهاتف' : 'Phone', child: TextField(controller: phone)),
+            const SizedBox(height: 12),
+            V2FormField(label: lang == 'ar' ? 'نبذة' : 'Bio', child: TextField(controller: bio, maxLines: 3)),
+          ],
+        ),
+      );
+      if (ok) {
+        _patch('/admin/providers/${widget.providerId}',
+            {'firstName': first.text.trim(), 'phone': phone.text.trim(), 'bio': bio.text.trim()},
+            lang == 'ar' ? 'تم تحديث الملف' : 'Profile updated');
+      }
+    } finally {
+      first.dispose();
+      phone.dispose();
+      bio.dispose();
     }
   }
 
@@ -633,66 +641,97 @@ class _ProviderDetailScreenState extends ConsumerState<ProviderDetailScreen> {
   Future<void> _editServices(List<Map<String, dynamic>> items, String lang, {Map? focus, bool add = false}) async {
     final list = items.map((e) => Map<String, dynamic>.from(e)).toList();
     if (add) list.add({'name': {'en': '', 'ar': ''}, 'durationMin': 60, 'price': 0, 'category': (p ?? {})['category']});
-    final ok = await v2Form(
-      context,
-      title: lang == 'ar' ? 'تحرير الخدمات' : 'Edit services',
-      bodyBuilder: (ctx, setLocal) => StatefulBuilder(
-        builder: (context, sb) => Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            for (var i = 0; i < list.length; i++)
-              Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(border: Border.all(color: Ops.border), borderRadius: BorderRadius.circular(10)),
-                child: Column(
-                  children: [
-                    Row(children: [
-                      Expanded(child: Text('${lang == 'ar' ? 'خدمة' : 'Service'} ${i + 1}', style: const TextStyle(fontWeight: FontWeight.w600))),
-                      IconButton(
-                        icon: const Icon(Icons.delete_outline, size: 18, color: Ops.terracottaInk),
-                        onPressed: () => sb(() => list.removeAt(i)),
-                      ),
-                    ]),
-                    TextField(
-                      controller: TextEditingController(text: '${(list[i]['name'] as Map?)?['en'] ?? ''}'),
-                      decoration: InputDecoration(labelText: lang == 'ar' ? 'الاسم (EN)' : 'Name (EN)'),
-                      onChanged: (v) => (list[i]['name'] ??= <String, dynamic>{})['en'] = v,
-                    ),
-                    TextField(
-                      controller: TextEditingController(text: '${(list[i]['name'] as Map?)?['ar'] ?? ''}'),
-                      decoration: InputDecoration(labelText: lang == 'ar' ? 'الاسم (ع)' : 'Name (AR)'),
-                      onChanged: (v) => (list[i]['name'] ??= <String, dynamic>{})['ar'] = v,
-                    ),
-                    Row(children: [
-                      Expanded(
-                        child: TextField(
-                          controller: TextEditingController(text: '${asInt(list[i]['durationMin'])}'),
-                          decoration: InputDecoration(labelText: lang == 'ar' ? 'المدة (د)' : 'Duration (min)'),
-                          keyboardType: TextInputType.number,
-                          onChanged: (v) => list[i]['durationMin'] = int.tryParse(v) ?? 0,
+
+    // One controller set per row, owned by this method so text survives the
+    // list's add/remove rebuilds and is disposed when the modal closes.
+    final rowCtls = <Map<String, TextEditingController>>[];
+    Map<String, TextEditingController> ctlsFor(Map<String, dynamic> row) => {
+          'en': TextEditingController(text: '${(row['name'] as Map?)?['en'] ?? ''}'),
+          'ar': TextEditingController(text: '${(row['name'] as Map?)?['ar'] ?? ''}'),
+          'dur': TextEditingController(text: '${asInt(row['durationMin'])}'),
+          'price': TextEditingController(text: '${asInt(row['price']) / 100}'),
+        };
+    for (final row in list) {
+      rowCtls.add(ctlsFor(row));
+    }
+
+    try {
+      final ok = await v2Form(
+        context,
+        title: lang == 'ar' ? 'تحرير الخدمات' : 'Edit services',
+        bodyBuilder: (ctx, setLocal) => StatefulBuilder(
+          builder: (context, sb) => Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (var i = 0; i < list.length; i++)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(border: Border.all(color: Ops.border), borderRadius: BorderRadius.circular(10)),
+                  child: Column(
+                    children: [
+                      Row(children: [
+                        Expanded(child: Text('${lang == 'ar' ? 'خدمة' : 'Service'} ${i + 1}', style: const TextStyle(fontWeight: FontWeight.w600))),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline, size: 18, color: Ops.terracottaInk),
+                          onPressed: () => sb(() {
+                            list.removeAt(i);
+                            for (final c in rowCtls.removeAt(i).values) {
+                              c.dispose();
+                            }
+                          }),
                         ),
+                      ]),
+                      TextField(
+                        controller: rowCtls[i]['en'],
+                        decoration: InputDecoration(labelText: lang == 'ar' ? 'الاسم (EN)' : 'Name (EN)'),
+                        onChanged: (v) => (list[i]['name'] ??= <String, dynamic>{})['en'] = v,
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: TextField(
-                          controller: TextEditingController(text: '${(asInt(list[i]['price']) / 100)}'),
-                          decoration: InputDecoration(labelText: lang == 'ar' ? 'السعر (ج.م)' : 'Price (EGP)'),
-                          keyboardType: TextInputType.number,
-                          onChanged: (v) => list[i]['price'] = ((double.tryParse(v) ?? 0) * 100).round(),
+                      TextField(
+                        controller: rowCtls[i]['ar'],
+                        decoration: InputDecoration(labelText: lang == 'ar' ? 'الاسم (ع)' : 'Name (AR)'),
+                        onChanged: (v) => (list[i]['name'] ??= <String, dynamic>{})['ar'] = v,
+                      ),
+                      Row(children: [
+                        Expanded(
+                          child: TextField(
+                            controller: rowCtls[i]['dur'],
+                            decoration: InputDecoration(labelText: lang == 'ar' ? 'المدة (د)' : 'Duration (min)'),
+                            keyboardType: TextInputType.number,
+                            onChanged: (v) => list[i]['durationMin'] = int.tryParse(v) ?? 0,
+                          ),
                         ),
-                      ),
-                    ]),
-                  ],
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            controller: rowCtls[i]['price'],
+                            decoration: InputDecoration(labelText: lang == 'ar' ? 'السعر (ج.م)' : 'Price (EGP)'),
+                            keyboardType: TextInputType.number,
+                            onChanged: (v) => list[i]['price'] = ((double.tryParse(v) ?? 0) * 100).round(),
+                          ),
+                        ),
+                      ]),
+                    ],
+                  ),
                 ),
-              ),
-            V2Btn.ghost(lang == 'ar' ? '+ خدمة' : '+ Service',
-                onPressed: () => sb(() => list.add({'name': {'en': '', 'ar': ''}, 'durationMin': 60, 'price': 0}))),
-          ],
+              V2Btn.ghost(lang == 'ar' ? '+ خدمة' : '+ Service',
+                  onPressed: () => sb(() {
+                        final row = <String, dynamic>{'name': {'en': '', 'ar': ''}, 'durationMin': 60, 'price': 0};
+                        list.add(row);
+                        rowCtls.add(ctlsFor(row));
+                      })),
+            ],
+          ),
         ),
-      ),
-    );
-    if (ok) _patch('/admin/providers/${widget.providerId}', {'items': list}, lang == 'ar' ? 'تم تحديث الخدمات' : 'Services updated');
+      );
+      if (ok) _patch('/admin/providers/${widget.providerId}', {'items': list}, lang == 'ar' ? 'تم تحديث الخدمات' : 'Services updated');
+    } finally {
+      for (final m in rowCtls) {
+        for (final c in m.values) {
+          c.dispose();
+        }
+      }
+    }
   }
 
   // ---- Coverage --------------------------------------------------------
@@ -890,32 +929,36 @@ class _ProviderDetailScreenState extends ConsumerState<ProviderDetailScreen> {
   Future<void> _editPayout(String method, String handle, String lang) async {
     var m = method;
     final h = TextEditingController(text: handle);
-    final ok = await v2Form(
-      context,
-      title: lang == 'ar' ? 'تعديل حساب الدفع' : 'Edit payout account',
-      bodyBuilder: (ctx, _) => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          V2FormField(
-            label: lang == 'ar' ? 'الطريقة' : 'Method',
-            child: DropdownButtonFormField<String>(
-              initialValue: m.isEmpty ? null : m,
-              items: const [
-                DropdownMenuItem(value: 'instapay', child: Text('InstaPay')),
-                DropdownMenuItem(value: 'wallet', child: Text('Mobile wallet')),
-                DropdownMenuItem(value: 'bank', child: Text('Bank transfer')),
-              ],
-              onChanged: (v) => m = v ?? '',
+    try {
+      final ok = await v2Form(
+        context,
+        title: lang == 'ar' ? 'تعديل حساب الدفع' : 'Edit payout account',
+        bodyBuilder: (ctx, _) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            V2FormField(
+              label: lang == 'ar' ? 'الطريقة' : 'Method',
+              child: DropdownButtonFormField<String>(
+                initialValue: m.isEmpty ? null : m,
+                items: const [
+                  DropdownMenuItem(value: 'instapay', child: Text('InstaPay')),
+                  DropdownMenuItem(value: 'wallet', child: Text('Mobile wallet')),
+                  DropdownMenuItem(value: 'bank', child: Text('Bank transfer')),
+                ],
+                onChanged: (v) => m = v ?? '',
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
-          V2FormField(label: lang == 'ar' ? 'رقم الحساب/الهاتف' : 'Account / phone', child: TextField(controller: h)),
-        ],
-      ),
-    );
-    if (ok) {
-      _patch('/admin/providers/${widget.providerId}', {'payoutMethod': m, 'payoutHandle': h.text.trim()},
-          lang == 'ar' ? 'تم تحديث حساب الدفع' : 'Payout account updated');
+            const SizedBox(height: 12),
+            V2FormField(label: lang == 'ar' ? 'رقم الحساب/الهاتف' : 'Account / phone', child: TextField(controller: h)),
+          ],
+        ),
+      );
+      if (ok) {
+        _patch('/admin/providers/${widget.providerId}', {'payoutMethod': m, 'payoutHandle': h.text.trim()},
+            lang == 'ar' ? 'تم تحديث حساب الدفع' : 'Payout account updated');
+      }
+    } finally {
+      h.dispose();
     }
   }
 

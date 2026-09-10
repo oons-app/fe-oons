@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:oons/admin_v2/data/permissions.dart';
 import 'package:oons/admin_v2/data/staff_client.dart';
@@ -95,8 +96,9 @@ class StaffSession extends StateNotifier<StaffState> {
         });
         setStaffGrants(parsed);
       }
-    } catch (_) {
-      // keep the local fallback table
+    } catch (e) {
+      // Non-fatal: keep the local fallback table in permissions.dart.
+      debugPrint('session: RBAC matrix fetch failed, using local table: $e');
     }
   }
 

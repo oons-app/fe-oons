@@ -143,7 +143,9 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
                   final d = await staffClient.get('/admin/providers/${idOf(p)}');
                   final prov = unwrapEntity(d, const ['provider']);
                   setLocal(() => services = asMapList(prov['items']));
-                } catch (_) {}
+                } catch (e) {
+                  debugPrint('book-for-them: provider services fetch failed: $e');
+                }
               },
               fieldViewBuilder: (context, controller, focus, onSubmit) => TextField(
                 controller: controller,
@@ -252,28 +254,33 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
     final c = customer ?? {};
     final name = TextEditingController(text: personName(c, lang, fallbackId: idOf(c)));
     final phone = TextEditingController(text: '${c['phone'] ?? ''}');
-    final ok = await v2Form(
-      context,
-      title: lang == 'ar' ? 'تعديل العميلة' : 'Edit customer',
-      bodyBuilder: (ctx, _) => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          V2FormField(label: lang == 'ar' ? 'الاسم' : 'Full name', child: TextField(controller: name)),
-          const SizedBox(height: 12),
-          V2FormField(label: lang == 'ar' ? 'الهاتف' : 'Phone', child: TextField(controller: phone)),
-        ],
-      ),
-    );
-    if (!ok) return;
     try {
-      await staffClient.patch('/admin/users/${widget.customerId}',
-          data: {'name': name.text.trim(), 'phone': phone.text.trim()});
-      if (mounted) {
-        v2Toast(context, lang == 'ar' ? 'تم التحديث' : 'Customer updated');
-        _load();
+      final ok = await v2Form(
+        context,
+        title: lang == 'ar' ? 'تعديل العميلة' : 'Edit customer',
+        bodyBuilder: (ctx, _) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            V2FormField(label: lang == 'ar' ? 'الاسم' : 'Full name', child: TextField(controller: name)),
+            const SizedBox(height: 12),
+            V2FormField(label: lang == 'ar' ? 'الهاتف' : 'Phone', child: TextField(controller: phone)),
+          ],
+        ),
+      );
+      if (!ok) return;
+      try {
+        await staffClient.patch('/admin/users/${widget.customerId}',
+            data: {'name': name.text.trim(), 'phone': phone.text.trim()});
+        if (mounted) {
+          v2Toast(context, lang == 'ar' ? 'تم التحديث' : 'Customer updated');
+          _load();
+        }
+      } on ApiException catch (e) {
+        if (mounted) v2Toast(context, e.message, error: true);
       }
-    } on ApiException catch (e) {
-      if (mounted) v2Toast(context, e.message, error: true);
+    } finally {
+      name.dispose();
+      phone.dispose();
     }
   }
 
@@ -284,62 +291,68 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
     final city = TextEditingController();
     var area = 'zamalek';
     var isDefault = false;
-    final ok = await v2Form(
-      context,
-      title: lang == 'ar' ? 'إضافة عنوان' : 'Add address',
-      confirmLabel: lang == 'ar' ? 'إضافة' : 'Add',
-      bodyBuilder: (ctx, setLocal) => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          V2FormField(label: lang == 'ar' ? 'التسمية' : 'Label', child: TextField(controller: label)),
-          const SizedBox(height: 12),
-          V2FormField(label: lang == 'ar' ? 'العنوان' : 'Line 1', child: TextField(controller: line1)),
-          const SizedBox(height: 12),
-          V2FormField(
-            label: lang == 'ar' ? 'المنطقة' : 'Area',
-            child: DropdownButtonFormField<String>(
-              initialValue: area,
-              items: [
-                for (final a in const ['zamalek', 'dokki', 'mohandeseen', 'maadi', 'nasr_city', 'heliopolis', 'new_cairo'])
-                  DropdownMenuItem(value: a, child: Text(areaName(a, lang))),
-              ],
-              onChanged: (v) => area = v ?? area,
-            ),
-          ),
-          const SizedBox(height: 12),
-          V2FormField(label: lang == 'ar' ? 'المدينة' : 'City', child: TextField(controller: city)),
-          const SizedBox(height: 4),
-          CheckboxListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text(lang == 'ar' ? 'افتراضي' : 'Set as default'),
-            value: isDefault,
-            onChanged: (v) => setLocal(() => isDefault = v ?? false),
-          ),
-        ],
-      ),
-      onValidate: () {
-        if (line1.text.trim().isEmpty) {
-          v2Toast(context, lang == 'ar' ? 'العنوان مطلوب' : 'Address is required', error: true);
-          return false;
-        }
-        return true;
-      },
-    );
-    if (!ok) return;
     try {
-      await staffClient.post('/admin/users/${widget.customerId}/addresses', data: {
-        'label': label.text.trim().isEmpty ? 'Home' : label.text.trim(),
-        'line1': line1.text.trim(),
-        'area': area,
-        if (city.text.trim().isNotEmpty) 'city': city.text.trim(),
-        'isDefault': isDefault,
-      });
-      if (mounted) {
-        v2Toast(context, lang == 'ar' ? 'تمت الإضافة' : 'Address added');
-        _load();
+      final ok = await v2Form(
+        context,
+        title: lang == 'ar' ? 'إضافة عنوان' : 'Add address',
+        confirmLabel: lang == 'ar' ? 'إضافة' : 'Add',
+        bodyBuilder: (ctx, setLocal) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            V2FormField(label: lang == 'ar' ? 'التسمية' : 'Label', child: TextField(controller: label)),
+            const SizedBox(height: 12),
+            V2FormField(label: lang == 'ar' ? 'العنوان' : 'Line 1', child: TextField(controller: line1)),
+            const SizedBox(height: 12),
+            V2FormField(
+              label: lang == 'ar' ? 'المنطقة' : 'Area',
+              child: DropdownButtonFormField<String>(
+                initialValue: area,
+                items: [
+                  for (final a in const ['zamalek', 'dokki', 'mohandeseen', 'maadi', 'nasr_city', 'heliopolis', 'new_cairo'])
+                    DropdownMenuItem(value: a, child: Text(areaName(a, lang))),
+                ],
+                onChanged: (v) => area = v ?? area,
+              ),
+            ),
+            const SizedBox(height: 12),
+            V2FormField(label: lang == 'ar' ? 'المدينة' : 'City', child: TextField(controller: city)),
+            const SizedBox(height: 4),
+            CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(lang == 'ar' ? 'افتراضي' : 'Set as default'),
+              value: isDefault,
+              onChanged: (v) => setLocal(() => isDefault = v ?? false),
+            ),
+          ],
+        ),
+        onValidate: () {
+          if (line1.text.trim().isEmpty) {
+            v2Toast(context, lang == 'ar' ? 'العنوان مطلوب' : 'Address is required', error: true);
+            return false;
+          }
+          return true;
+        },
+      );
+      if (!ok) return;
+      try {
+        await staffClient.post('/admin/users/${widget.customerId}/addresses', data: {
+          'label': label.text.trim().isEmpty ? 'Home' : label.text.trim(),
+          'line1': line1.text.trim(),
+          'area': area,
+          if (city.text.trim().isNotEmpty) 'city': city.text.trim(),
+          'isDefault': isDefault,
+        });
+        if (mounted) {
+          v2Toast(context, lang == 'ar' ? 'تمت الإضافة' : 'Address added');
+          _load();
+        }
+      } on ApiException catch (e) {
+        if (mounted) v2Toast(context, e.message, error: true);
       }
-    } on ApiException catch (e) {
-      if (mounted) v2Toast(context, e.message, error: true);
+    } finally {
+      label.dispose();
+      line1.dispose();
+      city.dispose();
     }
   }
 

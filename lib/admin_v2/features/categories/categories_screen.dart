@@ -91,54 +91,60 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
     final ar = TextEditingController(text: '${asMap(c?['name'])?['ar'] ?? ''}');
     final slug = TextEditingController(text: '${c?['slug'] ?? ''}');
     var vertical = '${c?['vertical'] ?? 'beauty'}';
-    final ok = await v2Form(
-      context,
-      title: c == null ? (lang == 'ar' ? 'فئة جديدة' : 'New category') : (lang == 'ar' ? 'تعديل الفئة' : 'Edit category'),
-      bodyBuilder: (ctx, setLocal) => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          V2FormField(label: 'Name (EN)', child: TextField(controller: en)),
-          const SizedBox(height: 12),
-          V2FormField(label: 'الاسم (AR)', child: TextField(controller: ar)),
-          const SizedBox(height: 12),
-          V2FormField(label: 'Slug', child: TextField(controller: slug)),
-          const SizedBox(height: 12),
-          V2FormField(
-            label: 'Vertical',
-            child: DropdownButtonFormField<String>(
-              initialValue: vertical,
-              items: [for (final v in _verticals) DropdownMenuItem(value: v.$1, child: Text(v.$2))],
-              onChanged: (v) => vertical = v ?? 'beauty',
-            ),
-          ),
-        ],
-      ),
-      onValidate: () {
-        if (en.text.trim().isEmpty) {
-          v2Toast(context, lang == 'ar' ? 'الاسم مطلوب' : 'Name is required', error: true);
-          return false;
-        }
-        return true;
-      },
-    );
-    if (!ok) return;
-    final payload = {
-      'name': {'en': en.text.trim(), 'ar': ar.text.trim()},
-      'slug': slug.text.trim(),
-      'vertical': vertical,
-    };
     try {
-      if (c == null) {
-        await staffClient.post('/admin/categories', data: payload);
-      } else {
-        await staffClient.patch('/admin/categories/${idOf(c)}', data: payload);
+      final ok = await v2Form(
+        context,
+        title: c == null ? (lang == 'ar' ? 'فئة جديدة' : 'New category') : (lang == 'ar' ? 'تعديل الفئة' : 'Edit category'),
+        bodyBuilder: (ctx, setLocal) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            V2FormField(label: 'Name (EN)', child: TextField(controller: en)),
+            const SizedBox(height: 12),
+            V2FormField(label: 'الاسم (AR)', child: TextField(controller: ar)),
+            const SizedBox(height: 12),
+            V2FormField(label: 'Slug', child: TextField(controller: slug)),
+            const SizedBox(height: 12),
+            V2FormField(
+              label: 'Vertical',
+              child: DropdownButtonFormField<String>(
+                initialValue: vertical,
+                items: [for (final v in _verticals) DropdownMenuItem(value: v.$1, child: Text(v.$2))],
+                onChanged: (v) => vertical = v ?? 'beauty',
+              ),
+            ),
+          ],
+        ),
+        onValidate: () {
+          if (en.text.trim().isEmpty) {
+            v2Toast(context, lang == 'ar' ? 'الاسم مطلوب' : 'Name is required', error: true);
+            return false;
+          }
+          return true;
+        },
+      );
+      if (!ok) return;
+      final payload = {
+        'name': {'en': en.text.trim(), 'ar': ar.text.trim()},
+        'slug': slug.text.trim(),
+        'vertical': vertical,
+      };
+      try {
+        if (c == null) {
+          await staffClient.post('/admin/categories', data: payload);
+        } else {
+          await staffClient.patch('/admin/categories/${idOf(c)}', data: payload);
+        }
+        if (mounted) {
+          v2Toast(context, c == null ? (lang == 'ar' ? 'تم الإنشاء' : 'Category created') : (lang == 'ar' ? 'تم التحديث' : 'Category updated'));
+          _load();
+        }
+      } on ApiException catch (e) {
+        if (mounted) v2Toast(context, e.message, error: true);
       }
-      if (mounted) {
-        v2Toast(context, c == null ? (lang == 'ar' ? 'تم الإنشاء' : 'Category created') : (lang == 'ar' ? 'تم التحديث' : 'Category updated'));
-        _load();
-      }
-    } on ApiException catch (e) {
-      if (mounted) v2Toast(context, e.message, error: true);
+    } finally {
+      en.dispose();
+      ar.dispose();
+      slug.dispose();
     }
   }
 

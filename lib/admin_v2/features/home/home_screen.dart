@@ -110,7 +110,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     try {
       final data = await staffClient.get('/admin/bookings', query: {'live': '1', 'limit': 20});
       if (mounted) setState(() => live = asMapList(data['bookings']));
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('home: live visits refresh failed: $e');
+    }
   }
 
   void _publishBadges() {

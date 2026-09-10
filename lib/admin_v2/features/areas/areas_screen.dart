@@ -83,49 +83,56 @@ class _AreasScreenState extends ConsumerState<AreasScreen> {
     final city = TextEditingController(text: '${asMap(a?['cityName'])?['en'] ?? a?['cityId'] ?? ''}');
     final fee = TextEditingController(
         text: a == null ? '0' : '${asInt(a['travelFee'] ?? a['travelFeeAmount']) / 100}');
-    final ok = await v2Form(
-      context,
-      title: a == null ? (lang == 'ar' ? 'منطقة جديدة' : 'New area') : (lang == 'ar' ? 'تعديل المنطقة' : 'Edit area'),
-      bodyBuilder: (ctx, _) => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          V2FormField(label: 'Name (EN)', child: TextField(controller: en)),
-          const SizedBox(height: 12),
-          V2FormField(label: 'الاسم (AR)', child: TextField(controller: ar)),
-          const SizedBox(height: 12),
-          V2FormField(label: lang == 'ar' ? 'المدينة' : 'City', child: TextField(controller: city)),
-          const SizedBox(height: 12),
-          V2FormField(
-              label: lang == 'ar' ? 'رسوم الانتقال (ج.م)' : 'Travel fee (EGP)',
-              child: TextField(controller: fee, keyboardType: TextInputType.number)),
-        ],
-      ),
-      onValidate: () {
-        if (en.text.trim().isEmpty) {
-          v2Toast(context, lang == 'ar' ? 'الاسم مطلوب' : 'Name is required', error: true);
-          return false;
-        }
-        return true;
-      },
-    );
-    if (!ok) return;
-    final payload = {
-      'name': {'en': en.text.trim(), 'ar': ar.text.trim()},
-      'city': city.text.trim(),
-      'travelFee': ((double.tryParse(fee.text.trim()) ?? 0) * 100).round(),
-    };
     try {
-      if (a == null) {
-        await staffClient.post('/admin/areas', data: payload);
-      } else {
-        await staffClient.patch('/admin/areas/${idOf(a)}', data: payload);
+      final ok = await v2Form(
+        context,
+        title: a == null ? (lang == 'ar' ? 'منطقة جديدة' : 'New area') : (lang == 'ar' ? 'تعديل المنطقة' : 'Edit area'),
+        bodyBuilder: (ctx, _) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            V2FormField(label: 'Name (EN)', child: TextField(controller: en)),
+            const SizedBox(height: 12),
+            V2FormField(label: 'الاسم (AR)', child: TextField(controller: ar)),
+            const SizedBox(height: 12),
+            V2FormField(label: lang == 'ar' ? 'المدينة' : 'City', child: TextField(controller: city)),
+            const SizedBox(height: 12),
+            V2FormField(
+                label: lang == 'ar' ? 'رسوم الانتقال (ج.م)' : 'Travel fee (EGP)',
+                child: TextField(controller: fee, keyboardType: TextInputType.number)),
+          ],
+        ),
+        onValidate: () {
+          if (en.text.trim().isEmpty) {
+            v2Toast(context, lang == 'ar' ? 'الاسم مطلوب' : 'Name is required', error: true);
+            return false;
+          }
+          return true;
+        },
+      );
+      if (!ok) return;
+      final payload = {
+        'name': {'en': en.text.trim(), 'ar': ar.text.trim()},
+        'city': city.text.trim(),
+        'travelFee': ((double.tryParse(fee.text.trim()) ?? 0) * 100).round(),
+      };
+      try {
+        if (a == null) {
+          await staffClient.post('/admin/areas', data: payload);
+        } else {
+          await staffClient.patch('/admin/areas/${idOf(a)}', data: payload);
+        }
+        if (mounted) {
+          v2Toast(context, a == null ? (lang == 'ar' ? 'تم الإنشاء' : 'Area created') : (lang == 'ar' ? 'تم التحديث' : 'Area updated'));
+          _load();
+        }
+      } on ApiException catch (e) {
+        if (mounted) v2Toast(context, e.message, error: true);
       }
-      if (mounted) {
-        v2Toast(context, a == null ? (lang == 'ar' ? 'تم الإنشاء' : 'Area created') : (lang == 'ar' ? 'تم التحديث' : 'Area updated'));
-        _load();
-      }
-    } on ApiException catch (e) {
-      if (mounted) v2Toast(context, e.message, error: true);
+    } finally {
+      en.dispose();
+      ar.dispose();
+      city.dispose();
+      fee.dispose();
     }
   }
 

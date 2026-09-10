@@ -237,7 +237,9 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> with WidgetsBin
                 try {
                   final data = await staffClient.get('/admin/users', query: {'q': q, 'limit': 8});
                   setLocal(() => results = asMapList(data['users']));
-                } catch (_) {}
+                } catch (e) {
+                  debugPrint('book-for-customer: user search failed: $e');
+                }
               },
               decoration: InputDecoration(hintText: lang == 'ar' ? 'اسم العميلة' : 'Customer name'),
             ),

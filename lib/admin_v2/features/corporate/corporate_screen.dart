@@ -65,46 +65,53 @@ class _CorporateScreenState extends ConsumerState<CorporateScreen> {
     final tax = TextEditingController(text: '${a?['taxId'] ?? ''}');
     final email = TextEditingController(text: '${a?['billingEmail'] ?? a?['contact'] ?? ''}');
     final seats = TextEditingController(text: '${a?['seats'] ?? ''}');
-    final ok = await v2Form(
-      context,
-      title: a == null
-          ? (lang == 'ar' ? 'حساب شركة جديد' : 'New corporate account')
-          : (lang == 'ar' ? 'تعديل حساب الشركة' : 'Edit corporate account'),
-      bodyBuilder: (ctx, _) => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          V2FormField(label: lang == 'ar' ? 'الاسم القانوني' : 'Company', child: TextField(controller: name)),
-          const SizedBox(height: 12),
-          V2FormField(label: lang == 'ar' ? 'بريد الفواتير' : 'Billing contact', child: TextField(controller: email)),
-          const SizedBox(height: 12),
-          V2FormField(label: lang == 'ar' ? 'الرقم الضريبي' : 'Tax ID', child: TextField(controller: tax)),
-          const SizedBox(height: 12),
-          V2FormField(label: lang == 'ar' ? 'المقاعد' : 'Seats', child: TextField(controller: seats, keyboardType: TextInputType.number)),
-        ],
-      ),
-      onValidate: () {
-        if (name.text.trim().isEmpty) {
-          v2Toast(context, lang == 'ar' ? 'الاسم مطلوب' : 'Company name is required', error: true);
-          return false;
-        }
-        return true;
-      },
-    );
-    if (!ok) return;
     try {
-      await staffClient.post('/admin/corporate', data: {
-        if (a != null && idOf(a).isNotEmpty) 'id': idOf(a),
-        'legalName': name.text.trim(),
-        'taxId': tax.text.trim(),
-        'billingEmail': email.text.trim(),
-        if (seats.text.trim().isNotEmpty) 'seats': int.tryParse(seats.text.trim()),
-      });
-      if (mounted) {
-        v2Toast(context, a == null ? (lang == 'ar' ? 'تم الإنشاء' : 'Account created') : (lang == 'ar' ? 'تم التحديث' : 'Account updated'));
-        _load();
+      final ok = await v2Form(
+        context,
+        title: a == null
+            ? (lang == 'ar' ? 'حساب شركة جديد' : 'New corporate account')
+            : (lang == 'ar' ? 'تعديل حساب الشركة' : 'Edit corporate account'),
+        bodyBuilder: (ctx, _) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            V2FormField(label: lang == 'ar' ? 'الاسم القانوني' : 'Company', child: TextField(controller: name)),
+            const SizedBox(height: 12),
+            V2FormField(label: lang == 'ar' ? 'بريد الفواتير' : 'Billing contact', child: TextField(controller: email)),
+            const SizedBox(height: 12),
+            V2FormField(label: lang == 'ar' ? 'الرقم الضريبي' : 'Tax ID', child: TextField(controller: tax)),
+            const SizedBox(height: 12),
+            V2FormField(label: lang == 'ar' ? 'المقاعد' : 'Seats', child: TextField(controller: seats, keyboardType: TextInputType.number)),
+          ],
+        ),
+        onValidate: () {
+          if (name.text.trim().isEmpty) {
+            v2Toast(context, lang == 'ar' ? 'الاسم مطلوب' : 'Company name is required', error: true);
+            return false;
+          }
+          return true;
+        },
+      );
+      if (!ok) return;
+      try {
+        await staffClient.post('/admin/corporate', data: {
+          if (a != null && idOf(a).isNotEmpty) 'id': idOf(a),
+          'legalName': name.text.trim(),
+          'taxId': tax.text.trim(),
+          'billingEmail': email.text.trim(),
+          if (seats.text.trim().isNotEmpty) 'seats': int.tryParse(seats.text.trim()),
+        });
+        if (mounted) {
+          v2Toast(context, a == null ? (lang == 'ar' ? 'تم الإنشاء' : 'Account created') : (lang == 'ar' ? 'تم التحديث' : 'Account updated'));
+          _load();
+        }
+      } on ApiException catch (e) {
+        if (mounted) v2Toast(context, e.message, error: true);
       }
-    } on ApiException catch (e) {
-      if (mounted) v2Toast(context, e.message, error: true);
+    } finally {
+      name.dispose();
+      tax.dispose();
+      email.dispose();
+      seats.dispose();
     }
   }
 

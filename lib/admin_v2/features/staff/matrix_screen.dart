@@ -63,7 +63,9 @@ class _MatrixScreenState extends ConsumerState<MatrixScreen> {
         fromServer = parsed.isNotEmpty;
         loading = false;
       });
-    } catch (_) {
+    } catch (e) {
+      // Non-fatal: the grid falls back to the local staffCan table.
+      debugPrint('matrix: RBAC matrix fetch failed, using local table: $e');
       if (mounted) setState(() => loading = false);
     }
   }

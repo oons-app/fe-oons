@@ -68,59 +68,66 @@ class _StaffScreenState extends ConsumerState<StaffScreen> {
     final pass = TextEditingController();
     final areasCtl = TextEditingController();
     var role = roleOps;
-    final ok = await v2Form(
-      context,
-      title: lang == 'ar' ? 'إضافة عضو فريق' : 'New staff member',
-      confirmLabel: lang == 'ar' ? 'إضافة' : 'Add',
-      bodyBuilder: (ctx, _) => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          V2FormField(label: lang == 'ar' ? 'الاسم' : 'Name', child: TextField(controller: name)),
-          const SizedBox(height: 12),
-          V2FormField(label: lang == 'ar' ? 'البريد' : 'Email', child: TextField(controller: email)),
-          const SizedBox(height: 12),
-          V2FormField(
-              label: lang == 'ar' ? 'كلمة مرور مؤقتة (١٠+ أحرف)' : 'Temp password (10+ chars)',
-              child: TextField(controller: pass, obscureText: true)),
-          const SizedBox(height: 12),
-          V2FormField(
-            label: lang == 'ar' ? 'الدور' : 'Role',
-            child: DropdownButtonFormField<String>(
-              initialValue: role,
-              items: [
-                for (final r in const [roleOps, roleFinance, roleVendor, roleAm])
-                  DropdownMenuItem(value: r, child: Text(roleLabel(r))),
-              ],
-              onChanged: (v) => role = v ?? roleOps,
-            ),
-          ),
-          const SizedBox(height: 12),
-          V2FormField(label: lang == 'ar' ? 'مناطق مدير الحساب' : 'AM areas', child: TextField(controller: areasCtl)),
-        ],
-      ),
-      onValidate: () {
-        if (pass.text.length < 10) {
-          v2Toast(context, lang == 'ar' ? 'كلمة المرور ١٠ أحرف على الأقل' : 'Password must be at least 10 characters', error: true);
-          return false;
-        }
-        return true;
-      },
-    );
-    if (!ok) return;
     try {
-      await staffClient.post('/admin/staff', data: {
-        'email': email.text.trim(),
-        'password': pass.text,
-        'staffRole': role,
-        if (name.text.trim().isNotEmpty) 'name': name.text.trim(),
-        if (areasCtl.text.trim().isNotEmpty) 'assignedAreas': areasCtl.text.trim(),
-      });
-      if (mounted) {
-        v2Toast(context, lang == 'ar' ? 'تمت الإضافة' : 'Staff added');
-        _load();
+      final ok = await v2Form(
+        context,
+        title: lang == 'ar' ? 'إضافة عضو فريق' : 'New staff member',
+        confirmLabel: lang == 'ar' ? 'إضافة' : 'Add',
+        bodyBuilder: (ctx, _) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            V2FormField(label: lang == 'ar' ? 'الاسم' : 'Name', child: TextField(controller: name)),
+            const SizedBox(height: 12),
+            V2FormField(label: lang == 'ar' ? 'البريد' : 'Email', child: TextField(controller: email)),
+            const SizedBox(height: 12),
+            V2FormField(
+                label: lang == 'ar' ? 'كلمة مرور مؤقتة (١٠+ أحرف)' : 'Temp password (10+ chars)',
+                child: TextField(controller: pass, obscureText: true)),
+            const SizedBox(height: 12),
+            V2FormField(
+              label: lang == 'ar' ? 'الدور' : 'Role',
+              child: DropdownButtonFormField<String>(
+                initialValue: role,
+                items: [
+                  for (final r in const [roleOps, roleFinance, roleVendor, roleAm])
+                    DropdownMenuItem(value: r, child: Text(roleLabel(r))),
+                ],
+                onChanged: (v) => role = v ?? roleOps,
+              ),
+            ),
+            const SizedBox(height: 12),
+            V2FormField(label: lang == 'ar' ? 'مناطق مدير الحساب' : 'AM areas', child: TextField(controller: areasCtl)),
+          ],
+        ),
+        onValidate: () {
+          if (pass.text.length < 10) {
+            v2Toast(context, lang == 'ar' ? 'كلمة المرور ١٠ أحرف على الأقل' : 'Password must be at least 10 characters', error: true);
+            return false;
+          }
+          return true;
+        },
+      );
+      if (!ok) return;
+      try {
+        await staffClient.post('/admin/staff', data: {
+          'email': email.text.trim(),
+          'password': pass.text,
+          'staffRole': role,
+          if (name.text.trim().isNotEmpty) 'name': name.text.trim(),
+          if (areasCtl.text.trim().isNotEmpty) 'assignedAreas': areasCtl.text.trim(),
+        });
+        if (mounted) {
+          v2Toast(context, lang == 'ar' ? 'تمت الإضافة' : 'Staff added');
+          _load();
+        }
+      } on ApiException catch (e) {
+        if (mounted) v2Toast(context, e.message, error: true);
       }
-    } on ApiException catch (e) {
-      if (mounted) v2Toast(context, e.message, error: true);
+    } finally {
+      name.dispose();
+      email.dispose();
+      pass.dispose();
+      areasCtl.dispose();
     }
   }
 

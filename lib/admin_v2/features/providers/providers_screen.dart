@@ -75,7 +75,9 @@ class _ProvidersScreenState extends ConsumerState<ProvidersScreen> {
     try {
       final data = await staffClient.get('/admin/vetting-sla');
       setState(() => sla = data);
-    } on ApiException catch (_) {}
+    } on ApiException catch (e) {
+      debugPrint('providers: vetting SLA fetch failed: ${e.message}');
+    }
   }
 
   Future<void> _reindex() async {
