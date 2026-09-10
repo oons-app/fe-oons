@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /pro/
+Disallow: /admin/
+
+Sitemap: https://oons.app/sitemap.xml

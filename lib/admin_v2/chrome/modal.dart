@@ -142,12 +142,18 @@ class _V2Modal extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Material(
-        color: Colors.transparent,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 480),
-          child: Container(
+    return Semantics(
+      // Names the dialog route for assistive tech (aria-label on web).
+      namesRoute: true,
+      scopesRoute: true,
+      explicitChildNodes: true,
+      label: title,
+      child: Center(
+        child: Material(
+          color: Colors.transparent,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
+            child: Container(
             margin: const EdgeInsets.all(24),
             decoration: BoxDecoration(
               color: Ops.card,
@@ -177,6 +183,7 @@ class _V2Modal extends StatelessWidget {
             ),
           ),
         ),
+      ),
       ),
     );
   }

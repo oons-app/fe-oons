@@ -1,0 +1,18 @@
+# Oons
+
+> Women-first home services for Greater Cairo — beauty, home cleaning, and food,
+> delivered by vetted female professionals with an escrow-backed booking flow.
+
+Oons (أُنس) is a booking app. This host serves the customer web app; most
+content is rendered client-side after sign-in.
+
+## Key pages
+
+- [Home](https://lady.oons.app/): browse services and start a booking
+- [Marketing site](https://oons.app/): what Oons is, for whom, and how it works
+- [Legal](https://oons.app/legal/privacy): privacy policy and terms
+
+## Notes
+
+- Booking, profiles, and account data require phone-OTP authentication.
+- For provider onboarding see https://oons.app/provider/.
