@@ -386,6 +386,7 @@ class _ProviderDetailScreenState extends ConsumerState<ProviderDetailScreen> {
             ],
           ),
         ),
+        _registrationSteps(prov, lang),
       ],
       right: [
         V2SectionCard(
@@ -418,6 +419,82 @@ class _ProviderDetailScreenState extends ConsumerState<ProviderDetailScreen> {
       ],
     );
   }
+
+  // ---- Registration / onboarding progress --------------------------------
+  Widget _registrationSteps(Map prov, String lang) {
+    final ar = lang == 'ar';
+    bool has(dynamic v) => v is List ? v.isNotEmpty : '${v ?? ''}'.trim().isNotEmpty;
+    final idOk = '${prov['idDocStatus'] ?? ''}'.toLowerCase() == 'accepted' || has(prov['idPhotoUrl']);
+    final fishOk = ['accepted', 'validated'].contains('${prov['fishDocStatus'] ?? ''}'.toLowerCase()) ||
+        has(prov['fishPhotoUrl']) ||
+        !isZeroTime(prov['fishValidatedAt']) ||
+        !isZeroTime(prov['fishGraceUntil']);
+    final profileOk = has(prov['bio']) && asInt(prov['years']) > 0;
+    final payoutOk = has(prov['payoutMethod']) && has(prov['payoutHandle']);
+    final vetted = !isZeroTime(prov['vettedAt']);
+    final rejected = !isZeroTime(prov['rejectedAt']);
+
+    final steps = <(String label, bool done, String note)>[
+      (ar ? 'الموافقة والتسجيل' : 'Consent & sign-up', !isZeroTime(prov['consentedAt']), formatDayOnly(prov['consentedAt'])),
+      (ar ? 'الملف الشخصي' : 'Profile details', profileOk, profileOk ? '' : (ar ? 'نبذة/خبرة ناقصة' : 'bio / experience missing')),
+      (ar ? 'الرقم القومي' : 'National ID', idOk, '${prov['idDocStatus'] ?? (idOk ? 'uploaded' : 'missing')}'),
+      (ar ? 'الفيش الجنائي' : 'Criminal record (FISH)', fishOk,
+          !isZeroTime(prov['fishGraceUntil']) && !fishOkStrict(prov)
+              ? '${ar ? 'مهلة حتى' : 'grace to'} ${formatDayOnly(prov['fishGraceUntil'])}'
+              : '${prov['fishDocStatus'] ?? (fishOk ? 'uploaded' : 'missing')}'),
+      (ar ? 'الخدمات' : 'Services added', has(prov['items']), '${asDynList(prov['items']).length}'),
+      (ar ? 'مناطق التغطية' : 'Coverage areas', has(prov['areas']), '${asDynList(prov['areas']).length}'),
+      (ar ? 'أوقات العمل' : 'Availability set', has(prov['workDays']), '${asDynList(prov['workDays']).length} ${ar ? 'يوم' : 'days'}'),
+      (ar ? 'المعرض' : 'Portfolio', has(prov['portfolio']), '${asDynList(prov['portfolio']).length}'),
+      (ar ? 'حساب الدفع' : 'Payout account', payoutOk, payoutOk ? '${prov['payoutMethod']}' : ''),
+      (
+        ar ? 'التحقق' : 'Vetting',
+        vetted,
+        rejected ? (ar ? 'مرفوضة' : 'rejected') : (vetted ? formatDayOnly(prov['vettedAt']) : (ar ? 'بانتظار' : 'pending'))
+      ),
+    ];
+    final doneCount = steps.where((s) => s.$2).length;
+
+    return V2SectionCard(
+      title: ar ? 'خطوات التسجيل' : 'Registration steps',
+      subtitle: '$doneCount / ${steps.length} ${ar ? 'مكتملة' : 'complete'}',
+      child: Column(
+        children: [
+          for (var i = 0; i < steps.length; i++)
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 9),
+              decoration: BoxDecoration(
+                border: Border(top: i == 0 ? BorderSide.none : const BorderSide(color: Ops.rowBorder)),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    steps[i].$2 ? Icons.check_circle : Icons.radio_button_unchecked,
+                    size: 17,
+                    color: steps[i].$2 ? Ops.green : Ops.borderStrong,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(steps[i].$1,
+                        style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: steps[i].$2 ? Ops.ink : Ops.inkSoft)),
+                  ),
+                  if (steps[i].$3.trim().isNotEmpty)
+                    Text(steps[i].$3,
+                        style: const TextStyle(fontSize: 11.5, color: Ops.mutedSoft, fontFamily: Ops.mono)),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  bool fishOkStrict(Map prov) =>
+      ['accepted', 'validated'].contains('${prov['fishDocStatus'] ?? ''}'.toLowerCase()) ||
+      !isZeroTime(prov['fishValidatedAt']);
 
   // ---- Documents ----------------------------------------------------------
   Widget _documents(Map prov, String lang, bool canVet) {
