@@ -255,7 +255,8 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
             _kv(lang == 'ar' ? 'المنطقة' : 'Area', areaLabel(c['area'], lang)),
             _kv(lang == 'ar' ? 'انضمّت' : 'Joined', formatDayOnly(c['createdAt'])),
             _kv(lang == 'ar' ? 'الحجوزات' : 'Bookings', '${bookings.length}'),
-            _kv(lang == 'ar' ? 'الوسم' : 'Tag', '${c['tag'] ?? '—'}', last: true),
+            _kv(lang == 'ar' ? 'التقييم' : 'Rating', asDouble(c['rating']) > 0 ? asDouble(c['rating']).toStringAsFixed(1) : '—'),
+            _kv(lang == 'ar' ? 'اللغة' : 'Locale', '${c['locale'] ?? '—'}', last: true),
           ],
         ),
       ),
@@ -424,7 +425,11 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
             children: [
               V2Btn(label: lang == 'ar' ? '→ العميلات' : '← Customers', onPressed: () => context.go(V2Paths.customers)),
               Text(name, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
-              V2StatusPill.forLabel('${c['status'] ?? ''}'.toLowerCase().contains('hold') ? 'On hold' : 'Active', large: true),
+              if (bookings.isNotEmpty)
+                V2StatusPill(
+                    label: statusLabel('${bookings.first['status']}', lang),
+                    tone: statusTone('${bookings.first['status']}'),
+                    large: true),
               Text('${c['phone'] ?? ''}', style: const TextStyle(fontSize: 13, color: Ops.muted, fontFamily: Ops.mono)),
               const SizedBox(width: 1),
               if (staffCan(role, 'users.impersonate')) V2Btn.imp('Impersonate', onPressed: _impersonate),

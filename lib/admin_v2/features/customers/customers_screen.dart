@@ -29,12 +29,10 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
   bool loading = true;
   String? error;
   String q = '';
-  String status = 'All'; // All | Active | On hold
   String visits = ''; // '', any, none, live, done, dispute
   bool advanced = false;
   Timer? _debounce;
 
-  static const _statusFilters = ['All', 'Active', 'On hold'];
   static const _visitFilters = [
     ('any', 'Has visits'),
     ('none', 'No visits'),
@@ -63,8 +61,6 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
       });
       final query = <String, dynamic>{'limit': 100};
       if (q.isNotEmpty) query['q'] = q;
-      if (status == 'Active') query['status'] = 'active';
-      if (status == 'On hold') query['status'] = 'on_hold';
       if (visits.isNotEmpty) query['visits'] = visits;
       final data = await staffClient.get('/admin/users', query: query);
       setState(() {
@@ -127,15 +123,6 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
         ),
       ],
       filters: [
-        for (final f in _statusFilters)
-          V2FilterChip(
-            label: f == 'All' ? (lang == 'ar' ? 'الكل' : 'All') : (f == 'Active' ? (lang == 'ar' ? 'نشطة' : 'Active') : (lang == 'ar' ? 'موقوفة' : 'On hold')),
-            selected: status == f,
-            onTap: () {
-              setState(() => status = f);
-              _load();
-            },
-          ),
         if (advanced)
           for (final f in _visitFilters)
             V2FilterChip(
@@ -153,34 +140,28 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
         V2Col(lang == 'ar' ? 'المنطقة' : 'Area', fixed: 120),
         V2Col(lang == 'ar' ? 'الحجوزات' : 'Bookings', fixed: 100),
         V2Col(lang == 'ar' ? 'انضمّت' : 'Joined', fixed: 110),
-        V2Col(lang == 'ar' ? 'الحالة' : 'Status', fixed: 100),
+        V2Col(lang == 'ar' ? 'آخر حجز' : 'Last visit', fixed: 120),
       ],
       rows: [
         for (final c in customers)
           V2GridRow(
             onTap: () => context.go(V2Paths.customer(idOf(c))),
             cells: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(personName(c, lang, fallbackId: idOf(c)),
-                      maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                  if ('${c['tag'] ?? ''}'.isNotEmpty)
-                    Text('${c['tag']}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, color: Ops.mutedSoft)),
-                ],
-              ),
+              Text(personName(c, lang, fallbackId: idOf(c)),
+                  maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
               Text('${c['phone'] ?? ''}',
                   maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12.5, fontFamily: Ops.mono, color: Ops.inkSoft)),
               Text(areaLabel(c['area'] ?? c['areaName'], lang),
                   maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, color: Ops.inkSoft)),
               Text('${asInt(c['bookingCount'])}', style: const TextStyle(fontSize: 13, fontFamily: Ops.mono)),
               Text(formatDayOnly(c['createdAt']), style: const TextStyle(fontSize: 12.5, fontFamily: Ops.mono, color: Ops.muted)),
-              Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: V2StatusPill.forLabel(
-                    '${c['status'] ?? ''}'.toLowerCase().contains('hold') ? 'On hold' : 'Active'),
-              ),
+              '${c['lastStatus'] ?? ''}'.isEmpty
+                  ? const Text('—', style: TextStyle(fontSize: 13, color: Ops.muted))
+                  : Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: V2StatusPill(
+                          label: statusLabel('${c['lastStatus']}', lang), tone: statusTone('${c['lastStatus']}')),
+                    ),
             ],
             actions: [
               if (canImpersonate) V2Btn.imp('Impersonate', onPressed: () => _impersonate(c), size: V2BtnSize.row),

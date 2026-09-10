@@ -128,8 +128,14 @@ bool isZeroTime(dynamic v) {
 String providerVetting(Map p, String lang) {
   if (!isZeroTime(p['rejectedAt'])) return lang == 'ar' ? 'مرفوضة' : 'Rejected';
   if (!isZeroTime(p['vettedAt'])) return lang == 'ar' ? 'تم التحقق' : 'Vetted';
-  final hasId = '${p['idPhotoUrl'] ?? p['idPath'] ?? ''}'.isNotEmpty;
-  final hasFish = '${p['fishPhotoUrl'] ?? p['fishPath'] ?? ''}'.isNotEmpty;
+  // List mode omits the photo URLs; fall back to the doc-status flags the DTO
+  // always sends (unknown | uploaded | validated | pending | accepted | rejected).
+  final idS = '${p['idDocStatus'] ?? ''}'.toLowerCase();
+  final fishS = '${p['fishDocStatus'] ?? ''}'.toLowerCase();
+  final hasId = '${p['idPhotoUrl'] ?? p['idPath'] ?? ''}'.isNotEmpty ||
+      (idS.isNotEmpty && idS != 'unknown' && idS != 'missing');
+  final hasFish = '${p['fishPhotoUrl'] ?? p['fishPath'] ?? ''}'.isNotEmpty ||
+      (fishS.isNotEmpty && fishS != 'unknown' && fishS != 'missing');
   if (!hasId || !hasFish) return lang == 'ar' ? 'بانتظار المستندات' : 'Awaiting docs';
   return lang == 'ar' ? 'بانتظار المراجعة' : 'Pending review';
 }
@@ -163,6 +169,7 @@ int listLen(dynamic v) {
 }
 
 int serviceCountOf(Map p) {
+  if (p['itemCount'] != null) return asInt(p['itemCount']);
   if (p['serviceCount'] != null) return asInt(p['serviceCount']);
   if (p['items'] is List) return (p['items'] as List).length;
   if (p['services'] is List) return (p['services'] as List).length;

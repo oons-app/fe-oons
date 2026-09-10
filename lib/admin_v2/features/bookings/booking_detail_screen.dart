@@ -148,8 +148,12 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen> {
     final travel = asInt(b['travel']);
     final serviceAmt = total - trust - travel;
     final method = paymentMethodLabel('${b['paymentMethod'] ?? ''}', lang);
-    final disputeState = '${b['disputeState'] ?? b['dispute'] ?? ''}'.toLowerCase();
-    final hasDispute = disputeState.isNotEmpty && disputeState != 'none';
+    // No dispute field on the DTO — infer from status / refund.
+    final disputeNote = '${b['status']}'.toLowerCase() == 'disputed'
+        ? (lang == 'ar' ? 'نزاع مفتوح' : 'Dispute open')
+        : asInt(b['refundAmount']) > 0
+            ? '${lang == 'ar' ? 'مُسترد' : 'Refunded'} ${money(asInt(b['refundAmount']), lang)}'
+            : (lang == 'ar' ? 'لا نزاع على هذا الحجز' : 'No dispute on this booking');
     final timeline = asDynList(b['timeline']);
 
     final left = <Widget>[
@@ -165,7 +169,7 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen> {
                 _fact(lang == 'ar' ? 'التاريخ' : 'Date', formatDayOnly(b['slotStart'])),
                 _fact(lang == 'ar' ? 'الوقت' : 'Time', formatTimeOnly(b['slotStart'])),
                 _fact(lang == 'ar' ? 'الخدمة' : 'Service', serviceLabel(b, lang)),
-                _fact(lang == 'ar' ? 'الفئة' : 'Category', '${b['categoryName'] ?? b['category'] ?? ''}'),
+                _fact(lang == 'ar' ? 'الفئة' : 'Category', '${b['service'] ?? b['categoryName'] ?? b['category'] ?? ''}'),
                 _fact(lang == 'ar' ? 'المنطقة' : 'Area', area),
                 _fact(lang == 'ar' ? 'الدفع للمهنية' : 'Payout', b['opsPaid'] == true ? (lang == 'ar' ? 'مسوّاة' : 'Settled') : (lang == 'ar' ? 'معلقة' : 'Pending')),
               ],
@@ -296,9 +300,7 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen> {
       if (canWrite)
         V2SectionCard(
           title: lang == 'ar' ? 'النزاع' : 'Dispute',
-          subtitle: hasDispute
-              ? '${lang == 'ar' ? 'نزاع' : 'Dispute'}: ${b['disputeState'] ?? b['dispute']}'
-              : (lang == 'ar' ? 'لا نزاع على هذا الحجز' : 'No dispute on this booking'),
+          subtitle: disputeNote,
           child: Column(
             children: [
               V2Btn(

@@ -270,12 +270,12 @@ class _ProvidersScreenState extends ConsumerState<ProvidersScreen> {
                   V2GridRow(
                     onTap: () => context.go(V2Paths.provider(idOf(p))),
                     cells: [
-                      _identity(personName(p, lang, fallbackId: idOf(p)), '${p['category'] ?? p['vertical'] ?? ''}'),
+                      _identity(personName(p, lang, fallbackId: idOf(p)), '${p['service'] ?? p['category'] ?? p['vertical'] ?? ''}'),
                       Text('${p['phone'] ?? ''}',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(fontSize: 12.5, fontFamily: Ops.mono, color: Ops.ink)),
-                      Text('${p['category'] ?? p['vertical'] ?? ''}',
+                      Text('${p['service'] ?? p['category'] ?? p['vertical'] ?? ''}',
                           maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, color: Ops.inkSoft)),
                       Text(asDouble(p['rating']).toStringAsFixed(1),
                           style: const TextStyle(fontSize: 13, fontFamily: Ops.mono, fontWeight: FontWeight.w600)),

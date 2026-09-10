@@ -28,6 +28,8 @@ class ProviderDetailScreen extends ConsumerStatefulWidget {
 
 class _ProviderDetailScreenState extends ConsumerState<ProviderDetailScreen> {
   Map<String, dynamic>? p;
+  Map<String, dynamic> ledger = {};
+  List<Map<String, dynamic>> jobs = [];
   bool loading = true;
   String? error;
   String tab = 'Overview';
@@ -46,8 +48,20 @@ class _ProviderDetailScreenState extends ConsumerState<ProviderDetailScreen> {
         error = null;
       });
       final data = await staffClient.get('/admin/providers/${widget.providerId}');
+      // The provider DTO carries no ledger or job history — pull them alongside.
+      final results = await Future.wait([
+        staffClient
+            .get('/admin/ledger', query: {'providerId': widget.providerId})
+            .catchError((_) => <String, dynamic>{}),
+        staffClient
+            .get('/admin/bookings', query: {'providerId': widget.providerId, 'limit': 20})
+            .catchError((_) => <String, dynamic>{}),
+      ]);
+      final led = asMapList(results[0]['ledgers'] ?? results[0]['ledger']);
       setState(() {
         p = unwrapEntity(data, const ['provider']);
+        ledger = led.isNotEmpty ? led.first : {};
+        jobs = asMapList(results[1]['bookings']);
         loading = false;
       });
     } on ApiException catch (e) {
@@ -340,14 +354,18 @@ class _ProviderDetailScreenState extends ConsumerState<ProviderDetailScreen> {
   // ---- Overview -------------------------------------------------------------
   Widget _overview(Map prov, String lang, bool canWrite) {
     final notes = '${prov['staffNotes'] ?? ''}'.trim();
-    final stats = asMap(prov['stats']) ?? {};
+    final years = asInt(prov['years'] ?? prov['experience'] ?? prov['experienceYears']);
+    final specialty = locName(prov['specialty'], lang);
+    final category = '${prov['service'] ?? prov['category'] ?? prov['vertical'] ?? ''}'
+        '${specialty.isNotEmpty ? ' · $specialty' : ''}';
+    final done = jobs.where((b) => '${b['status']}'.toLowerCase() == 'completed' || '${b['status']}'.toLowerCase() == 'released').length;
     final facts = <(String, String)>[
       (lang == 'ar' ? 'الاسم على الهوية' : 'Name on ID', personName(prov, lang, fallbackId: idOf(prov))),
       (lang == 'ar' ? 'الرقم القومي' : 'National ID', '${prov['nationalId'] ?? prov['national'] ?? ''}'),
       (lang == 'ar' ? 'الهاتف' : 'Phone', '${prov['phone'] ?? ''}'),
-      (lang == 'ar' ? 'الفئة' : 'Category', '${prov['category'] ?? prov['vertical'] ?? ''}'),
-      (lang == 'ar' ? 'الخبرة' : 'Experience', '${prov['experience'] ?? prov['experienceYears'] ?? ''}'),
-      (lang == 'ar' ? 'انضمّت' : 'Joined', formatDayOnly(prov['createdAt'] ?? prov['consentedAt'])),
+      (lang == 'ar' ? 'الفئة' : 'Category', category),
+      (lang == 'ar' ? 'الخبرة' : 'Experience', years > 0 ? '$years ${lang == 'ar' ? 'سنة' : 'yrs'}' : '—'),
+      (lang == 'ar' ? 'انضمّت' : 'Joined', formatDayOnly(prov['consentedAt'] ?? prov['createdAt'])),
       (lang == 'ar' ? 'التقييم' : 'Rating', asDouble(prov['rating']).toStringAsFixed(1)),
     ];
     return _twoCol(
@@ -373,10 +391,10 @@ class _ProviderDetailScreenState extends ConsumerState<ProviderDetailScreen> {
         V2SectionCard(
           title: lang == 'ar' ? 'الأداء' : 'Performance',
           child: _statGrid([
-            (lang == 'ar' ? 'الوظائف' : 'Jobs', '${stats['totalBookings'] ?? stats['jobs'] ?? prov['jobCount'] ?? 0}'),
+            (lang == 'ar' ? 'الوظائف' : 'Jobs', '${jobs.length}'),
             (lang == 'ar' ? 'التقييم' : 'Rating', asDouble(prov['rating']).toStringAsFixed(1)),
-            (lang == 'ar' ? 'الإكمال' : 'Completion', '${stats['completionRate'] ?? stats['completion'] ?? '—'}'),
-            (lang == 'ar' ? 'المطالبات' : 'Claims', '${stats['claims'] ?? 0}'),
+            (lang == 'ar' ? 'مكتملة' : 'Completed', '$done'),
+            (lang == 'ar' ? 'المراجعات' : 'Reviews', '${asInt(prov['reviewCount'])}'),
           ]),
         ),
         V2SectionCard(
@@ -603,8 +621,11 @@ class _ProviderDetailScreenState extends ConsumerState<ProviderDetailScreen> {
   // ---- Coverage --------------------------------------------------------
   Widget _coverage(Map prov, String lang, bool canVet) {
     final selected = asDynList(prov['areas']).map((e) => '$e').toSet();
-    final sched = asMap(prov['schedule']) ?? asMap(prov['availability']) ?? {};
-    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    // workDays is a list of weekday indices (0 = Sun). slotHours are "HH:mm" strings.
+    final workDays = asDynList(prov['workDays']).map((e) => asInt(e)).toSet();
+    final slots = asDynList(prov['slotHours']).map((e) => '$e').toList()..sort();
+    final hoursLabel = slots.length >= 2 ? '${slots.first} — ${slots.last}' : (slots.isNotEmpty ? slots.join(', ') : '09:00 — 21:00');
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     return _twoCol(
       lang,
       left: [
@@ -643,27 +664,25 @@ class _ProviderDetailScreenState extends ConsumerState<ProviderDetailScreen> {
           title: lang == 'ar' ? 'الجدول الأسبوعي' : 'Weekly schedule',
           child: Column(
             children: [
-              for (final d in days)
-                Container(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  decoration: const BoxDecoration(border: Border(top: BorderSide(color: Ops.rowBorder))),
-                  child: Row(
-                    children: [
-                      SizedBox(width: 48, child: Text(d, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600))),
-                      const SizedBox(width: 11),
-                      Expanded(
-                        child: Text(
-                          (sched[d.toLowerCase()] ?? sched[d]) != null && '${sched[d.toLowerCase()] ?? sched[d]}' != 'false'
-                              ? '09:00 — 21:00'
-                              : (lang == 'ar' ? 'غير متاح' : 'Unavailable'),
-                          style: const TextStyle(fontSize: 12.5, color: Ops.inkSoft, fontFamily: Ops.mono),
+              for (var i = 0; i < days.length; i++)
+                Builder(builder: (_) {
+                  final on = workDays.isEmpty ? i != 5 : workDays.contains(i);
+                  return Container(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    decoration: const BoxDecoration(border: Border(top: BorderSide(color: Ops.rowBorder))),
+                    child: Row(
+                      children: [
+                        SizedBox(width: 48, child: Text(days[i], style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600))),
+                        const SizedBox(width: 11),
+                        Expanded(
+                          child: Text(on ? hoursLabel : (lang == 'ar' ? 'غير متاح' : 'Unavailable'),
+                              style: const TextStyle(fontSize: 12.5, color: Ops.inkSoft, fontFamily: Ops.mono)),
                         ),
-                      ),
-                      V2StatusPill.forLabel(
-                          (sched[d.toLowerCase()] ?? sched[d]) != null ? 'Active' : 'Inactive'),
-                    ],
-                  ),
-                ),
+                        V2StatusPill.forLabel(on ? 'Active' : 'Inactive'),
+                      ],
+                    ),
+                  );
+                }),
             ],
           ),
         ),
@@ -726,8 +745,7 @@ class _ProviderDetailScreenState extends ConsumerState<ProviderDetailScreen> {
   Widget _money(Map prov, String lang, bool canVet) {
     final method = '${prov['payoutMethod'] ?? ''}';
     final handle = '${prov['payoutHandle'] ?? prov['payoutAccount'] ?? ''}';
-    final ledger = asMap(prov['ledger']) ?? asMap(prov['earnings']) ?? {};
-    final jobs = asDynList(prov['recentJobs'] ?? prov['jobsList']).map((e) => asMap(e) ?? {}).toList();
+    // ledger + jobs are fetched separately in _load().
     return _twoCol(
       lang,
       left: [
@@ -959,14 +977,15 @@ class _DocCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accepted = status.toLowerCase() == 'accepted';
-    final chipLabel = status.toLowerCase() == 'accepted'
+    final s = status.toLowerCase();
+    final accepted = s == 'accepted' || s == 'validated';
+    final chipLabel = accepted
         ? 'Accepted'
-        : status.toLowerCase() == 'rejected'
+        : s == 'rejected'
             ? 'Rejected'
-            : status.toLowerCase().contains('track')
+            : s.contains('track')
                 ? 'Not tracked'
-                : url == null
+                : (url == null && (s.isEmpty || s == 'unknown' || s == 'missing'))
                     ? 'Missing'
                     : 'Pending review';
     return Column(

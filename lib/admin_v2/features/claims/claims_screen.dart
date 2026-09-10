@@ -143,12 +143,13 @@ class _ClaimsScreenState extends ConsumerState<ClaimsScreen> {
           ),
       ],
       columns: [
-        V2Col(lang == 'ar' ? 'المطالبة' : 'Claim', fixed: 118),
-        V2Col(lang == 'ar' ? 'الحجز' : 'Booking', fixed: 130),
+        V2Col(lang == 'ar' ? 'المطالبة' : 'Claim', fixed: 110),
+        V2Col(lang == 'ar' ? 'الحجز' : 'Booking', fixed: 120),
         V2Col(lang == 'ar' ? 'العميلة' : 'Customer', flex: 1),
-        V2Col(lang == 'ar' ? 'المالك' : 'Owner', flex: 0.9),
+        V2Col(lang == 'ar' ? 'المهنية' : 'Professional', flex: 1),
+        V2Col(lang == 'ar' ? 'النوع' : 'Type', fixed: 100),
         V2Col(lang == 'ar' ? 'فُتحت' : 'Opened', fixed: 108),
-        V2Col(lang == 'ar' ? 'الحالة' : 'Status', fixed: 118),
+        V2Col(lang == 'ar' ? 'الحالة' : 'Status', fixed: 110),
       ],
       rows: [
         for (final c in _rows)
@@ -161,20 +162,17 @@ class _ClaimsScreenState extends ConsumerState<ClaimsScreen> {
                   final bid = '${c['bookingId'] ?? ''}';
                   if (bid.isNotEmpty) context.go(V2Paths.booking(bid));
                 },
-                child: Text('#${shortId('${c['bookingId'] ?? ''}')}',
+                child: Text(
+                    '${c['bookingRef'] ?? ''}'.isNotEmpty ? '${c['bookingRef']}' : '#${shortId('${c['bookingId'] ?? ''}')}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontSize: 12.5, fontFamily: Ops.mono, color: Ops.plum)),
               ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('${c['customer'] ?? c['customerName'] ?? ''}',
-                      maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13)),
-                  Text('${c['kind'] ?? c['type'] ?? ''}',
-                      maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, color: Ops.mutedSoft)),
-                ],
-              ),
-              Text('${c['owner'] ?? c['resolvedByAdminId'] ?? '—'}',
+              Text(personName(c['clientName'] ?? c['customer'] ?? c['customerName'], lang, fallbackId: '${c['clientId'] ?? ''}'),
+                  maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13)),
+              Text(personName(c['providerName'], lang, fallbackId: '${c['providerId'] ?? ''}'),
+                  maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, color: Ops.inkSoft)),
+              Text('${c['kind'] ?? c['type'] ?? ''}',
                   maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, color: Ops.inkSoft)),
               Text(formatDayOnly(c['createdAt']), style: const TextStyle(fontSize: 12.5, fontFamily: Ops.mono, color: Ops.muted)),
               Align(
