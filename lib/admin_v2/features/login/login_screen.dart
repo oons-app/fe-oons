@@ -27,7 +27,6 @@ class _V2LoginScreenState extends ConsumerState<V2LoginScreen> {
   }
 
   Future<void> _submit() async {
-    final lang = ref.read(localeCodeProvider);
     setState(() => busy = true);
     try {
       await ref.read(staffSessionProvider.notifier).login(email.text.trim(), password.text);
