@@ -80,7 +80,10 @@ final v2RouterProvider = Provider<GoRouter>((ref) {
         routes: [
           GoRoute(path: V2Paths.home, builder: (_, __) => const HomeScreen()),
           GoRoute(path: V2Paths.live, builder: (_, __) => const LiveScreen()),
-          GoRoute(path: V2Paths.bookings, builder: (_, __) => const BookingsScreen()),
+          GoRoute(
+            path: V2Paths.bookings,
+            builder: (_, s) => BookingsScreen(queryParams: s.uri.queryParameters),
+          ),
           GoRoute(
             path: '${V2Paths.bookings}/:id',
             builder: (_, s) => BookingDetailScreen(bookingId: s.pathParameters['id']!),
@@ -90,7 +93,10 @@ final v2RouterProvider = Provider<GoRouter>((ref) {
             path: '${V2Paths.customers}/:id',
             builder: (_, s) => CustomerDetailScreen(customerId: s.pathParameters['id']!),
           ),
-          GoRoute(path: V2Paths.providers, builder: (_, __) => const ProvidersScreen()),
+          GoRoute(
+            path: V2Paths.providers,
+            builder: (_, s) => ProvidersScreen(queryParams: s.uri.queryParameters),
+          ),
           GoRoute(
             path: '${V2Paths.providers}/:id',
             builder: (_, s) => ProviderDetailScreen(providerId: s.pathParameters['id']!),
