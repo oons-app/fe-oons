@@ -45,9 +45,17 @@ ThemeData opsV2Theme({required bool arabic}) {
         backgroundColor: Ops.plum,
         foregroundColor: Ops.plumText,
         elevation: 0,
-        padding: const EdgeInsetsDirectional.symmetric(horizontal: 16, vertical: 12),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Ops.radiusCtl)),
+        textStyle: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, fontFamily: Ops.sans),
+        padding: const EdgeInsetsDirectional.symmetric(horizontal: 15, vertical: 11),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Ops.radiusBtn)),
       ),
+    ),
+    snackBarTheme: SnackBarThemeData(
+      backgroundColor: Ops.plum,
+      contentTextStyle: const TextStyle(color: Ops.plumTextSoft, fontSize: 12.5, fontFamily: Ops.sans),
+      behavior: SnackBarBehavior.floating,
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(11)),
     ),
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
