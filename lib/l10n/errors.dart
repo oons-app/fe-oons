@@ -52,8 +52,29 @@ String friendlyError(Object e, String lang) {
     };
     final key = keys[msg];
     if (key != null) return '${t[key]}';
-    // Never surface raw English API text in Arabic UI.
-    if (lang == 'ar') return '${t['generic']}';
+
+    // Curated Arabic for the provider-registration validation messages
+    // (the server returns clear English; the Arabic UI must say what to fix).
+    if (lang == 'ar') {
+      const ar = <String, String>{
+        'Need your details.': 'في بيانات ناقصة أو بصيغة غلط. راجعي الفورم وجرّبي تاني.',
+        'Need your first and last name.': 'اكتبي الاسم الأول واسم العيلة.',
+        'Pick a service: beauty, cleaning, or chef.': 'اختاري الخدمة: تجميل، تنظيف، أو شيف.',
+        'Pick at least one live neighbourhood.': 'اختاري منطقة تغطية واحدة على الأقل من المتاحة.',
+        'Need your legal name, birth date, and residence.': 'اكتبي الاسم القانوني، تاريخ الميلاد، والعنوان.',
+        'Professionals must be 21 or older.': 'لازم يكون عمرك ٢١ سنة أو أكتر، وتاريخ الميلاد بصيغة سنة-شهر-يوم (مثال: 1995-01-31).',
+        'National ID must be 14 digits.': 'الرقم القومي لازم يكون ١٤ رقم بالظبط.',
+        'Need every legal consent to continue.': 'لازم توافقي على كل البنود عشان تكملي.',
+        'Need your legal name.': 'اكتبي الاسم القانوني الكامل.',
+      };
+      final m = ar[msg];
+      if (m != null) return m;
+      // Client-side validation errors: tell them to check inputs, not "server busy".
+      if (e.status >= 400 && e.status < 500) {
+        return 'في بيانات مش مظبوطة في الفورم. راجعيها وجرّبي تاني.';
+      }
+      return '${t['generic']}';
+    }
     if (msg.isNotEmpty && msg != 'error' && msg != 'offline' && !_technical(low)) return msg;
     return '${t['generic']}';
   }
