@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "lib/**"
+      - "test/**"
+      - "web/**"
+      - "assets/**"
+      - "pubspec.yaml"
+      - "pubspec.lock"
+      - "analysis_options.yaml"
+      - ".github/workflows/ci.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "lib/**"
+      - "test/**"
+      - "web/**"
+      - "assets/**"
+      - "pubspec.yaml"
+      - "pubspec.lock"
+      - "analysis_options.yaml"
+      - ".github/workflows/ci.yml"
+
+concurrency:
+  group: ci-fe-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Flutter analyze, test & web build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.47.2"
+          channel: stable
+          cache: true
+
+      - name: Pub get
+        run: flutter pub get
+
+      # Full-tree analyze fails on web-only libs (dart:html / dart:js_util) under VM.
+      - name: Analyze Ops Console
+        run: flutter analyze lib/admin_v2 --no-fatal-infos
+
+      - name: Test
+        run: flutter test
+
+      - name: Build Ops Console (web)
+        run: |
+          flutter build web -t lib/admin_v2/main.dart --release --base-href / \
+            --dart-define=API_BASE=https://api.oons.app \
+            --dart-define=PUBLIC_WEB_BASE=https://lady.oons.app \
+            --no-wasm-dry-run

@@ -1,17 +1,18 @@
-# oons
+# fe-oons
 
-A new Flutter project.
+Flutter app + Ops Console v2 (`lib/admin_v2`). Live staff UI: https://bo.oons.app
 
-## Getting Started
+Remote: https://github.com/oons-app/fe-oons
 
-This project is a starting point for a Flutter application.
+## CI/CD
 
-A few resources to get you started if this is your first Flutter project:
+See [docs/ci-cd.md](docs/ci-cd.md). Push to `main` (app paths) builds and deploys the Ops Console to Lightsail. Requires the same Lightsail secrets as `be-oons` on the **production** environment.
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+## Local Ops Console build
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+```bash
+flutter build web -t lib/admin_v2/main.dart --release --base-href / \
+  --dart-define=API_BASE=https://api.oons.app \
+  --dart-define=PUBLIC_WEB_BASE=https://lady.oons.app \
+  --no-wasm-dry-run
+```

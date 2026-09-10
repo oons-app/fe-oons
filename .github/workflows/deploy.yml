@@ -1,0 +1,93 @@
+name: Deploy Lightsail
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "lib/**"
+      - "web/**"
+      - "assets/**"
+      - "pubspec.yaml"
+      - "pubspec.lock"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-fe-lightsail
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy Ops Console to Lightsail
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.47.2"
+          channel: stable
+          cache: true
+
+      - name: Pub get
+        run: flutter pub get
+
+      - name: Build Ops Console (web)
+        run: |
+          set -euo pipefail
+          flutter build web -t lib/admin_v2/main.dart --release --base-href / \
+            --dart-define=API_BASE=https://api.oons.app \
+            --dart-define=PUBLIC_WEB_BASE=https://lady.oons.app \
+            --no-wasm-dry-run
+
+      - name: Setup SSH
+        env:
+          SSH_KEY: ${{ secrets.LIGHTSAIL_SSH_PRIVATE_KEY }}
+          HOST: ${{ secrets.LIGHTSAIL_HOST }}
+          KNOWN_HOSTS: ${{ secrets.LIGHTSAIL_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          if [ -n "${KNOWN_HOSTS:-}" ]; then
+            printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          else
+            ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          fi
+          chmod 644 ~/.ssh/known_hosts
+          cat >> ~/.ssh/config <<EOF
+          Host lightsail
+            HostName ${HOST}
+            User ${{ secrets.LIGHTSAIL_USER }}
+            IdentityFile ~/.ssh/id_deploy
+            IdentitiesOnly yes
+            StrictHostKeyChecking yes
+          EOF
+          chmod 600 ~/.ssh/config
+
+      - name: Rsync Ops Console to web-root
+        run: |
+          set -euo pipefail
+          # nginx bind-mounts ./web-root — rsync is enough (no container recreate).
+          rsync -az --delete \
+            -e "ssh -F $HOME/.ssh/config" \
+            build/web/ \
+            lightsail:/opt/oonsa/web-root/oons/admin/
+
+      - name: Health check
+        run: |
+          set -euo pipefail
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" https://bo.oons.app/ || true)
+            if [ "$code" = "200" ] || [ "$code" = "301" ] || [ "$code" = "302" ]; then
+              echo "bo.oons.app healthy ($code)"
+              exit 0
+            fi
+            echo "waiting... bo.oons.app=$code"
+            sleep 3
+          done
+          echo "Ops Console health check failed"
+          exit 1
