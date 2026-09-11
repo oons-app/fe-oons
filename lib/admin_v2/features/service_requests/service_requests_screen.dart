@@ -140,6 +140,30 @@ class _ServiceRequestsScreenState extends ConsumerState<ServiceRequestsScreen> {
     }
   }
 
+  /// categoryStatus off the wire is the backend's raw enum key
+  /// (pending_addition_approval, pending_initial_vetting, active, rejected,
+  /// changes_requested) — V2StatusPill.forLabel only exact-matches a fixed
+  /// English vocabulary, so passing that key straight through showed the
+  /// raw snake_case string verbatim (in both languages) for anything other
+  /// than the two keys that happen to already read as English words
+  /// ("active", "rejected"). This maps every value to a real label + tone.
+  Widget _categoryStatusPill(String rawStatus, bool anyChangesRequested, String lang) {
+    if (anyChangesRequested || rawStatus == 'changes_requested') {
+      return V2StatusPill(label: lang == 'ar' ? 'مطلوب تعديل' : 'Changes requested', tone: V2Tone.warn);
+    }
+    switch (rawStatus) {
+      case 'active':
+        return V2StatusPill(label: lang == 'ar' ? 'نشط' : 'Active', tone: V2Tone.ok);
+      case 'rejected':
+        return V2StatusPill(label: lang == 'ar' ? 'مرفوض' : 'Rejected', tone: V2Tone.bad);
+      case 'pending_addition_approval':
+      case 'pending_initial_vetting':
+        return V2StatusPill(label: lang == 'ar' ? 'قيد المراجعة' : 'Pending', tone: V2Tone.warn);
+      default:
+        return V2StatusPill(label: rawStatus, tone: V2Tone.neutral);
+    }
+  }
+
   String _detail(Map r, String lang) {
     final price = money(asInt(r['price']), lang);
     final isCleaning = '${r['kind']}' == 'cleaning';
@@ -223,7 +247,7 @@ class _ServiceRequestsScreenState extends ConsumerState<ServiceRequestsScreen> {
                 child: Text(locName(first['categoryName'], lang),
                     style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
               ),
-              if (categoryStatus.isNotEmpty) V2StatusPill.forLabel(anyChangesRequested ? 'Changes requested' : categoryStatus),
+              if (categoryStatus.isNotEmpty) _categoryStatusPill(categoryStatus, anyChangesRequested, lang),
             ],
           ),
           const SizedBox(height: 2),

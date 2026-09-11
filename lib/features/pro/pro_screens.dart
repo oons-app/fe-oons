@@ -1253,7 +1253,11 @@ class _ProJobScreenState extends ConsumerState<ProJobScreen> {
     try {
       roster = await ref.read(repoProvider).proWorkers();
     } catch (_) {}
-    final eligible = roster.where((w) => w['active'] == true && w['vetted'] == true).toList();
+    // assignable covers both "fully vetted" and "under an active grace
+    // period" — matches the actual gate assignWorkers enforces server-side.
+    // Filtering on vetted alone here would silently hide grace-covered
+    // workers from this picker even though the backend would accept them.
+    final eligible = roster.where((w) => w['active'] == true && w['assignable'] == true).toList();
     if (!mounted) return;
     if (eligible.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(

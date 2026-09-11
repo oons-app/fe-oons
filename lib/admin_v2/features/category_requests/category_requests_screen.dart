@@ -69,7 +69,10 @@ class _CategoryRequestsScreenState extends ConsumerState<CategoryRequestsScreen>
 
   String _status(Map r) {
     final s = '${r['status']}'.toLowerCase();
-    if (s.contains('approv')) return 'Approved';
+    // The real backend key for an approved grant is "active" (models.PCActive),
+    // never literally "approved" — this never matched, so every approved
+    // category request was silently mislabeled/miscounted as "Requested".
+    if (s.contains('approv') || s == 'active') return 'Approved';
     if (s.contains('reject')) return 'Rejected';
     return 'Requested';
   }

@@ -95,6 +95,8 @@ class _ProTeamScreenState extends ConsumerState<ProTeamScreen> {
     final ar = lang == 'ar';
     final name = '${w['firstName'] ?? ''} ${w['lastName'] ?? ''}'.trim();
     final vetted = w['vetted'] == true;
+    final assignable = w['assignable'] == true;
+    final onGrace = !vetted && assignable;
     final active = w['active'] == true;
     final idStatus = '${w['idDocStatus'] ?? 'unknown'}';
     final fishStatus = '${w['fishDocStatus'] ?? 'unknown'}';
@@ -107,6 +109,12 @@ class _ProTeamScreenState extends ConsumerState<ProTeamScreen> {
       status = ar ? 'موثّق' : 'Vetted';
       hot = true;
       soft = false;
+    } else if (onGrace) {
+      // Staff granted a temporary window to work while full vetting is
+      // still in progress — this worker CAN be assigned right now, unlike
+      // a plain "under review" one, so say so rather than implying they
+      // can't be picked yet.
+      status = ar ? 'مسموح مؤقتًا' : 'Temporary access';
     } else if (idStatus == 'rejected' || fishStatus == 'rejected') {
       status = ar ? 'محتاج تعديل' : 'Needs changes';
     } else {
