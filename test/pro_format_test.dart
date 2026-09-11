@@ -27,6 +27,13 @@ void main() {
     expect(pluralTasks(5, ar: true), '٥ مهام');
   });
 
+  test('plural tiers ar', () {
+    expect(pluralTiers(1, ar: true), 'شريحة واحدة');
+    expect(pluralTiers(2, ar: true), 'شريحتين');
+    expect(pluralTiers(3, ar: true), '٣ شرايح');
+    expect(pluralTiers(11, ar: true), '١١ شريحة');
+  });
+
   test('net after commission — travel not commissioned', () {
     expect(netAfterCommission(priceEgp: 1000, travelEgp: 50, commissionRate: 0.1), 950);
     expect(netAfterCommission(priceEgp: 800, travelEgp: 0, commissionRate: 0.1), 720);

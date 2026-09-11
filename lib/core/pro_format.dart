@@ -68,6 +68,16 @@ String pluralTasks(int n, {required bool ar}) {
   return '${toArabicDigits(n)} مهمة';
 }
 
+/// شريحة واحدة / شريحتين / ٣ شرايح / ١١+ شريحة — cleaning size-tier count.
+String pluralTiers(int n, {required bool ar}) {
+  if (!ar) return n == 1 ? '1 tier' : '$n tiers';
+  if (n == 0) return '٠ شرايح';
+  if (n == 1) return 'شريحة واحدة';
+  if (n == 2) return 'شريحتين';
+  if (n >= 3 && n <= 10) return '${toArabicDigits(n)} شرايح';
+  return '${toArabicDigits(n)} شريحة';
+}
+
 /// Net preview: commission on service price only; travel added after.
 int netAfterCommission({
   required int priceEgp,

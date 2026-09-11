@@ -47,8 +47,10 @@ class _ProServicesScreenState extends ConsumerState<ProServicesScreen> {
   bool busy = false;
   int tab = 0; // 0 services, 1 areas, 2 hours
   String filter = 'all'; // all | live | paused | pending
+  String? catFilter; // null = every category
   List<int>? _bulkUndoPrices;
   String? _confirmDeleteId;
+  String? _confirmDeleteTierId;
 
   @override
   void initState() {
@@ -426,16 +428,52 @@ class _ProServicesScreenState extends ConsumerState<ProServicesScreen> {
   }
 
   List<ProServiceDraft> get _filtered {
+    Iterable<ProServiceDraft> base;
     switch (filter) {
       case 'live':
-        return drafts.where((d) => d.active && !_categoryPending(d.categoryId)).toList();
+        base = drafts.where((d) => d.active && !_categoryPending(d.categoryId));
       case 'paused':
-        return drafts.where((d) => !d.active).toList();
+        base = drafts.where((d) => !d.active);
       case 'pending':
-        return drafts.where((d) => _categoryPending(d.categoryId)).toList();
+        base = drafts.where((d) => _categoryPending(d.categoryId));
       default:
-        return drafts;
+        base = drafts;
     }
+    if (catFilter != null) {
+      base = base.where((d) => d.categoryId == catFilter);
+    }
+    return base.toList();
+  }
+
+  /// Non-cleaning services only — cleaning tiers get their own table below.
+  List<ProServiceDraft> get _filteredCards => _filtered.where((d) => !d.isCleaning).toList();
+
+  /// How many services (any status) sit in each category — feeds the
+  /// category filter chips' "(n)" counts, independent of the status filter.
+  List<MapEntry<String, int>> get _categoryCounts {
+    final counts = <String, int>{};
+    for (final d in drafts) {
+      final cid = d.categoryId;
+      if (cid == null || cid.isEmpty) continue;
+      counts[cid] = (counts[cid] ?? 0) + 1;
+    }
+    return counts.entries.toList();
+  }
+
+  /// Cleaning drafts (post status+category filter), grouped by category and
+  /// sorted by size so "+ شريحة" always appends after the last row.
+  Map<String, List<ProServiceDraft>> get _cleaningGroups {
+    final map = <String, List<ProServiceDraft>>{};
+    for (final d in _filtered) {
+      if (!d.isCleaning) continue;
+      final cid = d.categoryId ?? '';
+      if (cid.isEmpty) continue;
+      map.putIfAbsent(cid, () => []).add(d);
+    }
+    for (final list in map.values) {
+      list.sort((a, b) => a.sizeFromSqm.compareTo(b.sizeFromSqm));
+    }
+    return map;
   }
 
   @override
@@ -555,20 +593,51 @@ class _ProServicesScreenState extends ConsumerState<ProServicesScreen> {
           ],
         ),
       ),
+      if (_categoryCounts.length > 1) ...[
+        const SizedBox(height: 8),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              Padding(
+                padding: const EdgeInsetsDirectional.only(end: 8),
+                child: ProChip(
+                  label: '${m['filterAll']}',
+                  on: catFilter == null,
+                  onTap: () => setState(() => catFilter = null),
+                ),
+              ),
+              for (final e in _categoryCounts)
+                Padding(
+                  padding: const EdgeInsetsDirectional.only(end: 8),
+                  child: ProChip(
+                    label: '${_categoryLabel(e.key, lang)} (${toArabicDigits(e.value)})',
+                    on: catFilter == e.key,
+                    onTap: () => setState(() => catFilter = catFilter == e.key ? null : e.key),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
       const SizedBox(height: 12),
+      ..._cleaningGroups.entries.map((e) => _cleaningTierSection(lang, m, e.key, e.value)),
+      if (_cleaningGroups.isNotEmpty) const SizedBox(height: 14),
       if (filtered.isEmpty)
         ProCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('${m['emptyFilter']}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Pro.ink)),
+              Text(_emptyFilterTitle(m), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Pro.ink)),
               const SizedBox(height: 6),
-              Text('${m['emptyFilterHint']}', style: const TextStyle(fontSize: 13, color: Pro.muted, height: 1.45)),
+              Text(_emptyFilterHint(m), style: const TextStyle(fontSize: 13, color: Pro.muted, height: 1.45)),
             ],
           ),
         )
+      else if (_filteredCards.isEmpty && _cleaningGroups.isNotEmpty)
+        const SizedBox.shrink()
       else
-        ...filtered.map((d) => _serviceCard(lang, m, d)),
+        ..._filteredCards.map((d) => _serviceCard(lang, m, d)),
       const SizedBox(height: 14),
       _bookingLinkCard(lang, m, p, me),
       const SizedBox(height: 14),
@@ -576,6 +645,32 @@ class _ProServicesScreenState extends ConsumerState<ProServicesScreen> {
       const SizedBox(height: 14),
       _categoriesCard(lang, m),
     ];
+  }
+
+  String _emptyFilterTitle(Map m) {
+    switch (filter) {
+      case 'live':
+        return '${m['emptyFilterLive'] ?? m['emptyFilter']}';
+      case 'paused':
+        return '${m['emptyFilterPaused'] ?? m['emptyFilter']}';
+      case 'pending':
+        return '${m['emptyFilterPending'] ?? m['emptyFilter']}';
+      default:
+        return '${m['emptyFilter']}';
+    }
+  }
+
+  String _emptyFilterHint(Map m) {
+    switch (filter) {
+      case 'live':
+        return '${m['emptyFilterLiveHint'] ?? m['emptyFilterHint']}';
+      case 'paused':
+        return '${m['emptyFilterPausedHint'] ?? m['emptyFilterHint']}';
+      case 'pending':
+        return '${m['emptyFilterPendingHint'] ?? m['emptyFilterHint']}';
+      default:
+        return '${m['emptyFilterHint']}';
+    }
   }
 
   Widget _statCard(String label, String value) {
@@ -722,6 +817,290 @@ class _ProServicesScreenState extends ConsumerState<ProServicesScreen> {
         child: Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: danger ? Pro.danger : Pro.ink)),
       ),
     );
+  }
+
+  // ---- Cleaning tier table -------------------------------------------------
+
+  Widget _cleaningTierSection(String lang, Map m, String categoryId, List<ProServiceDraft> tiers) {
+    final ar = lang == 'ar';
+    final catLabel = _categoryLabel(categoryId, lang);
+    final counts = tiers.map((t) => (18 - t.excludedTaskIds.length)).toSet();
+    final diverges = counts.length > 1;
+    final packageLabel = diverges
+        ? '${m['tierPackageLine']} ${toArabicDigits(counts.reduce((a, b) => a < b ? a : b))}–${toArabicDigits(counts.reduce((a, b) => a > b ? a : b))} ${ar ? 'مهمة' : 'tasks'}'
+        : '${m['tierPackageLine']} ${pluralTasks(counts.isEmpty ? 18 : counts.first, ar: ar)}';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: ProCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ProSectionWithHelp(
+              catLabel.isEmpty ? '${m['tierTableTitle']}' : '${m['tierTableTitle']} · $catLabel',
+              help: '${m['tipTiers']}',
+            ),
+            const SizedBox(height: 10),
+            ...tiers.map((t) => _tierRow(lang, m, t, tiers)),
+            const SizedBox(height: 2),
+            ProSoftButton(label: '${m['tierAdd']}', onTap: () => _addTier(categoryId, tiers)),
+            const SizedBox(height: 12),
+            InkWell(
+              onTap: () => showCleaningTaskChecklistSheet(
+                context: context,
+                lang: lang,
+                rooms: cleaningRoomsFromCatalog(catalog),
+                tiers: tiers,
+                initial: tiers.first,
+              ).then((_) {
+                if (mounted) setState(() {});
+              }),
+              child: Text(
+                packageLabel,
+                style: const TextStyle(fontSize: 12, color: Pro.plum, fontWeight: FontWeight.w600, decoration: TextDecoration.underline),
+              ),
+            ),
+            if (diverges) ...[
+              const SizedBox(height: 6),
+              InkWell(
+                onTap: () => _applyPackageToAll(tiers),
+                child: Text(
+                  '${m['tierApplyToAll']}',
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Pro.plum),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _tierRow(String lang, Map m, ProServiceDraft t, List<ProServiceDraft> siblings) {
+    final ar = lang == 'ar';
+    t.syncSizeFromControls();
+    final net = t.priceEgp > 0 ? netAfterCommission(priceEgp: t.priceEgp, travelEgp: 0, commissionRate: commissionRate) : null;
+    final error = _tierRowError(m, t, siblings);
+    if (_confirmDeleteTierId == t.id) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(color: const Color(0xFFF8EEEE), borderRadius: BorderRadius.circular(12), border: Border.all(color: Pro.dangerLine)),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                '${m['deleteConfirm']}'.replaceAll('{name}', cleaningSizeMeta(fromSqm: t.sizeFromSqm, toSqm: t.sizeToSqm, workers: t.workerCount, ar: ar)),
+                style: const TextStyle(fontSize: 13, height: 1.45, color: Pro.ink),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(child: ProSoftButton(label: '${m['deleteNo']}', onTap: () => setState(() => _confirmDeleteTierId = null))),
+                  const SizedBox(width: 8),
+                  Expanded(child: ProSoftButton(label: '${m['deleteYes']}', danger: true, onTap: () => _deleteTier(t))),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Pro.bg,
+          borderRadius: BorderRadius.circular(Pro.rSm),
+          border: Border.all(color: error != null ? Pro.dangerLine : Pro.lineSoft),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('${m['tierFrom']}', style: const TextStyle(fontSize: 11, color: Pro.muted)),
+                      const SizedBox(height: 4),
+                      _tierSizeFromField(t),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('${m['tierTo']}', style: const TextStyle(fontSize: 11, color: Pro.muted)),
+                      const SizedBox(height: 4),
+                      _tierSizeToField(t),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                InkWell(
+                  onTap: () => setState(() => t.workerCount = t.workerCount >= 3 ? 1 : t.workerCount + 1),
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                    decoration: BoxDecoration(color: Pro.chip, borderRadius: BorderRadius.circular(10)),
+                    child: Text(pluralWorkers(t.workerCount, ar: ar), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Pro.ink)),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(child: _tierPriceField(t)),
+                const SizedBox(width: 8),
+                if (net != null)
+                  Text('${m['net']} ${toArabicDigits(net)}', style: const TextStyle(fontFamily: T.mono, fontSize: 12, color: Pro.soft)),
+                IconButton(
+                  onPressed: () => setState(() => _confirmDeleteTierId = t.id),
+                  icon: const Icon(Icons.delete_outline, size: 18, color: Pro.muted),
+                  visualDensity: VisualDensity.compact,
+                  constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                ),
+              ],
+            ),
+            if (error != null) ...[
+              const SizedBox(height: 6),
+              Text(error, style: const TextStyle(fontSize: 11, color: Pro.danger)),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _tierSizeFromField(ProServiceDraft t) {
+    return TextField(
+      controller: t.sizeFromCtrl,
+      keyboardType: TextInputType.number,
+      onChanged: (v) => setState(() {
+        final n = normalizeMoneyInput(v);
+        t.sizeFromCtrl.value = TextEditingValue(text: n, selection: TextSelection.collapsed(offset: n.length));
+      }),
+      style: const TextStyle(fontFamily: T.mono, fontSize: 14, color: Pro.ink),
+      decoration: InputDecoration(
+        isDense: true,
+        hintText: '120',
+        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Pro.lineSoft)),
+      ),
+    );
+  }
+
+  Widget _tierSizeToField(ProServiceDraft t) {
+    return TextField(
+      controller: t.sizeToCtrl,
+      keyboardType: TextInputType.number,
+      onChanged: (v) => setState(() {
+        final n = toWesternDigits(v).replaceAll(RegExp(r'[^0-9]'), '');
+        t.sizeToCtrl.value = TextEditingValue(text: n, selection: TextSelection.collapsed(offset: n.length));
+      }),
+      style: const TextStyle(fontFamily: T.mono, fontSize: 14, color: Pro.ink),
+      decoration: InputDecoration(
+        isDense: true,
+        hintText: '150',
+        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Pro.lineSoft)),
+      ),
+    );
+  }
+
+  Widget _tierPriceField(ProServiceDraft t) {
+    return TextField(
+      controller: t.priceCtrl,
+      keyboardType: TextInputType.number,
+      onChanged: (v) => setState(() {
+        final n = normalizeMoneyInput(v);
+        t.priceCtrl.value = TextEditingValue(text: n, selection: TextSelection.collapsed(offset: n.length));
+      }),
+      style: const TextStyle(fontFamily: T.mono, fontSize: 14, fontWeight: FontWeight.w600, color: Pro.ink),
+      decoration: InputDecoration(
+        isDense: true,
+        hintText: '800',
+        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Pro.lineSoft)),
+      ),
+    );
+  }
+
+  /// Mirrors the backend's per-worker-count overlap + at-most-one-open-ended
+  /// rules (`models.ValidateCleaningTierSet`) so a row shows its own error
+  /// before Save is even attempted.
+  String? _tierRowError(Map m, ProServiceDraft t, List<ProServiceDraft> siblings) {
+    if (t.sizeToSqm != null && t.sizeToSqm! < t.sizeFromSqm) {
+      return '${m['tierToBeforeFrom']}';
+    }
+    for (final other in siblings) {
+      if (identical(other, t) || other.workerCount != t.workerCount) continue;
+      if (t.sizeToSqm == null && other.sizeToSqm == null) {
+        return '${m['tierDoubleOpenEnded']}';
+      }
+      if (cleaningSizesOverlap(aFrom: t.sizeFromSqm, aTo: t.sizeToSqm, bFrom: other.sizeFromSqm, bTo: other.sizeToSqm)) {
+        return '${m['tierOverlap']}';
+      }
+    }
+    return null;
+  }
+
+  void _addTier(String categoryId, List<ProServiceDraft> tiers) {
+    if (tiers.isEmpty) return;
+    final last = tiers.last; // sorted by sizeFromSqm ascending
+    final newId = 'new-${const Uuid().v4().substring(0, 8)}';
+    final wasOpenEnded = last.sizeToSqm == null;
+    final from = wasOpenEnded ? last.sizeFromSqm : last.sizeToSqm! + 1;
+    final to = from + 30;
+    final newTier = ProServiceDraft(
+      id: newId,
+      categoryId: categoryId,
+      kind: 'cleaning',
+      active: true,
+      duration: last.duration,
+      priceEgp: last.priceEgp,
+      sizeFromSqm: from,
+      sizeToSqm: to,
+      workerCount: last.workerCount,
+      excludedTaskIds: Set.of(last.excludedTaskIds),
+    );
+    setState(() {
+      if (wasOpenEnded) {
+        // The new bounded tier takes over the open tier's start; the open
+        // tier moves to start right after it and stays open.
+        last.sizeFromCtrl.text = '${to + 1}';
+        last.syncSizeFromControls();
+      }
+      drafts.add(newTier);
+    });
+  }
+
+  void _deleteTier(ProServiceDraft t) {
+    setState(() {
+      drafts.remove(t);
+      t.dispose();
+      _confirmDeleteTierId = null;
+    });
+  }
+
+  void _applyPackageToAll(List<ProServiceDraft> tiers) {
+    if (tiers.length < 2) return;
+    final first = Set.of(tiers.first.excludedTaskIds);
+    setState(() {
+      for (final t in tiers.skip(1)) {
+        t.excludedTaskIds
+          ..clear()
+          ..addAll(first);
+      }
+    });
   }
 
   Widget _bookingLinkCard(String lang, Map m, Map p, ProviderP? me) {

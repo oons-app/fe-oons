@@ -112,6 +112,148 @@ class ProServiceDraft {
   }
 }
 
+/// The 4-room/18-task cleaning package checklist — one card per room, one
+/// checkbox per task. Shared between the add/edit service sheet (a cleaning
+/// draft's own step 6) and the standalone tier-table package sheet
+/// (`showCleaningTaskChecklistSheet`) so both stay in sync with one
+/// implementation.
+List<Widget> cleaningTaskChecklist({
+  required List<Map<String, dynamic>> rooms,
+  required Set<String> excludedTaskIds,
+  required String lang,
+  required void Function(String taskId, bool included) onToggle,
+}) {
+  return rooms.map((room) {
+    final tasks = ((room['tasks'] as List?) ?? const []).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+    final roomName = room['name'] is Map ? Loc.fromJson(room['name'] as Map).of(lang) : '${room['name']}';
+    final onCount = tasks.where((t) => !excludedTaskIds.contains('${t['id']}')).length;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: Pro.cardDec(radius: Pro.rMd),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(child: Text(roomName, style: const TextStyle(fontWeight: FontWeight.w700, color: Pro.ink))),
+                Text('${toArabicDigits(onCount)}/${toArabicDigits(tasks.length)}', style: const TextStyle(fontFamily: T.mono, fontSize: 12, color: Pro.muted)),
+              ],
+            ),
+            const SizedBox(height: 8),
+            ...tasks.map((t) {
+              final id = '${t['id']}';
+              final label = t['name'] is Map ? Loc.fromJson(t['name'] as Map).of(lang) : '${t['name']}';
+              final on = !excludedTaskIds.contains(id);
+              return CheckboxListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                value: on,
+                activeColor: Pro.plum,
+                title: Text(label, style: const TextStyle(fontSize: 13)),
+                onChanged: (v) => onToggle(id, v == true),
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }).toList();
+}
+
+/// Parses `catalog['cleaningRooms']` (raw JSON from `/pro/catalog`) into the
+/// room/task list `cleaningTaskChecklist` expects. Shared so every caller
+/// reads the same shape the same way.
+List<Map<String, dynamic>> cleaningRoomsFromCatalog(Map<String, dynamic> catalog) {
+  final raw = catalog['cleaningRooms'];
+  if (raw is! List) return const [];
+  return raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+}
+
+/// Opens the package-tasks sheet for one or more cleaning tiers that share a
+/// category — a tier-picker row on top when there's more than one, then the
+/// same room/task checklist used inside the add/edit sheet. Mutates each
+/// draft's `excludedTaskIds` directly; call `setState` in the caller after
+/// this resolves to refresh anything (like a package-range footer) that
+/// reads those sets.
+Future<void> showCleaningTaskChecklistSheet({
+  required BuildContext context,
+  required String lang,
+  required List<Map<String, dynamic>> rooms,
+  required List<ProServiceDraft> tiers,
+  required ProServiceDraft initial,
+}) {
+  final ar = lang == 'ar';
+  var current = initial;
+  return showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Pro.bg,
+    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+    builder: (ctx) => StatefulBuilder(
+      builder: (ctx, setSheetState) {
+        final included = 18 - current.excludedTaskIds.length;
+        return DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.85,
+          maxChildSize: 0.95,
+          minChildSize: 0.5,
+          builder: (_, ctrl) => ListView(
+            controller: ctrl,
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+            children: [
+              Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: Pro.lineSoft, borderRadius: BorderRadius.circular(2)))),
+              const SizedBox(height: 12),
+              Text(ar ? 'الشغل اللي الباقة شاملته' : 'Package tasks', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Pro.ink)),
+              const SizedBox(height: 4),
+              Text(pluralTasks(included, ar: ar), style: const TextStyle(fontSize: 13, color: Pro.muted)),
+              if (tiers.length > 1) ...[
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 7,
+                  runSpacing: 7,
+                  children: tiers.map((t) {
+                    final on = identical(t, current);
+                    return InkWell(
+                      onTap: () => setSheetState(() => current = t),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: on ? Pro.ink : Pro.card,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: on ? Pro.ink : Pro.line),
+                        ),
+                        child: Text(
+                          cleaningSizeMeta(fromSqm: t.sizeFromSqm, toSqm: t.sizeToSqm, workers: t.workerCount, ar: ar),
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: on ? Colors.white : const Color(0xFF4E434A)),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
+              const SizedBox(height: 14),
+              ...cleaningTaskChecklist(
+                rooms: rooms,
+                excludedTaskIds: current.excludedTaskIds,
+                lang: lang,
+                onToggle: (id, included) => setSheetState(() {
+                  if (included) {
+                    current.excludedTaskIds.remove(id);
+                  } else {
+                    current.excludedTaskIds.add(id);
+                  }
+                }),
+              ),
+            ],
+          ),
+        );
+      },
+    ),
+  );
+}
+
 Future<ProServiceDraft?> showProServiceEditorSheet({
   required BuildContext context,
   required String lang,
@@ -173,11 +315,7 @@ class _ProServiceEditorSheetState extends State<_ProServiceEditorSheet> {
   bool get isEdit => widget.existing != null;
   bool get ar => widget.lang == 'ar';
 
-  List<Map<String, dynamic>> get cleaningRooms {
-    final raw = widget.catalog['cleaningRooms'];
-    if (raw is! List) return const [];
-    return raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
-  }
+  List<Map<String, dynamic>> get cleaningRooms => cleaningRoomsFromCatalog(widget.catalog);
 
   int get totalTasks {
     var n = 0;
@@ -592,49 +730,18 @@ class _ProServiceEditorSheetState extends State<_ProServiceEditorSheet> {
               _stepLabel(
                 '${m['stepTasks'] ?? (ar ? '٦ · الشغل اللي الباقة شاملته' : '6 · Package tasks')} · ${pluralTasks(included, ar: ar)}',
               ),
-              ...cleaningRooms.map((room) {
-                final tasks = ((room['tasks'] as List?) ?? const []).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
-                final roomName = room['name'] is Map ? Loc.fromJson(room['name'] as Map).of(widget.lang) : '${room['name']}';
-                final onCount = tasks.where((t) => !draft.excludedTaskIds.contains('${t['id']}')).length;
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: Pro.cardDec(radius: Pro.rMd),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(child: Text(roomName, style: const TextStyle(fontWeight: FontWeight.w700, color: Pro.ink))),
-                            Text('${toArabicDigits(onCount)}/${toArabicDigits(tasks.length)}', style: const TextStyle(fontFamily: T.mono, fontSize: 12, color: Pro.muted)),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        ...tasks.map((t) {
-                          final id = '${t['id']}';
-                          final label = t['name'] is Map ? Loc.fromJson(t['name'] as Map).of(widget.lang) : '${t['name']}';
-                          final on = !draft.excludedTaskIds.contains(id);
-                          return CheckboxListTile(
-                            dense: true,
-                            contentPadding: EdgeInsets.zero,
-                            value: on,
-                            activeColor: Pro.plum,
-                            title: Text(label, style: const TextStyle(fontSize: 13)),
-                            onChanged: (v) => setState(() {
-                              if (v == true) {
-                                draft.excludedTaskIds.remove(id);
-                              } else {
-                                draft.excludedTaskIds.add(id);
-                              }
-                            }),
-                          );
-                        }),
-                      ],
-                    ),
-                  ),
-                );
-              }),
+              ...cleaningTaskChecklist(
+                rooms: cleaningRooms,
+                excludedTaskIds: draft.excludedTaskIds,
+                lang: widget.lang,
+                onToggle: (id, included) => setState(() {
+                  if (included) {
+                    draft.excludedTaskIds.remove(id);
+                  } else {
+                    draft.excludedTaskIds.add(id);
+                  }
+                }),
+              ),
             ],
             const SizedBox(height: 12),
             SwitchListTile(
