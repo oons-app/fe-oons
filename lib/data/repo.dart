@@ -477,6 +477,35 @@ class Repo {
     await api.delete('/pro/categories/$id');
   }
 
+  // ---- Team (workers) -------------------------------------------------
+
+  Future<List<Map<String, dynamic>>> proWorkers() async {
+    final r = await api.get('/pro/workers');
+    return ((r['workers'] as List?) ?? []).cast<Map<String, dynamic>>();
+  }
+
+  Future<Map<String, dynamic>> proCreateWorker(Map<String, dynamic> body) async {
+    return api.post('/pro/workers', data: body);
+  }
+
+  Future<Map<String, dynamic>> proPatchWorker(String id, Map<String, dynamic> body) async {
+    return api.patch('/pro/workers/$id', data: body);
+  }
+
+  Future<void> proDeleteWorker(String id) async {
+    await api.delete('/pro/workers/$id');
+  }
+
+  Future<Map<String, dynamic>> uploadWorkerId(String workerId, List<int> bytes, {String filename = 'id.jpg', void Function(double)? onProgress}) =>
+      api.upload('/pro/workers/$workerId/id', 'id', bytes, filename: filename, onProgress: onProgress);
+
+  Future<Map<String, dynamic>> uploadWorkerFish(String workerId, List<int> bytes, {String filename = 'fish.jpg', void Function(double)? onProgress}) =>
+      api.upload('/pro/workers/$workerId/fish', 'fish', bytes, filename: filename, onProgress: onProgress);
+
+  Future<Map<String, dynamic>> assignWorkers(String bookingId, List<String> workerIds) async {
+    return api.post('/bookings/$bookingId/assign-workers', data: {'workerIds': workerIds});
+  }
+
   Future<Map<String, dynamic>> earningsSummary() async => api.get('/pro/earnings/summary');
 
   Future<Map<String, dynamic>> earningsBreakdown() async => api.get('/pro/earnings/breakdown', query: {'by': 'category'});

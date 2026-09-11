@@ -459,6 +459,20 @@ class BookingGuestItem {
       );
 }
 
+/// A worker snapshot on a booking — set once via /bookings/:id/assign-workers.
+/// The name is copied at assignment time, so a later roster edit never
+/// rewrites a past booking's record.
+class BookingWorker {
+  BookingWorker({required this.workerId, required this.name});
+  final String workerId;
+  final String name;
+
+  factory BookingWorker.fromJson(Map j) => BookingWorker(
+        workerId: '${j['workerId'] ?? ''}',
+        name: '${j['name'] ?? ''}',
+      );
+}
+
 class Booking {
   Booking({
     required this.id,
@@ -471,6 +485,7 @@ class Booking {
     required this.lineItems,
     required this.timeline,
     this.items = const [],
+    this.assignedWorkers = const [],
     this.kind,
     this.fawryCode,
     this.fawryExpiresAt,
@@ -501,6 +516,7 @@ class Booking {
   final String escrow;
   final Loc serviceName;
   final List<BookingGuestItem> items;
+  final List<BookingWorker> assignedWorkers;
   final String? kind;
   final List<LineItem> lineItems;
   final List<TimelineEv> timeline;
@@ -568,6 +584,7 @@ class Booking {
         escrow: '${j['escrow'] ?? 'held'}',
         serviceName: Loc.fromJson(j['serviceName']),
         items: ((j['items'] as List?) ?? []).whereType<Map>().map((e) => BookingGuestItem.fromJson(e)).toList(),
+        assignedWorkers: ((j['assignedWorkers'] as List?) ?? []).whereType<Map>().map((e) => BookingWorker.fromJson(e)).toList(),
         kind: j['kind'] == null || '${j['kind']}'.isEmpty ? null : '${j['kind']}',
         lineItems: ((j['lineItems'] as List?) ?? []).map((e) => LineItem.fromJson(e as Map)).toList(),
         timeline: ((j['timeline'] as List?) ?? []).map((e) => TimelineEv.fromJson(e)).toList(),
@@ -604,6 +621,7 @@ class Booking {
         escrow: escrow,
         serviceName: serviceName,
         items: items,
+        assignedWorkers: assignedWorkers,
         kind: kind,
         lineItems: lineItems,
         timeline: timeline,

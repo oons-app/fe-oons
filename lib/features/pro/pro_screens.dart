@@ -1029,6 +1029,38 @@ class _ProJobScreenState extends ConsumerState<ProJobScreen> {
                       ),
                     ),
                   ],
+                  if (!locked && (bk.status == 'paid' || bk.status == 'on_the_way' || bk.assignedWorkers.isNotEmpty)) ...[
+                    const SizedBox(height: 12),
+                    ProCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          ProSectionLabel(lang == 'ar' ? 'الفريق المكلّف' : 'Assigned team'),
+                          const SizedBox(height: 8),
+                          if (bk.assignedWorkers.isEmpty)
+                            Text(
+                              lang == 'ar' ? 'لسه محددتيش مين هيروح.' : "You haven't picked who's going yet.",
+                              style: const TextStyle(fontSize: 13, color: Pro.muted),
+                            )
+                          else
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 6,
+                              children: bk.assignedWorkers.map((w) => ProPill(w.name, hot: true)).toList(),
+                            ),
+                          if (bk.status == 'paid' || bk.status == 'on_the_way') ...[
+                            const SizedBox(height: 10),
+                            _softAction(
+                              bk.assignedWorkers.isEmpty
+                                  ? (lang == 'ar' ? 'كلّفي الفريق' : 'Assign the team')
+                                  : (lang == 'ar' ? 'عدّلي الفريق' : 'Edit team'),
+                              () => _assignTeam(lang),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
                   if (!locked && bk.timeline.isNotEmpty) ...[
                     const SizedBox(height: 12),
                     ProCard(
@@ -1210,6 +1242,42 @@ class _ProJobScreenState extends ConsumerState<ProJobScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendlyError(e, lang))));
       }
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  Future<void> _assignTeam(String lang) async {
+    final ar = lang == 'ar';
+    List<Map<String, dynamic>> roster = [];
+    try {
+      roster = await ref.read(repoProvider).proWorkers();
+    } catch (_) {}
+    final eligible = roster.where((w) => w['active'] == true && w['vetted'] == true).toList();
+    if (!mounted) return;
+    if (eligible.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(
+        ar
+            ? 'مفيش حد موثّق في الفريق لسه. ضيفي ووثّقي عضو من "الفريق" في حسابك.'
+            : 'No vetted team members yet. Add and vet one from Team in your account.',
+      )));
+      return;
+    }
+    final currentIds = data?.booking.assignedWorkers.map((w) => w.workerId).toSet() ?? <String>{};
+    final selected = await showModalBottomSheet<Set<String>>(
+      context: context,
+      backgroundColor: Pro.bg,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => _TeamPickerSheet(lang: lang, roster: eligible, initiallySelected: currentIds),
+    );
+    if (selected == null || !mounted) return;
+    setState(() => busy = true);
+    try {
+      await ref.read(repoProvider).assignWorkers(widget.id, selected.toList());
+      await _load();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(ar ? 'اتحدد الفريق ✓' : 'Team assigned ✓')));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendlyError(e, lang))));
     } finally {
       if (mounted) setState(() => busy = false);
     }
@@ -1667,6 +1735,31 @@ class _ProAccountScreenState extends ConsumerState<ProAccountScreen> {
             ),
           ),
           const SizedBox(height: 20),
+          ProSectionLabel(lang == 'ar' ? 'الفريق' : 'Team'),
+          const SizedBox(height: 10),
+          ProCard(
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    lang == 'ar'
+                        ? 'ضيفي أعضاء فريقك ووثّقيهم عشان تقدري تكلّفيهم بالحجوزات.'
+                        : 'Add and vet your team members so you can assign them to bookings.',
+                    style: const TextStyle(fontSize: 12.5, color: Pro.muted, height: 1.4),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                InkWell(
+                  onTap: () => context.push('/pro/team'),
+                  child: Text(
+                    lang == 'ar' ? 'إدارة الفريق' : 'Manage team',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Pro.plum),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
           ProSectionLabel(lang == 'ar' ? 'الإعدادات' : 'Settings'),
           const SizedBox(height: 10),
           ClipRRect(
@@ -2018,6 +2111,71 @@ class _ProRateScreenState extends ConsumerState<ProRateScreen> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Picker over a provider's active + vetted roster, for "assign the team" on
+/// a confirmed booking. Returns the selected worker ids, or null if
+/// cancelled.
+class _TeamPickerSheet extends StatefulWidget {
+  const _TeamPickerSheet({required this.lang, required this.roster, required this.initiallySelected});
+  final String lang;
+  final List<Map<String, dynamic>> roster;
+  final Set<String> initiallySelected;
+
+  @override
+  State<_TeamPickerSheet> createState() => _TeamPickerSheetState();
+}
+
+class _TeamPickerSheetState extends State<_TeamPickerSheet> {
+  late final selected = Set<String>.of(widget.initiallySelected);
+
+  @override
+  Widget build(BuildContext context) {
+    final ar = widget.lang == 'ar';
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(ar ? 'مين هيروح؟' : "Who's going?", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Pro.ink)),
+            const SizedBox(height: 4),
+            Text(
+              ar ? 'اختاري واحد أو أكتر من فريقك الموثّق.' : 'Pick one or more from your vetted team.',
+              style: const TextStyle(fontSize: 13, color: Pro.muted),
+            ),
+            const SizedBox(height: 14),
+            ...widget.roster.map((w) {
+              final id = '${w['id']}';
+              final name = '${w['firstName'] ?? ''} ${w['lastName'] ?? ''}'.trim();
+              final on = selected.contains(id);
+              return CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                value: on,
+                activeColor: Pro.plum,
+                title: Text(name.isEmpty ? (ar ? 'بدون اسم' : 'Unnamed') : name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                subtitle: '${w['phone'] ?? ''}'.isEmpty ? null : Text('${w['phone']}', style: const TextStyle(fontSize: 12, color: Pro.muted)),
+                onChanged: (v) => setState(() {
+                  if (v == true) {
+                    selected.add(id);
+                  } else {
+                    selected.remove(id);
+                  }
+                }),
+              );
+            }),
+            const SizedBox(height: 10),
+            ProPrimaryButton(
+              label: ar ? 'تأكيد' : 'Confirm',
+              enabled: selected.isNotEmpty,
+              onTap: () => Navigator.pop(context, selected),
+            ),
+          ],
         ),
       ),
     );
