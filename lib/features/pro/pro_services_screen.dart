@@ -96,7 +96,10 @@ class _ProServicesScreenState extends ConsumerState<ProServicesScreen> {
     if (me == null) return;
     List<Map<String, dynamic>> allCats = [];
     try {
-      allCats = await repo.categories(vertical: me.service, activeOnly: true);
+      // Across every vertical, not just the provider's registered one —
+      // providers can hold active categories (and services) in more than
+      // one vertical, e.g. a beauty provider who also does cleaning.
+      allCats = await repo.categories(activeOnly: true);
     } catch (_) {}
     final mine = allProCategories.map((c) => '${c['categoryId']}').toSet();
     final available = allCats.where((c) {
@@ -1235,6 +1238,12 @@ class _ProServicesScreenState extends ConsumerState<ProServicesScreen> {
   }
 }
 
+String _verticalLabel(String key, String lang) {
+  const ar = {'beauty': 'تجميل', 'cleaning': 'تنظيف', 'chef': 'طبخ', 'childcare': 'رعاية أطفال'};
+  const en = {'beauty': 'Beauty', 'cleaning': 'Cleaning', 'chef': 'Chef', 'childcare': 'Childcare'};
+  return (lang == 'ar' ? ar : en)[key] ?? '';
+}
+
 class _RequestCategorySheet extends StatelessWidget {
   const _RequestCategorySheet({
     required this.available,
@@ -1281,6 +1290,7 @@ class _RequestCategorySheet extends StatelessWidget {
                 final id = '${c['id'] ?? c['_id'] ?? ''}';
                 final n = c['name'];
                 final label = n is Map ? Loc.fromJson(n).of(lang) : '${n ?? c['slug']}';
+                final verticalLabel = _verticalLabel('${c['vertical'] ?? ''}', lang);
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: InkWell(
@@ -1293,7 +1303,17 @@ class _RequestCategorySheet extends StatelessWidget {
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: Pro.line),
                       ),
-                      child: Text(label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Pro.ink)),
+                      child: Row(
+                        children: [
+                          Expanded(child: Text(label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Pro.ink))),
+                          if (verticalLabel.isNotEmpty)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                              decoration: BoxDecoration(color: Pro.chip, borderRadius: BorderRadius.circular(999)),
+                              child: Text(verticalLabel, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Pro.soft)),
+                            ),
+                        ],
+                      ),
                     ),
                   ),
                 );
