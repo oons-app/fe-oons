@@ -565,13 +565,22 @@ class _ProviderDetailScreenState extends ConsumerState<ProviderDetailScreen> {
       confirmLabel: lang == 'ar' ? 'رفض' : 'Reject',
       danger: true,
       bodyBuilder: (ctx, _) => V2FormField(
-        label: lang == 'ar' ? 'السبب (اختياري)' : 'Reason (optional)',
-        child: TextField(onChanged: (v) => note = v, maxLines: 2),
+        label: lang == 'ar' ? 'السبب (هتشوفه المهنية)' : 'Reason (the provider will see this)',
+        child: TextField(onChanged: (v) => note = v, maxLines: 2, autofocus: true),
       ),
+      // The backend now requires this note on reject too — validate here
+      // so the provider never ends up with a rejection and zero explanation.
+      onValidate: () {
+        if (note.trim().isEmpty) {
+          v2Toast(context, lang == 'ar' ? 'لازم تكتبي السبب' : 'A reason is required', error: true);
+          return false;
+        }
+        return true;
+      },
     );
     if (ok) {
       _post('/admin/providers/${widget.providerId}/docs/$kind',
-          data: {'status': 'rejected', if (note.trim().isNotEmpty) 'note': note.trim()},
+          data: {'status': 'rejected', 'note': note.trim()},
           okMsg: '$label ${lang == 'ar' ? 'مرفوض' : 'rejected'}');
     }
   }
@@ -603,6 +612,9 @@ class _ProviderDetailScreenState extends ConsumerState<ProviderDetailScreen> {
   Widget _workerCard(Map w, String lang, bool canVet) {
     final name = '${w['firstName'] ?? ''} ${w['lastName'] ?? ''}'.trim();
     final vetted = w['vetted'] == true;
+    final assignable = w['assignable'] == true;
+    final graceUntil = DateTime.tryParse('${w['vettingGraceUntil'] ?? ''}');
+    final onGrace = !vetted && assignable && graceUntil != null;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -615,7 +627,7 @@ class _ProviderDetailScreenState extends ConsumerState<ProviderDetailScreen> {
           Row(
             children: [
               Expanded(child: Text(name.isEmpty ? '—' : name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700))),
-              V2StatusPill.forLabel(vetted ? 'Vetted' : 'Pending review'),
+              V2StatusPill.forLabel(vetted ? 'Vetted' : (onGrace ? 'Pending' : 'Pending review')),
             ],
           ),
           if ('${w['phone'] ?? ''}'.isNotEmpty)
@@ -627,6 +639,23 @@ class _ProviderDetailScreenState extends ConsumerState<ProviderDetailScreen> {
             Padding(
               padding: const EdgeInsets.only(top: 2),
               child: Text('${w['address']}', style: const TextStyle(fontSize: 12, color: Ops.muted)),
+            ),
+          if (onGrace)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                lang == 'ar'
+                    ? 'مسموح ليها تشتغل مؤقتًا لحد ${formatDayOnly(graceUntil.toIso8601String())} لحد ما التوثيق يخلص'
+                    : 'Allowed to work temporarily until ${formatDayOnly(graceUntil.toIso8601String())} while vetting finishes',
+                style: const TextStyle(fontSize: 11.5, color: Ops.terracottaInk),
+              ),
+            ),
+          if (canVet && !vetted)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: onGrace
+                  ? V2Btn.ghost(lang == 'ar' ? 'شيلي الإذن المؤقت' : 'Revoke grace', onPressed: () => _workerGrace('${w['id']}', lang, revoke: true), size: V2BtnSize.row)
+                  : V2Btn.ghost(lang == 'ar' ? 'اسمحي لها تشتغل مؤقتًا' : 'Allow to work temporarily', onPressed: () => _workerGrace('${w['id']}', lang), size: V2BtnSize.row),
             ),
           const SizedBox(height: 12),
           LayoutBuilder(builder: (context, box) {
@@ -659,6 +688,48 @@ class _ProviderDetailScreenState extends ConsumerState<ProviderDetailScreen> {
     );
   }
 
+  /// Grants (or revokes) a temporary "allowed to work while vetting is
+  /// still in progress" window — for a provider who just added several
+  /// workers and shouldn't be fully blocked from using any of them on day
+  /// one. Mirrors the provider's own FISH-grace pattern.
+  Future<void> _workerGrace(String workerId, String lang, {bool revoke = false}) async {
+    if (revoke) {
+      await _post('/admin/workers/${widget.providerId}/$workerId/grace',
+          data: {'revoke': true}, okMsg: lang == 'ar' ? 'اتشال الإذن المؤقت' : 'Grace revoked');
+      return;
+    }
+    var days = 14;
+    var note = '';
+    final ok = await v2Form(
+      context,
+      title: lang == 'ar' ? 'اسمحي لها تشتغل مؤقتًا' : 'Allow to work temporarily',
+      confirmLabel: lang == 'ar' ? 'اسمحي' : 'Allow',
+      bodyBuilder: (ctx, setLocal) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          V2FormField(
+            label: lang == 'ar' ? 'عدد الأيام' : 'Days',
+            child: TextField(
+              keyboardType: TextInputType.number,
+              controller: TextEditingController(text: '$days'),
+              onChanged: (v) => days = int.tryParse(v) ?? days,
+            ),
+          ),
+          const SizedBox(height: 12),
+          V2FormField(
+            label: lang == 'ar' ? 'ملاحظة (اختياري)' : 'Note (optional)',
+            child: TextField(onChanged: (v) => note = v, maxLines: 2),
+          ),
+        ],
+      ),
+    );
+    if (ok) {
+      await _post('/admin/workers/${widget.providerId}/$workerId/grace',
+          data: {'days': days, if (note.trim().isNotEmpty) 'note': note.trim()},
+          okMsg: lang == 'ar' ? 'اتسمحلها تشتغل مؤقتًا' : 'Temporary access granted');
+    }
+  }
+
   Future<void> _postWorkerDoc(String workerId, String kind, String status, String label, String lang, {String? note}) async {
     await _post(
       '/admin/workers/${widget.providerId}/$workerId/docs/$kind',
@@ -675,9 +746,16 @@ class _ProviderDetailScreenState extends ConsumerState<ProviderDetailScreen> {
       confirmLabel: lang == 'ar' ? 'رفض' : 'Reject',
       danger: true,
       bodyBuilder: (ctx, _) => V2FormField(
-        label: lang == 'ar' ? 'السبب' : 'Reason',
-        child: TextField(onChanged: (v) => note = v, maxLines: 2),
+        label: lang == 'ar' ? 'السبب (هيشوفه صاحب الحساب)' : 'Reason (the provider will see this)',
+        child: TextField(onChanged: (v) => note = v, maxLines: 2, autofocus: true),
       ),
+      onValidate: () {
+        if (note.trim().isEmpty) {
+          v2Toast(context, lang == 'ar' ? 'لازم تكتبي السبب' : 'A reason is required', error: true);
+          return false;
+        }
+        return true;
+      },
     );
     if (ok) {
       await _postWorkerDoc(workerId, kind, 'rejected', label, lang, note: note.trim());

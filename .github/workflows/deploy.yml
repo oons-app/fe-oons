@@ -90,13 +90,35 @@ jobs:
             code=$(curl -s -o /dev/null -w "%{http_code}" https://lady.oons.app/ || true)
             if [ "$code" = "200" ] || [ "$code" = "301" ] || [ "$code" = "302" ]; then
               echo "lady.oons.app healthy ($code)"
-              exit 0
+              break
             fi
             echo "waiting... lady.oons.app=$code"
             sleep 3
+            if [ "$i" = "10" ]; then
+              echo "Main App health check failed"
+              exit 1
+            fi
           done
-          echo "Main App health check failed"
-          exit 1
+
+      # A 200 above only proves *some* build is live — it stayed green for
+      # a real stretch once while this workflow was silently deploying the
+      # wrong app entirely. Prove *this* build actually took effect by
+      # diffing the deployed bundle's own hash against the one we just
+      # built and rsynced, so a future infra regression (wrong path, stale
+      # cache, rsync silently no-op'ing) fails the pipeline instead of
+      # going unnoticed.
+      - name: Verify the deployed bundle matches this build
+        run: |
+          set -euo pipefail
+          local_sum=$(sha256sum build/web/main.dart.js | cut -d' ' -f1)
+          remote_sum=$(curl -fsSL https://lady.oons.app/main.dart.js | sha256sum | cut -d' ' -f1)
+          echo "local:  $local_sum"
+          echo "remote: $remote_sum"
+          if [ "$local_sum" != "$remote_sum" ]; then
+            echo "Deployed main.dart.js does not match this build — the rsync/deploy did not take effect."
+            exit 1
+          fi
+          echo "Deployed bundle verified — matches this build."
 
   deploy-admin:
     name: Deploy Ops Console to Lightsail
@@ -165,10 +187,27 @@ jobs:
             code=$(curl -s -o /dev/null -w "%{http_code}" https://bo.oons.app/ || true)
             if [ "$code" = "200" ] || [ "$code" = "301" ] || [ "$code" = "302" ]; then
               echo "bo.oons.app healthy ($code)"
-              exit 0
+              break
             fi
             echo "waiting... bo.oons.app=$code"
             sleep 3
+            if [ "$i" = "10" ]; then
+              echo "Ops Console health check failed"
+              exit 1
+            fi
           done
-          echo "Ops Console health check failed"
-          exit 1
+
+      # Same reasoning as the main app's deploy job — a 200 only proves
+      # something is live, not that it's *this* build.
+      - name: Verify the deployed bundle matches this build
+        run: |
+          set -euo pipefail
+          local_sum=$(sha256sum build/web/main.dart.js | cut -d' ' -f1)
+          remote_sum=$(curl -fsSL https://bo.oons.app/main.dart.js | sha256sum | cut -d' ' -f1)
+          echo "local:  $local_sum"
+          echo "remote: $remote_sum"
+          if [ "$local_sum" != "$remote_sum" ]; then
+            echo "Deployed main.dart.js does not match this build — the rsync/deploy did not take effect."
+            exit 1
+          fi
+          echo "Deployed bundle verified — matches this build."

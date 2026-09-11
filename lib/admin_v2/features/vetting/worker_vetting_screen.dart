@@ -28,6 +28,8 @@ class _WorkerVettingScreenState extends ConsumerState<WorkerVettingScreen> {
   bool loading = true;
   String? error;
 
+  static const _slaTargetHours = 72;
+
   @override
   void initState() {
     super.initState();
@@ -42,6 +44,7 @@ class _WorkerVettingScreenState extends ConsumerState<WorkerVettingScreen> {
       });
       final data = await staffClient.get('/admin/workers/pending-vetting');
       final list = asMapList(data['pending']);
+      list.sort((a, b) => asDouble(b['waitHours']).compareTo(asDouble(a['waitHours'])));
       setState(() {
         pending = list;
         loading = false;
@@ -60,6 +63,10 @@ class _WorkerVettingScreenState extends ConsumerState<WorkerVettingScreen> {
     final role = ref.watch(staffSessionProvider).effectiveRole;
     if (!canSeeScreen(role, 'workerVetting')) return const V2Gate(allowed: false, child: SizedBox.shrink());
 
+    final longestH = pending.isEmpty ? 0.0 : asDouble(pending.first['waitHours']);
+    final breaching = pending.where((w) => asDouble(w['waitHours']) > _slaTargetHours).length;
+    String wait(double h) => h >= 24 ? '${(h / 24).floor()}d' : '${h.toStringAsFixed(0)}h';
+
     return ColoredBox(
       color: Ops.page,
       child: ListView(
@@ -70,6 +77,8 @@ class _WorkerVettingScreenState extends ConsumerState<WorkerVettingScreen> {
             runSpacing: 12,
             children: [
               _stat(lang == 'ar' ? 'في الطابور' : 'In queue', '${pending.length}', lang == 'ar' ? 'بانتظار قرار' : 'awaiting a decision'),
+              _stat(lang == 'ar' ? 'أطول انتظار' : 'Longest wait', wait(longestH), lang == 'ar' ? 'الهدف ٣ أيام' : 'SLA target 3d'),
+              _stat(lang == 'ar' ? 'تجاوز المهلة' : 'Breaching SLA', '$breaching', lang == 'ar' ? 'أكثر من ٣ أيام' : 'over 3 days'),
             ],
           ),
           const SizedBox(height: 16),
@@ -125,8 +134,22 @@ class _WorkerVettingScreenState extends ConsumerState<WorkerVettingScreen> {
                                         : 'at ${w['providerName'] ?? '—'}',
                                     style: const TextStyle(fontSize: 11.5, color: Ops.mutedSoft),
                                   ),
+                                  if (w['assignable'] == true)
+                                    Text(
+                                      lang == 'ar' ? 'مسموح ليها تشتغل مؤقتًا' : 'Allowed to work temporarily',
+                                      style: const TextStyle(fontSize: 11, color: Ops.terracottaInk),
+                                    ),
                                 ],
                               ),
+                            ),
+                            SizedBox(
+                              width: 60,
+                              child: Text(wait(asDouble(w['waitHours'])),
+                                  style: TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w600,
+                                      fontFamily: Ops.mono,
+                                      color: asDouble(w['waitHours']) > _slaTargetHours ? Ops.terracottaInk : Ops.inkSoft)),
                             ),
                             V2Btn.ghost(
                               lang == 'ar' ? 'مراجعة' : 'Review',

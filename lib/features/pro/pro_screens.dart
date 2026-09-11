@@ -1258,7 +1258,7 @@ class _ProJobScreenState extends ConsumerState<ProJobScreen> {
     if (eligible.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(
         ar
-            ? 'مفيش حد موثّق في الفريق لسه. ضيفي ووثّقي عضو من "الفريق" في حسابك.'
+            ? 'مفيش حد موثّق في فريق العمل لسه. ضيفي ووثّقي عضو من "فريق العمل" في حسابك.'
             : 'No vetted team members yet. Add and vet one from Team in your account.',
       )));
       return;
@@ -1735,7 +1735,7 @@ class _ProAccountScreenState extends ConsumerState<ProAccountScreen> {
             ),
           ),
           const SizedBox(height: 20),
-          ProSectionLabel(lang == 'ar' ? 'الفريق' : 'Team'),
+          ProSectionLabel(lang == 'ar' ? 'فريق العمل' : 'Team'),
           const SizedBox(height: 10),
           ProCard(
             child: Row(

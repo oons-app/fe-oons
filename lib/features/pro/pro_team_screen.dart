@@ -61,7 +61,7 @@ class _ProTeamScreenState extends ConsumerState<ProTeamScreen> {
         backgroundColor: Pro.bg,
         elevation: 0,
         foregroundColor: Pro.ink,
-        title: Text(ar ? 'الفريق' : 'Team'),
+        title: Text(ar ? 'فريق العمل' : 'Team'),
       ),
       body: loading
           ? const Center(child: CircularProgressIndicator(color: Pro.plum))
@@ -174,9 +174,15 @@ class _WorkerEditorSheetState extends State<_WorkerEditorSheet> {
   String? uploadLabel;
   String? workerId;
   Map<String, dynamic>? current;
+  // Mutable, not a `widget.existing != null` getter: a fresh create flips
+  // this to true immediately so the just-created worker's document-upload
+  // section appears in the SAME sheet, without needing to close and reopen
+  // it (widget.existing itself never changes for the life of this sheet —
+  // recomputing "edit mode" from it after a successful create silently hid
+  // the upload buttons the entire session).
+  late bool isEdit;
 
   bool get ar => widget.lang == 'ar';
-  bool get isEdit => widget.existing != null;
 
   @override
   void initState() {
@@ -184,6 +190,7 @@ class _WorkerEditorSheetState extends State<_WorkerEditorSheet> {
     current = widget.existing;
     workerId = widget.existing?['id'] as String?;
     active = widget.existing?['active'] != false;
+    isEdit = widget.existing != null;
   }
 
   @override
@@ -218,6 +225,7 @@ class _WorkerEditorSheetState extends State<_WorkerEditorSheet> {
       if (r['worker'] is Map) {
         current = Map<String, dynamic>.from(r['worker'] as Map);
         workerId = '${current!['id']}';
+        isEdit = true;
         nationalId.clear();
       }
       changed = true;
@@ -342,6 +350,13 @@ class _WorkerEditorSheetState extends State<_WorkerEditorSheet> {
                 IconButton(onPressed: () => Navigator.pop(context, changed), icon: const Icon(Icons.close, color: Pro.muted)),
               ],
             ),
+            if (!isEdit) ...[
+              const SizedBox(height: 4),
+              Text(
+                ar ? 'احفظي البيانات الأول، وبعدها هتقدري ترفعي البطاقة والفيش.' : "Save these details first, then you'll be able to upload the ID and criminal record.",
+                style: const TextStyle(fontSize: 12, color: Pro.muted, height: 1.4),
+              ),
+            ],
             const SizedBox(height: 14),
             Text(ar ? 'الاسم الأول' : 'First name', style: const TextStyle(fontSize: 12, color: Pro.muted)),
             const SizedBox(height: 6),

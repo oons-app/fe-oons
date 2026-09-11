@@ -1845,6 +1845,7 @@ class _CategoryServicesSheet extends StatefulWidget {
 
 class _CategoryServicesSheetState extends State<_CategoryServicesSheet> {
   late final staged = List<ProServiceDraft>.of(widget.initial);
+  bool submitting = false;
 
   bool get ar => widget.lang == 'ar';
 
@@ -1888,6 +1889,7 @@ class _CategoryServicesSheetState extends State<_CategoryServicesSheet> {
   }
 
   bool get _canSubmit =>
+      !submitting &&
       staged.isNotEmpty &&
       staged.every((d) => d.name.en.trim().isNotEmpty || d.name.ar.trim().isNotEmpty) &&
       staged.every((d) => d.priceEgp > 0);
@@ -1964,7 +1966,13 @@ class _CategoryServicesSheetState extends State<_CategoryServicesSheet> {
             ProPrimaryButton(
               label: ar ? 'ابعتي للمراجعة' : 'Submit for review',
               enabled: _canSubmit,
-              onTap: () => Navigator.pop(context, staged),
+              // Guard against a double-tap firing two submissions before the
+              // sheet has a chance to close — the actual network call runs
+              // after this pops, so disabling here is the only backstop.
+              onTap: () {
+                setState(() => submitting = true);
+                Navigator.pop(context, staged);
+              },
             ),
           ],
         ),

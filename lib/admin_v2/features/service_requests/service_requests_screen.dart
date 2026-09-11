@@ -43,6 +43,11 @@ class _ServiceRequestsScreenState extends ConsumerState<ServiceRequestsScreen> {
   bool loading = true;
   String? error;
   String q = '';
+  // Item ids a staff member has unchecked within a bundle — lets a decision
+  // apply to only some of a bundle's services (e.g. approve two tiers,
+  // leave a third pending for its own separate reject/changes-requested
+  // call) instead of only ever deciding the whole bundle at once.
+  final Set<String> _excludedItemIds = {};
 
   @override
   void initState() {
@@ -86,6 +91,11 @@ class _ServiceRequestsScreenState extends ConsumerState<ServiceRequestsScreen> {
 
   Future<void> _decide(_Bundle b, String status) async {
     final lang = ref.read(localeCodeProvider);
+    final itemIds = b.items.map((r) => '${r['itemId']}').where((id) => !_excludedItemIds.contains(id)).toList();
+    if (itemIds.isEmpty) {
+      v2Toast(context, lang == 'ar' ? 'اختاري خدمة واحدة على الأقل' : 'Select at least one service', error: true);
+      return;
+    }
     var note = '';
     if (status != 'approve') {
       final ok = await v2Form(
@@ -99,13 +109,20 @@ class _ServiceRequestsScreenState extends ConsumerState<ServiceRequestsScreen> {
           label: lang == 'ar' ? 'السبب (هتشوفه المهنية)' : 'Reason (the provider will see this)',
           child: TextField(onChanged: (v) => note = v, maxLines: 3, autofocus: true),
         ),
+        onValidate: () {
+          if (note.trim().isEmpty) {
+            v2Toast(context, lang == 'ar' ? 'لازم تكتبي السبب' : 'A reason is required', error: true);
+            return false;
+          }
+          return true;
+        },
       );
       if (!ok) return;
     }
     try {
       await staffClient.post(
         '/admin/service-requests/${b.providerId}/${b.categoryId}/decide',
-        data: {'status': status, if (note.trim().isNotEmpty) 'note': note.trim()},
+        data: {'status': status, 'itemIds': itemIds, if (note.trim().isNotEmpty) 'note': note.trim()},
       );
       if (mounted) {
         v2Toast(
@@ -227,11 +244,35 @@ class _ServiceRequestsScreenState extends ConsumerState<ServiceRequestsScreen> {
             ),
           ],
           const SizedBox(height: 12),
+          if (canWrite && b.items.length > 1)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Text(
+                lang == 'ar' ? 'شيلي علامة الصح عن أي خدمة عشان تقرري فيها لوحدها' : 'Uncheck a service to decide it on its own',
+                style: const TextStyle(fontSize: 11, color: Ops.mutedSoft, fontStyle: FontStyle.italic),
+              ),
+            ),
           for (final r in b.items)
             Padding(
               padding: const EdgeInsets.only(bottom: 6),
               child: Row(
                 children: [
+                  if (canWrite && b.items.length > 1)
+                    SizedBox(
+                      width: 32,
+                      height: 32,
+                      child: Checkbox(
+                        value: !_excludedItemIds.contains('${r['itemId']}'),
+                        onChanged: (v) => setState(() {
+                          final id = '${r['itemId']}';
+                          if (v == true) {
+                            _excludedItemIds.remove(id);
+                          } else {
+                            _excludedItemIds.add(id);
+                          }
+                        }),
+                      ),
+                    ),
                   Expanded(
                     child: Text(locName(r['name'], lang), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                   ),

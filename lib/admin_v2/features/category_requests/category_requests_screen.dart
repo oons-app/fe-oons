@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:oons/admin_v2/chrome/modal.dart';
 import 'package:oons/admin_v2/chrome/toast.dart';
 import 'package:oons/admin_v2/data/maps.dart';
 import 'package:oons/admin_v2/data/permissions.dart';
@@ -87,8 +88,32 @@ class _CategoryRequestsScreenState extends ConsumerState<CategoryRequestsScreen>
 
   Future<void> _handle(Map r, String action) async {
     final lang = ref.read(localeCodeProvider);
+    var note = '';
+    if (action == 'reject') {
+      // The backend now requires a note on reject — collect it here instead
+      // of firing a silent reject with nothing for the provider to act on.
+      final ok = await v2Form(
+        context,
+        title: lang == 'ar' ? 'رفض الطلب' : 'Reject request',
+        confirmLabel: lang == 'ar' ? 'رفض' : 'Reject',
+        danger: true,
+        bodyBuilder: (ctx, _) => V2FormField(
+          label: lang == 'ar' ? 'السبب (هتشوفه المهنية)' : 'Reason (the provider will see this)',
+          child: TextField(onChanged: (v) => note = v, maxLines: 2, autofocus: true),
+        ),
+        onValidate: () {
+          if (note.trim().isEmpty) {
+            v2Toast(context, lang == 'ar' ? 'لازم تكتبي السبب' : 'A reason is required', error: true);
+            return false;
+          }
+          return true;
+        },
+      );
+      if (!ok) return;
+    }
     try {
-      await staffClient.post('/admin/provider-categories/${idOf(r)}/$action');
+      await staffClient.post('/admin/provider-categories/${idOf(r)}/$action',
+          data: {if (note.trim().isNotEmpty) 'note': note.trim()});
       if (mounted) {
         v2Toast(context, action == 'approve'
             ? (lang == 'ar' ? 'تمت الموافقة' : 'Approved')
