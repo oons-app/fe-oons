@@ -42,7 +42,7 @@ gh secret set LIGHTSAIL_SSH_KNOWN_HOSTS -R oons-app/fe-oons -e production \
 
 - SSH with the deploy key
 - Write access to `/opt/oonsa/web-root/oons/admin/`
-- nginx `web` service already bind-mounts `./web-root` (no container rebuild needed for FE deploys)
+- Caddy (the `web` service, `be-oons/docker-compose.lightsail.yml`) already bind-mounts `./web-root` (no container rebuild needed for FE deploys)
 
 ## Manual deploy
 
