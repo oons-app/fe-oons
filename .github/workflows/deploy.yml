@@ -17,7 +17,88 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  deploy-main:
+    name: Deploy Main App to Lightsail
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.47.2"
+          channel: stable
+          cache: true
+
+      - name: Pub get
+        run: flutter pub get
+
+      # Default entrypoint (lib/main.dart) — the customer + provider app
+      # served at lady.oons.app (and every vanity/custom-domain host, which
+      # shares this same bundle per the Caddyfile). base-href defaults to /
+      # since it's served from web-root's top level.
+      - name: Build Main App (web)
+        run: |
+          set -euo pipefail
+          flutter build web --release --no-wasm-dry-run \
+            --dart-define=API_BASE=https://api.oons.app \
+            --dart-define=PUBLIC_WEB_BASE=https://lady.oons.app
+
+      - name: Setup SSH
+        env:
+          SSH_KEY: ${{ secrets.LIGHTSAIL_SSH_PRIVATE_KEY }}
+          HOST: ${{ secrets.LIGHTSAIL_HOST }}
+          KNOWN_HOSTS: ${{ secrets.LIGHTSAIL_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          if [ -n "${KNOWN_HOSTS:-}" ]; then
+            printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          else
+            ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          fi
+          chmod 644 ~/.ssh/known_hosts
+          cat >> ~/.ssh/config <<EOF
+          Host lightsail
+            HostName ${HOST}
+            User ${{ secrets.LIGHTSAIL_USER }}
+            IdentityFile ~/.ssh/id_deploy
+            IdentitiesOnly yes
+            StrictHostKeyChecking yes
+          EOF
+          chmod 600 ~/.ssh/config
+
+      - name: Rsync Main App to web-root
+        run: |
+          set -euo pipefail
+          # web-root's top level is the main app; oons/admin/ is the Ops
+          # Console's own subtree (deployed by the other job) — excluded so
+          # this --delete never touches it.
+          rsync -az --delete \
+            --exclude 'oons/admin/' \
+            -e "ssh -F $HOME/.ssh/config" \
+            build/web/ \
+            lightsail:/opt/oonsa/web-root/
+
+      - name: Health check
+        run: |
+          set -euo pipefail
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" https://lady.oons.app/ || true)
+            if [ "$code" = "200" ] || [ "$code" = "301" ] || [ "$code" = "302" ]; then
+              echo "lady.oons.app healthy ($code)"
+              exit 0
+            fi
+            echo "waiting... lady.oons.app=$code"
+            sleep 3
+          done
+          echo "Main App health check failed"
+          exit 1
+
+  deploy-admin:
     name: Deploy Ops Console to Lightsail
     runs-on: ubuntu-latest
     environment: production

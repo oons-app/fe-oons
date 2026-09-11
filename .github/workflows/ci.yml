@@ -51,6 +51,12 @@ jobs:
       - name: Test
         run: flutter test
 
+      - name: Build Main App (web)
+        run: |
+          flutter build web --release --no-wasm-dry-run \
+            --dart-define=API_BASE=https://api.oons.app \
+            --dart-define=PUBLIC_WEB_BASE=https://lady.oons.app
+
       - name: Build Ops Console (web)
         run: |
           flutter build web -t lib/admin_v2/main.dart --release --base-href / \
