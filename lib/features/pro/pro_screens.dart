@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:oons/core/analytics.dart';
@@ -380,34 +381,52 @@ class _ProRegisterScreenState extends ConsumerState<ProRegisterScreen> {
                       );
                   clearPendingRegistration();
                   final repo = ref.read(repoProvider);
+                  // Registration itself succeeded once we get here — the account
+                  // exists. The two document uploads are best-effort follow-ups:
+                  // one failing (oversized photo, a dropped connection) must not
+                  // look like the whole signup failed, and must not stop the
+                  // other upload from being attempted. Failures are surfaced on
+                  // the account screen instead, where "ارفعي" can retry them.
+                  final docIssues = <String>[];
                   if (idBytes != null) {
                     if (mounted) setState(() => uploadProgress = 0.05);
-                    final r = await repo.uploadProID(
-                      idBytes!,
-                      filename: idName ?? 'id.jpg',
-                      onProgress: (f) {
-                        if (mounted) setState(() => uploadProgress = 0.05 + f * 0.45);
-                      },
-                    );
-                    if (r['provider'] is Map) {
-                      ref.read(sessionProvider.notifier).setProvider(ProviderP.fromJson(r['provider'] as Map));
+                    try {
+                      final r = await repo.uploadProID(
+                        idBytes!,
+                        filename: idName ?? 'id.jpg',
+                        onProgress: (f) {
+                          if (mounted) setState(() => uploadProgress = 0.05 + f * 0.45);
+                        },
+                      );
+                      if (r['provider'] is Map) {
+                        ref.read(sessionProvider.notifier).setProvider(ProviderP.fromJson(r['provider'] as Map));
+                      }
+                    } catch (e) {
+                      docIssues.add('${p['uploadId']}: ${friendlyError(e, lang)}');
                     }
                   }
                   if (fishBytes != null) {
                     if (mounted) setState(() => uploadProgress = 0.5);
-                    final r = await repo.uploadProFish(
-                      fishBytes!,
-                      filename: fishName ?? 'fish.jpg',
-                      onProgress: (f) {
-                        if (mounted) setState(() => uploadProgress = 0.5 + f * 0.45);
-                      },
-                    );
-                    if (r['provider'] is Map) {
-                      ref.read(sessionProvider.notifier).setProvider(ProviderP.fromJson(r['provider'] as Map));
+                    try {
+                      final r = await repo.uploadProFish(
+                        fishBytes!,
+                        filename: fishName ?? 'fish.jpg',
+                        onProgress: (f) {
+                          if (mounted) setState(() => uploadProgress = 0.5 + f * 0.45);
+                        },
+                      );
+                      if (r['provider'] is Map) {
+                        ref.read(sessionProvider.notifier).setProvider(ProviderP.fromJson(r['provider'] as Map));
+                      }
+                    } catch (e) {
+                      docIssues.add('${p['uploadFish']}: ${friendlyError(e, lang)}');
                     }
                   }
                   if (mounted) setState(() => uploadProgress = 1);
                   await ref.read(sessionProvider.notifier).refreshMe();
+                  if (docIssues.isNotEmpty) {
+                    await Hive.box('prefs').put('pendingDocIssue', docIssues.join('\n'));
+                  }
                   tapSuccess();
                   if (mounted) context.go('/pro/account');
                 } catch (e) {
@@ -1292,6 +1311,7 @@ class _ProAccountScreenState extends ConsumerState<ProAccountScreen> {
   bool busy = false;
   double? uploadProgress;
   String? uploadLabel;
+  String? docIssue;
 
   @override
   void initState() {
@@ -1299,6 +1319,15 @@ class _ProAccountScreenState extends ConsumerState<ProAccountScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(sessionProvider.notifier).refreshMe();
     });
+    // One-time notice: a document upload failed right after registration
+    // (oversized photo, dropped connection) while the account itself was
+    // created fine. Surface it once, here, where "ارفعي" can retry it.
+    final prefs = Hive.box('prefs');
+    final pending = prefs.get('pendingDocIssue') as String?;
+    if (pending != null && pending.isNotEmpty) {
+      docIssue = pending;
+      prefs.delete('pendingDocIssue');
+    }
   }
 
   void _prime(ProviderP? me) {
@@ -1331,6 +1360,34 @@ class _ProAccountScreenState extends ConsumerState<ProAccountScreen> {
             bottom: false,
             child: Text('${p['account']}', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: Pro.ink)),
           ),
+          if (docIssue != null) ...[
+            const SizedBox(height: 14),
+            ProCard(
+              color: Pro.pendingBg,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.warning_amber_rounded, color: Pro.pendingInk, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      lang == 'ar'
+                          ? 'اتسجل حسابك، بس في ورقة ما اترفعتش:\n$docIssue\nارفعيها تاني من "ورقك" تحت.'
+                          : 'Your account is set up, but a document didn\'t upload:\n$docIssue\nUpload it again from "Papers" below.',
+                      style: const TextStyle(fontSize: 12.5, color: Pro.pendingInk, height: 1.5),
+                    ),
+                  ),
+                  InkWell(
+                    onTap: () => setState(() => docIssue = null),
+                    child: const Padding(
+                      padding: EdgeInsets.only(left: 4, top: 2),
+                      child: Icon(Icons.close, color: Pro.pendingInk, size: 18),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 14),
           ProCard(
             child: Row(

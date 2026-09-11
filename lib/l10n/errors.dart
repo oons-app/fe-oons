@@ -66,6 +66,9 @@ String friendlyError(Object e, String lang) {
         'National ID must be 14 digits.': 'الرقم القومي لازم يكون ١٤ رقم بالظبط.',
         'Need every legal consent to continue.': 'لازم توافقي على كل البنود عشان تكملي.',
         'Need your legal name.': 'اكتبي الاسم القانوني الكامل.',
+        'That photo is too large (8 MB max). Try a lower-resolution photo.':
+            'الصورة كبيرة أوي (٨ ميجا الحد الأقصى). جربي صورة أصغر أو بجودة أقل.',
+        'Need a photo.': 'اختاري صورة.',
       };
       final m = ar[msg];
       if (m != null) return m;
