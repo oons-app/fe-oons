@@ -39,6 +39,7 @@ class _ProServicesScreenState extends ConsumerState<ProServicesScreen> {
   List<Map<String, dynamic>> allProCategories = [];
   List<Map<String, dynamic>> approvedCategories = [];
   List<Map<String, dynamic>> pendingCategories = [];
+  List<Map<String, dynamic>> needsAttentionCategories = [];
   Map<String, dynamic> catalog = {};
   double commissionRate = 0.10;
   bool catsLoaded = false;
@@ -80,6 +81,10 @@ class _ProServicesScreenState extends ConsumerState<ProServicesScreen> {
           final s = '${r['status']}';
           return s == 'pending_addition_approval' || s == 'pending_initial_vetting';
         }).toList();
+        needsAttentionCategories = rows.where((r) {
+          final s = '${r['status']}';
+          return s == 'rejected' || s == 'changes_requested';
+        }).toList();
         catalog = cat;
         commissionRate = (cat['commissionRate'] as num?)?.toDouble() ?? 0.10;
         catsLoaded = true;
@@ -93,7 +98,6 @@ class _ProServicesScreenState extends ConsumerState<ProServicesScreen> {
 
   Future<void> _requestCategorySheet() async {
     final lang = langOf(ref);
-    final repo = ref.read(repoProvider);
     final me = ref.read(sessionProvider).provider;
     if (me == null) return;
     List<Map<String, dynamic>> allCats = [];
@@ -103,7 +107,12 @@ class _ProServicesScreenState extends ConsumerState<ProServicesScreen> {
       // one vertical, e.g. a beauty provider who also does cleaning.
       allCats = await repo.categories(activeOnly: true);
     } catch (_) {}
-    final mine = allProCategories.map((c) => '${c['categoryId']}').toSet();
+    // Only a currently active/pending grant blocks re-requesting — a
+    // rejected or changes-requested one is resubmitted via "Edit &
+    // resubmit" on the category itself (see needsAttentionCategories),
+    // never hidden here forever.
+    const blocking = {'active', 'pending_addition_approval', 'pending_initial_vetting'};
+    final mine = allProCategories.where((c) => blocking.contains('${c['status']}')).map((c) => '${c['categoryId']}').toSet();
     final available = allCats.where((c) {
       final id = '${c['id'] ?? c['_id'] ?? ''}';
       return id.isNotEmpty && !mine.contains(id);
@@ -115,7 +124,7 @@ class _ProServicesScreenState extends ConsumerState<ProServicesScreen> {
       );
       return;
     }
-    showModalBottomSheet(
+    final picked = await showModalBottomSheet<Map<String, dynamic>>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Pro.bg,
@@ -123,22 +132,75 @@ class _ProServicesScreenState extends ConsumerState<ProServicesScreen> {
       builder: (ctx) => _RequestCategorySheet(
         available: available,
         lang: lang,
-        onRequest: (catId) async {
-          Navigator.pop(ctx);
-          try {
-            await repo.proAddCategory(catId);
-            if (!mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(lang == 'ar' ? 'تم إرسال الطلب للمراجعة ✓' : 'Request sent for review ✓')),
-            );
-            await _loadCategories();
-          } on ApiException catch (e) {
-            if (!mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
-          }
-        },
+        onRequest: (cat) => Navigator.pop(ctx, cat),
       ),
     );
+    if (picked == null || !mounted) return;
+    await _openCategoryServicesSheet(picked);
+  }
+
+  Repo get repo => ref.read(repoProvider);
+
+  /// Opens the staged-services flow for one specialty: define one or more
+  /// real services (price, duration, cleaning tiers) before a single
+  /// "submit for review" call bundles the category + services together.
+  /// `category` must carry the real category id under `id` or
+  /// `categoryId`. When re-requesting after a rejection/changes-requested
+  /// decision, the provider's own already-typed drafts under that category
+  /// are staged first so nothing is lost.
+  Future<void> _openCategoryServicesSheet(Map<String, dynamic> category) async {
+    final lang = langOf(ref);
+    final catId = '${category['id'] ?? category['categoryId'] ?? ''}';
+    if (catId.isEmpty) return;
+    final staged = <ProServiceDraft>[
+      for (final d in drafts)
+        if (d.categoryId == catId && (d.approvalState == 'rejected' || d.approvalState == 'changes_requested'))
+          ProServiceDraft(
+            id: 'new-${const Uuid().v4().substring(0, 8)}', // a resubmission always creates fresh items server-side
+            categoryId: d.categoryId,
+            name: d.name,
+            catalogItemId: d.catalogItemId,
+            kind: d.kind,
+            duration: d.duration,
+            priceEgp: d.priceEgp,
+            travelEgp: d.travelEgp,
+            active: true,
+            sizeFromSqm: d.sizeFromSqm,
+            sizeToSqm: d.sizeToSqm,
+            workerCount: d.workerCount,
+            excludedTaskIds: Set.of(d.excludedTaskIds),
+          ),
+    ];
+    final result = await showModalBottomSheet<List<ProServiceDraft>>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Pro.bg,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
+      builder: (ctx) => _CategoryServicesSheet(
+        lang: lang,
+        category: category,
+        initial: staged,
+        repo: repo,
+        catalog: catalog,
+        commissionRate: commissionRate,
+      ),
+    );
+    if (result == null || result.isEmpty || !mounted) return;
+    try {
+      final items = result.map((d) => d.toApiItem()).toList();
+      await repo.proAddCategoryWithServices(catId, items);
+      for (final d in result) {
+        d.dispose();
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(lang == 'ar' ? 'اتبعت لفريق أُنس للمراجعة ✓' : 'Sent to Oons for review ✓')),
+      );
+      await _loadCategories();
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    }
   }
 
   String? _matchCategoryId(ServiceItem it) {
@@ -1342,6 +1404,7 @@ class _ProServicesScreenState extends ConsumerState<ProServicesScreen> {
           if (!catsLoaded)
             const LinearProgressIndicator(minHeight: 2, color: Pro.plum)
           else ...[
+            ...needsAttentionCategories.map((c) => _needsAttentionCatRow(lang, c)),
             ...approvedCategories.map((c) => _catRow(lang, c, pending: false)),
             ...pendingCategories.map((c) => _catRow(lang, c, pending: true)),
           ],
@@ -1392,6 +1455,58 @@ class _ProServicesScreenState extends ConsumerState<ProServicesScreen> {
               child: Text(lang == 'ar' ? 'شيلي' : 'Remove', style: const TextStyle(fontSize: 12, color: Pro.muted)),
             ),
         ],
+      ),
+    );
+  }
+
+  /// A rejected/changes-requested specialty — surfaced with admin's own
+  /// note (previously never returned to the provider at all) and an
+  /// "Edit & resubmit" action that reopens the staged-services flow,
+  /// pre-filled with whatever was last submitted.
+  Widget _needsAttentionCatRow(String lang, Map c) {
+    final ar = lang == 'ar';
+    final n = c['name'];
+    final label = n is Map ? Loc.fromJson(n).of(lang) : '$n';
+    final note = '${c['decisionNote'] ?? ''}'.trim();
+    final rejected = '${c['status']}' == 'rejected';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF8EEEE),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Pro.dangerLine),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(child: Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Pro.ink))),
+                ProPill(rejected ? (ar ? 'مرفوض' : 'Rejected') : (ar ? 'مطلوب تعديل' : 'Needs changes'), soft: true),
+              ],
+            ),
+            if (note.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(note, style: const TextStyle(fontSize: 12.5, color: Pro.danger, height: 1.4)),
+            ],
+            const SizedBox(height: 8),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: TextButton(
+                onPressed: () => _openCategoryServicesSheet({
+                  'id': c['categoryId'],
+                  'categoryId': c['categoryId'],
+                  'name': c['name'],
+                  'slug': c['slug'],
+                  'vertical': c['vertical'],
+                }),
+                child: Text(ar ? 'عدّلي وابعتي تاني' : 'Edit & resubmit', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Pro.plum)),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1631,7 +1746,7 @@ class _RequestCategorySheet extends StatelessWidget {
   });
   final List<Map<String, dynamic>> available;
   final String lang;
-  final Future<void> Function(String categoryId) onRequest;
+  final void Function(Map<String, dynamic> category) onRequest;
 
   @override
   Widget build(BuildContext context) {
@@ -1666,14 +1781,13 @@ class _RequestCategorySheet extends StatelessWidget {
               itemCount: available.length,
               itemBuilder: (_, i) {
                 final c = available[i];
-                final id = '${c['id'] ?? c['_id'] ?? ''}';
                 final n = c['name'];
                 final label = n is Map ? Loc.fromJson(n).of(lang) : '${n ?? c['slug']}';
                 final verticalLabel = _verticalLabel('${c['vertical'] ?? ''}', lang);
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: InkWell(
-                    onTap: () => onRequest(id),
+                    onTap: () => onRequest(c),
                     borderRadius: BorderRadius.circular(12),
                     child: Container(
                       padding: const EdgeInsets.all(14),
@@ -1700,6 +1814,160 @@ class _RequestCategorySheet extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Stages one or more real services (price, duration, cleaning tiers) for a
+/// not-yet-approved specialty, before a single "submit for review" bundles
+/// the category and every staged service together — the actual final output
+/// admin reviews, not a bare category name.
+class _CategoryServicesSheet extends StatefulWidget {
+  const _CategoryServicesSheet({
+    required this.lang,
+    required this.category,
+    required this.initial,
+    required this.repo,
+    required this.catalog,
+    required this.commissionRate,
+  });
+  final String lang;
+  final Map<String, dynamic> category;
+  final List<ProServiceDraft> initial;
+  final Repo repo;
+  final Map<String, dynamic> catalog;
+  final double commissionRate;
+
+  @override
+  State<_CategoryServicesSheet> createState() => _CategoryServicesSheetState();
+}
+
+class _CategoryServicesSheetState extends State<_CategoryServicesSheet> {
+  late final staged = List<ProServiceDraft>.of(widget.initial);
+
+  bool get ar => widget.lang == 'ar';
+
+  String get _catLabel {
+    final n = widget.category['name'];
+    if (n is Map) return Loc.fromJson(n).of(widget.lang);
+    return '${n ?? widget.category['slug'] ?? ''}';
+  }
+
+  Future<void> _addService({ProServiceDraft? existing}) async {
+    final result = await showProServiceEditorSheet(
+      context: context,
+      lang: widget.lang,
+      approvedCategories: [widget.category],
+      repo: widget.repo,
+      existing: existing,
+      usedCategoryIds: const {},
+      catalog: widget.catalog,
+      commissionRate: widget.commissionRate,
+    );
+    if (result == null || !mounted) return;
+    if (result.categoryId == '__delete__') {
+      if (existing != null) {
+        setState(() => staged.remove(existing));
+        existing.dispose();
+      }
+      return;
+    }
+    setState(() {
+      if (existing == null) {
+        staged.add(result);
+      } else {
+        final i = staged.indexOf(existing);
+        if (i >= 0) {
+          staged[i] = result;
+        } else {
+          staged.add(result);
+        }
+      }
+    });
+  }
+
+  bool get _canSubmit =>
+      staged.isNotEmpty &&
+      staged.every((d) => d.name.en.trim().isNotEmpty || d.name.ar.trim().isNotEmpty) &&
+      staged.every((d) => d.priceEgp > 0);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.75,
+        maxChildSize: 0.95,
+        minChildSize: 0.5,
+        builder: (_, ctrl) => ListView(
+          controller: ctrl,
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+          children: [
+            Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: Pro.lineSoft, borderRadius: BorderRadius.circular(2)))),
+            const SizedBox(height: 12),
+            Text(
+              ar ? 'خدمات $_catLabel' : '$_catLabel services',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Pro.ink),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              ar
+                  ? 'ضيفي تفاصيل خدمة واحدة أو أكتر (السعر والمدة، أو مساحة التنظيف)، وفريق أُنس هيراجع التخصص والخدمات مع بعض دفعة واحدة.'
+                  : "Add one or more services with real details (price, duration, or cleaning size) — Oons reviews the specialty and its services together, in one pass.",
+              style: const TextStyle(fontSize: 13, color: Pro.muted, height: 1.45),
+            ),
+            const SizedBox(height: 14),
+            if (staged.isEmpty)
+              ProCard(
+                child: Text(
+                  ar ? 'لسه مفيش خدمات مضافة.' : 'No services added yet.',
+                  style: const TextStyle(fontSize: 13, color: Pro.muted),
+                ),
+              )
+            else
+              ...staged.map((d) {
+                final name = d.name.of(widget.lang);
+                final label = name.isEmpty ? _catLabel : name;
+                final meta = d.isCleaning
+                    ? cleaningSizeMeta(fromSqm: d.sizeFromSqm, toSqm: d.sizeToSqm, workers: d.workerCount, ar: ar)
+                    : '${toArabicDigits(d.duration)}${ar ? ' د' : ' min'} · ${toArabicDigits(d.priceEgp)} ${ar ? 'ج.م' : 'EGP'}';
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: InkWell(
+                    onTap: () => _addService(existing: d),
+                    borderRadius: BorderRadius.circular(Pro.rMd),
+                    child: ProCard(
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Pro.ink)),
+                                const SizedBox(height: 2),
+                                Text(meta, style: const TextStyle(fontFamily: T.mono, fontSize: 12, color: Pro.soft)),
+                              ],
+                            ),
+                          ),
+                          const Icon(Icons.edit_outlined, size: 16, color: Pro.muted),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            const SizedBox(height: 8),
+            ProSoftButton(label: ar ? '+ ضيفي خدمة' : '+ Add a service', onTap: () => _addService()),
+            const SizedBox(height: 16),
+            ProPrimaryButton(
+              label: ar ? 'ابعتي للمراجعة' : 'Submit for review',
+              enabled: _canSubmit,
+              onTap: () => Navigator.pop(context, staged),
+            ),
+          ],
+        ),
       ),
     );
   }

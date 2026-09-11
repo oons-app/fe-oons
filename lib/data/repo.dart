@@ -473,6 +473,14 @@ class Repo {
     return api.post('/pro/categories', data: {'categoryId': categoryId});
   }
 
+  /// Bundles a new-specialty request with its real configured service(s) —
+  /// price, duration, cleaning size tiers — so admin reviews the actual
+  /// final output in one pass instead of a bare category name followed by
+  /// a second, separate per-service approval.
+  Future<Map<String, dynamic>> proAddCategoryWithServices(String categoryId, List<Map<String, dynamic>> items) async {
+    return api.post('/pro/categories/with-services', data: {'categoryId': categoryId, 'items': items});
+  }
+
   Future<void> proRemoveCategory(String id) async {
     await api.delete('/pro/categories/$id');
   }
