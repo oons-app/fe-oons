@@ -124,6 +124,41 @@ class _ProviderDetailScreenState extends ConsumerState<ProviderDetailScreen> {
     if (ok) run();
   }
 
+  // Super-admin-only escape hatch — bypasses every doc/checklist check and
+  // approves every pending category, service item, and worker doc on this
+  // provider in one call. Server-side gate is staffrbac.PermForceVet, which
+  // Can() only ever grants to super_admin regardless of what the client
+  // sends, so this button is a UI convenience, not the real access control.
+  Future<void> _forceVet(String name, String lang) async {
+    final ok = await v2Confirm(
+      context,
+      title: lang == 'ar' ? 'تحقّق قسري من $name؟' : 'Force-vet $name?',
+      body: lang == 'ar'
+          ? 'يتجاوز مستندات الهوية والفيش وتأكيد الجنس، ويوافق فورًا على كل تخصص وخدمة وعامل بانتظار المراجعة. للاستخدام الاستثنائي فقط.'
+          : 'Bypasses ID/FISH document checks and the sex-marker confirmation, and immediately approves every pending specialty, service, and worker doc on this profile. Exceptional use only.',
+      confirmLabel: lang == 'ar' ? 'تحقّق قسري' : 'Force-vet',
+      danger: true,
+      roleLabel: _roleLabel,
+    );
+    if (!ok) return;
+    try {
+      final r = await staffClient.post('/admin/providers/${widget.providerId}/force-vet');
+      if (!mounted) return;
+      final items = asInt(r['itemsApproved']);
+      final cats = asInt(r['categoriesActivated']);
+      final workers = asInt(r['workersVetted']);
+      v2Toast(
+        context,
+        lang == 'ar'
+            ? 'تم التحقق القسري — $items خدمة، $cats تخصص، $workers عامل'
+            : 'Force-vetted — $items item(s), $cats categor${cats == 1 ? 'y' : 'ies'}, $workers worker(s)',
+      );
+      _load();
+    } on ApiException catch (e) {
+      if (mounted) v2Toast(context, e.message, error: true);
+    }
+  }
+
   Future<void> _impersonate() async {
     final lang = ref.read(localeCodeProvider);
     try {
@@ -317,6 +352,15 @@ class _ProviderDetailScreenState extends ConsumerState<ProviderDetailScreen> {
                           danger: true,
                         ),
                       ),
+                      // Super-admin only — server enforces this independently
+                      // (staffrbac.PermForceVet), this is just the UI gate.
+                      if (role == roleSuper)
+                        V2Btn(
+                          label: lang == 'ar' ? 'تحقّق قسري' : 'Force-vet',
+                          kind: V2BtnKind.danger,
+                          size: V2BtnSize.sm,
+                          onPressed: () => _forceVet(name, lang),
+                        ),
                       V2Btn(
                         label: suspended
                             ? (lang == 'ar' ? 'إعادة تفعيل' : 'Reinstate')
