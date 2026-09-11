@@ -526,6 +526,26 @@ class _BookScreenState extends ConsumerState<BookScreen> {
                                                     Text(meta, style: const TextStyle(fontSize: 11, color: Client.muted)),
                                                   if (cleaningMatch)
                                                     Text('${b['homeSizeMatch']}', style: const TextStyle(fontSize: 11, color: Client.plum, fontWeight: FontWeight.w600)),
+                                                  // What the provider says this service includes. A
+                                                  // cleaning package already lists its tasks through
+                                                  // the checklist, so this is for everything else.
+                                                  for (final ben in svc.benefits)
+                                                    Padding(
+                                                      padding: const EdgeInsets.only(top: 2),
+                                                      child: Row(
+                                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                                        children: [
+                                                          const Padding(
+                                                            padding: EdgeInsetsDirectional.only(end: 4, top: 2),
+                                                            child: Icon(Icons.check, size: 11, color: Client.plum),
+                                                          ),
+                                                          Expanded(
+                                                            child: Text(ben.of(lang),
+                                                                style: const TextStyle(fontSize: 11, color: Client.muted, height: 1.35)),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
                                                 ],
                                               ),
                                             ),

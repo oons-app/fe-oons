@@ -263,6 +263,7 @@ class ServiceItem {
     this.workerCount = 0,
     this.excludedTaskIds = const [],
     this.approvalState = '',
+    this.benefits = const [],
   });
   final String id;
   final Loc name;
@@ -277,6 +278,9 @@ class ServiceItem {
   final int? sizeToSqm;
   final int workerCount;
   final List<String> excludedTaskIds;
+  /// "What's included" bullets shown on the booking page. Cleaning packages
+  /// describe themselves through the 18-task checklist instead.
+  final List<Loc> benefits;
   // Server-owned: "" / "approved" = live, "pending" = awaiting staff
   // activation, "rejected" = declined. Never sent back to the server.
   final String approvalState;
@@ -302,6 +306,10 @@ class ServiceItem {
             .where((e) => e.isNotEmpty)
             .toList(),
         approvalState: '${j['approvalState'] ?? ''}',
+        benefits: ((j['benefits'] as List?) ?? const [])
+            .map((e) => Loc.fromJson(e))
+            .where((e) => e.en.isNotEmpty || e.ar.isNotEmpty)
+            .toList(),
       );
 
   Map<String, dynamic> toPatchJson() => {
@@ -313,6 +321,7 @@ class ServiceItem {
         if (catalogItemId != null && catalogItemId!.isNotEmpty) 'catalogItemId': catalogItemId,
         'kind': isCleaning ? 'cleaning' : 'standard',
         'active': active,
+        if (benefits.isNotEmpty) 'benefits': [for (final b in benefits) b.toJson()],
         if (travelFee > 0) 'travelFee': travelFee,
         if (isCleaning) ...{
           'sizeFromSqm': sizeFromSqm,

@@ -268,6 +268,7 @@ class _ProServicesScreenState extends ConsumerState<ProServicesScreen> {
             workerCount: it.workerCount > 0 ? it.workerCount : 1,
             excludedTaskIds: it.excludedTaskIds.toSet(),
             approvalState: it.approvalState,
+            benefits: List.of(it.benefits),
           )));
     areas
       ..clear()
@@ -306,45 +307,114 @@ class _ProServicesScreenState extends ConsumerState<ProServicesScreen> {
     if (result.categoryId == '__delete__') {
       result.dispose();
       if (existing == null) return;
-      setState(() {
-        final i = drafts.indexWhere((d) => d.id == existing.id);
-        if (i >= 0) {
-          drafts[i].dispose();
-          drafts.removeAt(i);
-        }
-      });
+      await _deleteConfirmed(existing);
       return;
     }
-    setState(() {
-      if (existing == null) {
-        drafts.add(result);
-      } else {
-        final i = drafts.indexWhere((d) => d.id == existing.id);
+    await _persistOne(result, existing: existing);
+  }
+
+  /// Saves exactly one service and folds the server's answer back into the
+  /// list — no global "Save changes" needed, and nothing else on the page can
+  /// block it. The old flow only mutated local state, so an edit sat unsaved
+  /// until the bottom button, and one unrelated invalid draft (a service
+  /// under a specialty that had gone pending, say) failed the whole save.
+  Future<void> _persistOne(ProServiceDraft result, {ProServiceDraft? existing}) async {
+    final lang = langOf(ref);
+    final m = Copy.of(lang)['svcMgmt'] as Map;
+    final repo = ref.read(repoProvider);
+    final isNew = existing == null || _isLocalId(existing.id);
+    setState(() => busy = true);
+    try {
+      final payload = result.toApiItem()..remove('id');
+      final r = isNew
+          ? await repo.proCreateService(payload)
+          : await repo.proUpdateService(existing.id, payload);
+      if (!mounted) return;
+      _absorbProvider(r);
+      final saved = r['item'] is Map ? ServiceItem.fromJson(r['item'] as Map) : null;
+      setState(() {
+        final replacement = saved != null ? _draftFromItem(saved) : result;
+        if (saved != null) result.dispose();
+        final i = existing == null ? -1 : drafts.indexWhere((d) => d.id == existing.id);
         if (i >= 0) {
           drafts[i].dispose();
-          drafts[i] = result;
+          drafts[i] = replacement;
         } else {
-          drafts.add(result);
+          drafts.add(replacement);
         }
+      });
+      tapSuccess();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(isNew
+            ? (lang == 'ar'
+                ? 'اتحفظت. هتتبعت لفريق أُنس للموافقة — مش هتظهر للعميلات لحد ما تتفعّل (٢٤–٤٨ ساعة).'
+                : "Saved. It goes to Oons for review — it won't show to clients until it's activated (24–48h).")
+            : '${m['save']} ✓'),
+      ));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendlyError(e, lang))));
       }
-    });
-    if (existing == null && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(
-        lang == 'ar'
-            ? 'خدمتك هتتبعت لفريق أُنس للموافقة بعد ما تحفظي — مش هتظهر للعميلات لحد ما تتفعّل (٢٤–٤٨ ساعة).'
-            : "Your new service goes to Oons for review once you save — it won't show to clients until it's activated (24–48h).",
-      )));
+    } finally {
+      if (mounted) setState(() => busy = false);
     }
   }
 
-  void _duplicate(ProServiceDraft d) {
-    setState(() {
-      drafts.add(d.copyAsNew('new-${const Uuid().v4().substring(0, 8)}'));
-    });
+  /// A draft that has never reached the server yet — `_duplicate` and the
+  /// editor mint these, and they must be POSTed rather than PATCHed.
+  bool _isLocalId(String id) => id.isEmpty || id == 'new' || id.startsWith('new-');
+
+  /// Folds a `{provider: ...}` response back into the session so the rest of
+  /// the app (booking page, profile) sees the change, without re-priming the
+  /// whole drafts list — re-priming would discard any inline cleaning-tier
+  /// edits the provider has in flight.
+  void _absorbProvider(Map<String, dynamic> r) {
+    if (r['provider'] is Map) {
+      ref.read(sessionProvider.notifier).setProvider(ProviderP.fromJson(r['provider'] as Map));
+    }
   }
 
-  void _toggleActive(ProServiceDraft d) {
-    setState(() => d.active = !d.active);
+  ProServiceDraft _draftFromItem(ServiceItem it) => ProServiceDraft(
+        id: it.id,
+        categoryId: _matchCategoryId(it),
+        name: it.name,
+        catalogItemId: it.catalogItemId,
+        kind: it.kind,
+        duration: it.duration > 0 ? it.duration : 60,
+        priceEgp: (it.price / 100).round(),
+        travelEgp: (it.travelFee / 100).round(),
+        active: it.active,
+        sizeFromSqm: it.sizeFromSqm > 0 ? it.sizeFromSqm : 120,
+        sizeToSqm: it.sizeToSqm,
+        workerCount: it.workerCount > 0 ? it.workerCount : 1,
+        excludedTaskIds: it.excludedTaskIds.toSet(),
+        approvalState: it.approvalState,
+        benefits: List.of(it.benefits),
+      );
+
+  Future<void> _duplicate(ProServiceDraft d) async {
+    // A duplicate is a brand-new service — save it straight away so it can't
+    // be lost by navigating off the page before the global save.
+    await _persistOne(d.copyAsNew('new-${const Uuid().v4().substring(0, 8)}'));
+  }
+
+  Future<void> _toggleActive(ProServiceDraft d) async {
+    if (_isLocalId(d.id)) {
+      setState(() => d.active = !d.active);
+      return;
+    }
+    final lang = langOf(ref);
+    final next = !d.active;
+    setState(() => d.active = next); // optimistic — this is a one-tap toggle
+    try {
+      final r = await ref.read(repoProvider).proSetServiceActive(d.id, next);
+      if (mounted) _absorbProvider(r);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => d.active = !next); // put it back
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendlyError(e, lang))));
+    }
   }
 
   Future<void> _bulkPrice(double factor) async {
@@ -427,12 +497,37 @@ class _ProServicesScreenState extends ConsumerState<ProServicesScreen> {
     setState(() => _confirmDeleteId = d.id);
   }
 
-  void _deleteConfirmed(ProServiceDraft d) {
-    setState(() {
-      drafts.remove(d);
-      d.dispose();
-      _confirmDeleteId = null;
-    });
+  Future<void> _deleteConfirmed(ProServiceDraft d) async {
+    // A never-saved draft only exists locally; nothing to ask the server.
+    if (_isLocalId(d.id)) {
+      setState(() {
+        drafts.remove(d);
+        d.dispose();
+        _confirmDeleteId = null;
+      });
+      return;
+    }
+    final lang = langOf(ref);
+    setState(() => busy = true);
+    try {
+      final r = await ref.read(repoProvider).proDeleteService(d.id);
+      if (!mounted) return;
+      _absorbProvider(r);
+      setState(() {
+        drafts.remove(d);
+        d.dispose();
+        _confirmDeleteId = null;
+      });
+    } catch (e) {
+      // The server refuses while upcoming bookings still point at it, and
+      // says so in the message — surface that rather than a generic failure.
+      if (mounted) {
+        setState(() => _confirmDeleteId = null);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendlyError(e, lang))));
+      }
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
   }
 
   Future<void> _save() async {
@@ -821,6 +916,25 @@ class _ProServicesScreenState extends ConsumerState<ProServicesScreen> {
             if (travel > 0) ...[
               const SizedBox(height: 4),
               Text('${m['travel']} ${toArabicDigits(travel)} ${ar ? 'ج.م' : 'EGP'}', style: const TextStyle(fontSize: 12, color: Pro.muted)),
+            ],
+            if (d.benefits.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              for (final b in d.benefits)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 3),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Padding(
+                        padding: EdgeInsetsDirectional.only(end: 6, top: 2),
+                        child: Icon(Icons.check, size: 13, color: Pro.plum),
+                      ),
+                      Expanded(
+                        child: Text(b.of(lang), style: const TextStyle(fontSize: 12, color: Pro.muted, height: 1.4)),
+                      ),
+                    ],
+                  ),
+                ),
             ],
             if (_confirmDeleteId == d.id) ...[
               const SizedBox(height: 12),

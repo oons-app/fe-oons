@@ -23,7 +23,9 @@ class ProServiceDraft {
     this.workerCount = 1,
     Set<String>? excludedTaskIds,
     this.approvalState = '',
-  })  : name = name ?? const Loc('', ''),
+    List<Loc>? benefits,
+  })  : benefits = benefits ?? <Loc>[],
+        name = name ?? const Loc('', ''),
         priceCtrl = TextEditingController(text: priceEgp > 0 ? '$priceEgp' : ''),
         travelCtrl = TextEditingController(text: travelEgp > 0 ? '$travelEgp' : ''),
         sizeFromCtrl = TextEditingController(text: '$sizeFromSqm'),
@@ -41,6 +43,10 @@ class ProServiceDraft {
   int? sizeToSqm;
   int workerCount;
   final Set<String> excludedTaskIds;
+  /// "What's included" bullets shown on the booking page. Cleaning packages
+  /// describe themselves through the 18-task checklist instead; this is how
+  /// every other kind of service says what the client actually gets.
+  final List<Loc> benefits;
   // Server-owned; "" for a not-yet-saved draft. copyAsNew() resets it since a
   // duplicate is a brand-new service and always starts pending review again.
   final String approvalState;
@@ -84,6 +90,7 @@ class ProServiceDraft {
       sizeToSqm: sizeToSqm,
       workerCount: workerCount,
       excludedTaskIds: Set.of(excludedTaskIds),
+      benefits: List.of(benefits),
     );
   }
 
@@ -101,6 +108,7 @@ class ProServiceDraft {
       if (catalogItemId != null && catalogItemId!.isNotEmpty) 'catalogItemId': catalogItemId,
       'kind': isCleaning ? 'cleaning' : 'standard',
       'active': active,
+      if (benefits.isNotEmpty) 'benefits': [for (final b in benefits) b.toJson()],
       if (travelEgp > 0) 'travelFee': travelEgp * 100,
       if (isCleaning) ...{
         'sizeFromSqm': sizeFromSqm,
@@ -345,16 +353,98 @@ class _ProServiceEditorSheetState extends State<_ProServiceEditorSheet> {
             sizeToSqm: e.sizeToSqm,
             workerCount: e.workerCount,
             excludedTaskIds: Set.of(e.excludedTaskIds),
+            benefits: List.of(e.benefits),
           )
         : ProServiceDraft(id: 'new');
+    _primeBenefits();
     if (draft.categoryId != null) {
       _applyKindForCategory(draft.categoryId!);
       _loadNameChips(draft.categoryId!);
     }
   }
 
+  /// One controller per "what's included" line. The provider types in a
+  /// single language; the server mirrors it across both locales the same way
+  /// it does for a service name, so there's no second field to fill in.
+  final List<TextEditingController> benefitCtrls = [];
+
+  void _primeBenefits() {
+    for (final b in draft.benefits) {
+      benefitCtrls.add(TextEditingController(text: b.of(widget.lang).isEmpty ? b.en : b.of(widget.lang)));
+    }
+  }
+
+  /// Mirrors models.MaxServiceBenefits — the server silently drops anything
+  /// past this, so stop offering "+ add" rather than letting her type a line
+  /// that quietly disappears on save.
+  static const _maxBenefits = 12;
+
+  List<Widget> _benefitsSection(Map m) {
+    return [
+      const SizedBox(height: 18),
+      _stepLabel('${m['stepBenefits'] ?? (ar ? 'الخدمة شاملة إيه' : "What's included")}'),
+      Text(
+        '${m['benefitsHint'] ?? (ar ? 'اكتبي كل حاجة العميلة هتاخدها في الخدمة دي — سطر لكل حاجة. هتظهرلها وهي بتحجز.' : "List what the client gets with this service — one line each. She sees these when booking.")}',
+        style: const TextStyle(fontSize: 12, color: Pro.muted, height: 1.45),
+      ),
+      const SizedBox(height: 8),
+      for (var i = 0; i < benefitCtrls.length; i++)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: ProField(
+                  controller: benefitCtrls[i],
+                  hint: ar ? 'مثال: غسيل وتصفيف' : 'e.g. wash and blow-dry',
+                  onChanged: (_) => setState(() {}),
+                ),
+              ),
+              const SizedBox(width: 8),
+              InkWell(
+                onTap: () => setState(() {
+                  benefitCtrls.removeAt(i).dispose();
+                }),
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(color: Pro.chip, borderRadius: BorderRadius.circular(10)),
+                  child: const Icon(Icons.close, size: 16, color: Pro.muted),
+                ),
+              ),
+            ],
+          ),
+        ),
+      if (benefitCtrls.length < _maxBenefits)
+        ProSoftButton(
+          label: ar ? '+ ضيفي سطر' : '+ Add a line',
+          onTap: () => setState(() => benefitCtrls.add(TextEditingController())),
+        )
+      else
+        Text(
+          ar ? 'وصلتي للحد الأقصى ($_maxBenefits).' : 'That\'s the maximum ($_maxBenefits).',
+          style: const TextStyle(fontSize: 12, color: Pro.muted),
+        ),
+    ];
+  }
+
+  /// Pull the live controller text back onto the draft. Called before handing
+  /// the draft back, so a benefit typed but not "confirmed" isn't lost.
+  void _syncBenefits() {
+    draft.benefits
+      ..clear()
+      ..addAll(benefitCtrls
+          .map((c) => c.text.trim())
+          .where((t) => t.isNotEmpty)
+          .map((t) => Loc(t, t)));
+  }
+
   @override
   void dispose() {
+    for (final c in benefitCtrls) {
+      c.dispose();
+    }
     draft.dispose();
     super.dispose();
   }
@@ -743,6 +833,11 @@ class _ProServiceEditorSheetState extends State<_ProServiceEditorSheet> {
                 }),
               ),
             ],
+            // A cleaning package already spells out what it covers through
+            // the 18-task checklist above, so the free-text list is for every
+            // other kind of service — the ones that had no way at all to say
+            // what the client actually gets.
+            if (!draft.isCleaning) ..._benefitsSection(m),
             const SizedBox(height: 12),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
@@ -767,6 +862,7 @@ class _ProServiceEditorSheetState extends State<_ProServiceEditorSheet> {
               enabled: canSave,
               onTap: () {
                 draft.syncSizeFromControls();
+                _syncBenefits();
                 Navigator.pop(context, draft);
               },
             ),

@@ -91,6 +91,21 @@ class _ProviderDetailScreenState extends ConsumerState<ProviderDetailScreen> {
     }
   }
 
+  /// Every live category, for the service editor's category picker. Fetched
+  /// on demand (the Services tab is the only thing that needs it) and cached
+  /// for the life of the screen.
+  List<Map<String, dynamic>> categories = [];
+
+  Future<void> _categoriesOnce() async {
+    if (categories.isNotEmpty) return;
+    try {
+      final data = await staffClient.get('/admin/categories', query: {'children': '1'});
+      if (mounted) setState(() => categories = asMapList(data['categories']));
+    } catch (e) {
+      debugPrint('provider detail: categories fetch failed: $e');
+    }
+  }
+
   String get _role => ref.read(staffSessionProvider).effectiveRole;
   String get _roleLabel => roleLabel(_role);
 
@@ -398,6 +413,7 @@ class _ProviderDetailScreenState extends ConsumerState<ProviderDetailScreen> {
           V2TabBar(tabs: _tabs, active: tab, onSelect: (t) {
             setState(() => tab = t);
             if (t == 'Coverage') _areasOnce();
+            if (t == 'Services') _categoriesOnce();
           }),
           const SizedBox(height: 16),
 
@@ -809,168 +825,415 @@ class _ProviderDetailScreenState extends ConsumerState<ProviderDetailScreen> {
   // ---- Services ---------------------------------------------------------
   Widget _services(Map prov, String lang, bool canWrite) {
     final items = asDynList(prov['items'] ?? prov['services']).map((e) => asMap(e) ?? {}).toList();
+    final ar = lang == 'ar';
     return V2SectionCard(
-      title: lang == 'ar' ? 'الخدمات والأسعار' : 'Services & pricing',
+      title: ar ? 'الخدمات والأسعار' : 'Services & pricing',
+      subtitle: ar
+          ? 'تعديل كامل لكل خدمة: التخصص، السعر، المدة، المزايا، وحالة المراجعة.'
+          : 'Full per-service control: specialty, price, duration, benefits and review state.',
       trailing: [
         if (canWrite)
-          V2Btn.primary(lang == 'ar' ? '+ إضافة خدمة' : '+ Add service',
-              onPressed: () => _editServices(items, lang, add: true), size: V2BtnSize.sm),
+          V2Btn.primary(ar ? '+ إضافة خدمة' : '+ Add service',
+              onPressed: () => _serviceEditor(null, lang), size: V2BtnSize.sm),
       ],
       child: Column(
         children: [
           if (items.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 24),
-              child: Text(lang == 'ar' ? 'لا خدمات على هذا الملف بعد' : 'No services on this profile yet',
+              child: Text(ar ? 'لا خدمات على هذا الملف بعد' : 'No services on this profile yet',
                   style: const TextStyle(fontSize: 13, color: Ops.muted)),
             )
           else
-            for (final s in items)
-              Container(
-                padding: const EdgeInsets.symmetric(vertical: 11),
-                decoration: const BoxDecoration(border: Border(top: BorderSide(color: Ops.rowBorder))),
-                child: Row(
-                  children: [
-                    Expanded(
-                      flex: 3,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(locName(s['name'], lang), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                          Text('${s['category'] ?? prov['category'] ?? ''}',
-                              style: const TextStyle(fontSize: 11.5, color: Ops.mutedSoft)),
-                        ],
-                      ),
-                    ),
-                    Expanded(
-                      flex: 2,
-                      child: Text(money(asInt(s['price']), lang),
-                          style: const TextStyle(fontSize: 13, fontFamily: Ops.mono)),
-                    ),
-                    Expanded(
-                      flex: 2,
-                      child: Text('${asInt(s['durationMin'])} ${lang == 'ar' ? 'د' : 'min'}',
-                          style: const TextStyle(fontSize: 13, color: Ops.inkSoft)),
-                    ),
-                    if (canWrite) ...[
-                      V2Btn.ghost(lang == 'ar' ? 'تعديل' : 'Edit',
-                          onPressed: () => _editServices(items, lang, focus: s), size: V2BtnSize.row),
-                      const SizedBox(width: 6),
-                      V2Btn.danger(lang == 'ar' ? 'إزالة' : 'Remove',
-                          onPressed: () => _confirmThen(
-                                lang == 'ar' ? 'إزالة الخدمة؟' : 'Remove service?',
-                                '${locName(s['name'], lang)} ${lang == 'ar' ? 'ستُزال من الملف.' : 'is removed from the profile.'}',
-                                lang == 'ar' ? 'إزالة' : 'Remove',
-                                () {
-                                  final next = items.where((x) => x != s).toList();
-                                  _patch('/admin/providers/${widget.providerId}', {'items': next},
-                                      lang == 'ar' ? 'أُزيلت الخدمة' : 'Service removed');
-                                },
-                                danger: true,
-                              ),
-                          size: V2BtnSize.row),
-                    ],
-                  ],
-                ),
-              ),
+            for (final s in items) _serviceRow(s, lang, canWrite),
         ],
       ),
     );
   }
 
-  Future<void> _editServices(List<Map<String, dynamic>> items, String lang, {Map? focus, bool add = false}) async {
-    final list = items.map((e) => Map<String, dynamic>.from(e)).toList();
-    if (add) list.add({'name': {'en': '', 'ar': ''}, 'durationMin': 60, 'price': 0, 'category': (p ?? {})['category']});
+  Widget _serviceRow(Map<String, dynamic> s, String lang, bool canWrite) {
+    final ar = lang == 'ar';
+    final state = '${s['approvalState'] ?? ''}'.trim();
+    final paused = s['active'] == false;
+    final cleaning = '${s['kind'] ?? ''}' == 'cleaning';
+    final benefits = asDynList(s['benefits']);
+    final travel = asInt(s['travelFee']);
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 11),
+      decoration: const BoxDecoration(border: Border(top: BorderSide(color: Ops.rowBorder))),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                flex: 3,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(locName(s['name'], lang),
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                    Text(_categoryLabel('${s['categoryId'] ?? ''}', lang),
+                        style: const TextStyle(fontSize: 11.5, color: Ops.mutedSoft)),
+                  ],
+                ),
+              ),
+              Expanded(
+                flex: 2,
+                child: Text(money(asInt(s['price']), lang),
+                    style: const TextStyle(fontSize: 13, fontFamily: Ops.mono)),
+              ),
+              Expanded(
+                flex: 2,
+                child: Text('${asInt(s['durationMin'])} ${ar ? 'د' : 'min'}',
+                    style: const TextStyle(fontSize: 13, color: Ops.inkSoft)),
+              ),
+              if (canWrite) ...[
+                V2Btn.ghost(ar ? 'تعديل' : 'Edit',
+                    onPressed: () => _serviceEditor(s, lang), size: V2BtnSize.row),
+                const SizedBox(width: 6),
+                V2Btn.danger(ar ? 'إزالة' : 'Remove',
+                    onPressed: () => _confirmThen(
+                          ar ? 'إزالة الخدمة؟' : 'Remove service?',
+                          '${locName(s['name'], lang)} ${ar ? 'ستُزال من الملف.' : 'is removed from the profile.'}',
+                          ar ? 'إزالة' : 'Remove',
+                          () => _deleteService('${s['id']}', lang),
+                          danger: true,
+                        ),
+                    size: V2BtnSize.row),
+              ],
+            ],
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              _serviceStatePill(state, lang),
+              if (paused) V2StatusPill(label: ar ? 'موقوفة' : 'Paused', tone: V2Tone.neutral),
+              if (cleaning) V2StatusPill(label: ar ? 'باقة تنظيف' : 'Cleaning package', tone: V2Tone.info),
+              if (travel > 0)
+                V2StatusPill(label: '${ar ? 'انتقال' : 'Travel'} ${money(travel, lang)}', tone: V2Tone.neutral),
+              if (benefits.isNotEmpty)
+                V2StatusPill(
+                    label: '${benefits.length} ${ar ? 'ميزة' : benefits.length == 1 ? 'benefit' : 'benefits'}',
+                    tone: V2Tone.neutral),
+            ],
+          ),
+          if ('${s['approvalNote'] ?? ''}'.trim().isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text('${ar ? 'ملاحظة' : 'Note'}: ${s['approvalNote']}',
+                style: const TextStyle(fontSize: 11.5, color: Ops.mutedSoft, height: 1.4)),
+          ],
+        ],
+      ),
+    );
+  }
 
-    // One controller set per row, owned by this method so text survives the
-    // list's add/remove rebuilds and is disposed when the modal closes.
-    final rowCtls = <Map<String, TextEditingController>>[];
-    Map<String, TextEditingController> ctlsFor(Map<String, dynamic> row) => {
-          'en': TextEditingController(text: '${(row['name'] as Map?)?['en'] ?? ''}'),
-          'ar': TextEditingController(text: '${(row['name'] as Map?)?['ar'] ?? ''}'),
-          'dur': TextEditingController(text: '${asInt(row['durationMin'])}'),
-          'price': TextEditingController(text: '${asInt(row['price']) / 100}'),
-        };
-    for (final row in list) {
-      rowCtls.add(ctlsFor(row));
+  /// Maps the server's raw approval-state key onto a labelled pill. Passing
+  /// the raw key to V2StatusPill.forLabel would print the snake_case key
+  /// itself with no tone, since forLabel matches a fixed English vocabulary.
+  Widget _serviceStatePill(String state, String lang) {
+    final ar = lang == 'ar';
+    switch (state) {
+      case 'pending':
+        return V2StatusPill(label: ar ? 'قيد المراجعة' : 'Pending review', tone: V2Tone.warn);
+      case 'changes_requested':
+        return V2StatusPill(label: ar ? 'مطلوب تعديل' : 'Changes requested', tone: V2Tone.warn);
+      case 'rejected':
+        return V2StatusPill(label: ar ? 'مرفوضة' : 'Rejected', tone: V2Tone.bad);
+      default:
+        return V2StatusPill(label: ar ? 'معتمدة' : 'Approved', tone: V2Tone.ok);
+    }
+  }
+
+  String _categoryLabel(String categoryId, String lang) {
+    if (categoryId.isEmpty) return lang == 'ar' ? 'بدون تخصص' : 'No specialty';
+    for (final c in categories) {
+      if ('${c['id'] ?? c['categoryId'] ?? ''}' == categoryId) return locName(c['name'], lang);
+    }
+    return categoryId;
+  }
+
+  Future<void> _deleteService(String itemId, String lang) async {
+    try {
+      await staffClient.delete('/admin/providers/${widget.providerId}/services/$itemId');
+      if (!mounted) return;
+      v2Toast(context, lang == 'ar' ? 'أُزيلت الخدمة' : 'Service removed');
+      _load();
+    } on ApiException catch (e) {
+      // The server refuses while upcoming bookings still point at it.
+      if (mounted) v2Toast(context, e.message, error: true);
+    }
+  }
+
+  /// The full per-service editor. [existing] null means create.
+  ///
+  /// This replaces a dialog that could only reach name/duration/price and
+  /// then wrote the whole items array back through PATCH /admin/providers/:id
+  /// with no validation at all. Every field a service actually has is here,
+  /// and it saves through the per-service endpoints, which run the same rules
+  /// a provider's own writes go through.
+  Future<void> _serviceEditor(Map<String, dynamic>? existing, String lang) async {
+    await _categoriesOnce();
+    if (!mounted) return;
+    final ar = lang == 'ar';
+    final isEdit = existing != null;
+
+    final nameEn = TextEditingController(text: '${(existing?['name'] as Map?)?['en'] ?? ''}');
+    final nameAr = TextEditingController(text: '${(existing?['name'] as Map?)?['ar'] ?? ''}');
+    final duration = TextEditingController(text: '${asInt(existing?['durationMin'] ?? 60)}');
+    final price = TextEditingController(text: '${(asInt(existing?['price']) / 100).round()}');
+    final travel = TextEditingController(text: '${(asInt(existing?['travelFee']) / 100).round()}');
+    final note = TextEditingController(text: '${existing?['approvalNote'] ?? ''}');
+    final sizeFrom = TextEditingController(text: '${asInt(existing?['sizeFromSqm'] ?? 0)}');
+    final sizeTo = TextEditingController(
+        text: existing?['sizeToSqm'] == null ? '' : '${asInt(existing?['sizeToSqm'])}');
+    final workers = TextEditingController(text: '${asInt(existing?['workerCount'] ?? 1)}');
+    final benefitCtls = <TextEditingController>[
+      for (final b in asDynList(existing?['benefits']))
+        TextEditingController(text: locName(b, lang)),
+    ];
+
+    var categoryId = '${existing?['categoryId'] ?? ''}';
+    var kind = '${existing?['kind'] ?? 'standard'}' == 'cleaning' ? 'cleaning' : 'standard';
+    var active = existing?['active'] != false;
+    var state = '${existing?['approvalState'] ?? ''}'.trim();
+    if (state.isEmpty) state = 'approved';
+
+    void disposeAll() {
+      for (final c in [nameEn, nameAr, duration, price, travel, note, sizeFrom, sizeTo, workers, ...benefitCtls]) {
+        c.dispose();
+      }
     }
 
     try {
       final ok = await v2Form(
         context,
-        title: lang == 'ar' ? 'تحرير الخدمات' : 'Edit services',
+        title: isEdit
+            ? (ar ? 'تعديل الخدمة' : 'Edit service')
+            : (ar ? 'إضافة خدمة' : 'Add service'),
+        confirmLabel: ar ? 'حفظ' : 'Save',
         bodyBuilder: (ctx, setLocal) => StatefulBuilder(
           builder: (context, sb) => Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              for (var i = 0; i < list.length; i++)
-                Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(border: Border.all(color: Ops.border), borderRadius: BorderRadius.circular(10)),
-                  child: Column(
-                    children: [
-                      Row(children: [
-                        Expanded(child: Text('${lang == 'ar' ? 'خدمة' : 'Service'} ${i + 1}', style: const TextStyle(fontWeight: FontWeight.w600))),
-                        IconButton(
-                          icon: const Icon(Icons.delete_outline, size: 18, color: Ops.terracottaInk),
-                          onPressed: () => sb(() {
-                            list.removeAt(i);
-                            for (final c in rowCtls.removeAt(i).values) {
-                              c.dispose();
-                            }
-                          }),
-                        ),
-                      ]),
-                      TextField(
-                        controller: rowCtls[i]['en'],
-                        decoration: InputDecoration(labelText: lang == 'ar' ? 'الاسم (EN)' : 'Name (EN)'),
-                        onChanged: (v) => (list[i]['name'] ??= <String, dynamic>{})['en'] = v,
+              V2FormField(
+                label: ar ? 'التخصص' : 'Specialty',
+                child: DropdownButtonFormField<String>(
+                  initialValue: categoryId.isEmpty ? null : categoryId,
+                  isExpanded: true,
+                  hint: Text(ar ? 'اختاري تخصص' : 'Pick a specialty'),
+                  items: [
+                    for (final c in categories)
+                      DropdownMenuItem(
+                        value: '${c['id'] ?? c['categoryId'] ?? ''}',
+                        child: Text(locName(c['name'], lang), overflow: TextOverflow.ellipsis),
                       ),
-                      TextField(
-                        controller: rowCtls[i]['ar'],
-                        decoration: InputDecoration(labelText: lang == 'ar' ? 'الاسم (ع)' : 'Name (AR)'),
-                        onChanged: (v) => (list[i]['name'] ??= <String, dynamic>{})['ar'] = v,
-                      ),
-                      Row(children: [
-                        Expanded(
-                          child: TextField(
-                            controller: rowCtls[i]['dur'],
-                            decoration: InputDecoration(labelText: lang == 'ar' ? 'المدة (د)' : 'Duration (min)'),
-                            keyboardType: TextInputType.number,
-                            onChanged: (v) => list[i]['durationMin'] = int.tryParse(v) ?? 0,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: TextField(
-                            controller: rowCtls[i]['price'],
-                            decoration: InputDecoration(labelText: lang == 'ar' ? 'السعر (ج.م)' : 'Price (EGP)'),
-                            keyboardType: TextInputType.number,
-                            onChanged: (v) => list[i]['price'] = ((double.tryParse(v) ?? 0) * 100).round(),
-                          ),
-                        ),
-                      ]),
-                    ],
+                  ],
+                  onChanged: (v) => sb(() => categoryId = v ?? ''),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(children: [
+                Expanded(
+                  child: V2FormField(
+                    label: ar ? 'الاسم (ع)' : 'Name (AR)',
+                    child: TextField(controller: nameAr),
                   ),
                 ),
-              V2Btn.ghost(lang == 'ar' ? '+ خدمة' : '+ Service',
-                  onPressed: () => sb(() {
-                        final row = <String, dynamic>{'name': {'en': '', 'ar': ''}, 'durationMin': 60, 'price': 0};
-                        list.add(row);
-                        rowCtls.add(ctlsFor(row));
-                      })),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: V2FormField(
+                    label: ar ? 'الاسم (EN)' : 'Name (EN)',
+                    child: TextField(controller: nameEn),
+                  ),
+                ),
+              ]),
+              const SizedBox(height: 10),
+              V2FormField(
+                label: ar ? 'النوع' : 'Kind',
+                child: DropdownButtonFormField<String>(
+                  initialValue: kind,
+                  isExpanded: true,
+                  items: [
+                    DropdownMenuItem(value: 'standard', child: Text(ar ? 'خدمة عادية' : 'Standard service')),
+                    DropdownMenuItem(value: 'cleaning', child: Text(ar ? 'باقة تنظيف (بالمساحة)' : 'Cleaning package (by size)')),
+                  ],
+                  onChanged: (v) => sb(() => kind = v ?? 'standard'),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(children: [
+                Expanded(
+                  child: V2FormField(
+                    label: ar ? 'السعر (ج.م)' : 'Price (EGP)',
+                    child: TextField(controller: price, keyboardType: TextInputType.number),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: V2FormField(
+                    label: ar ? 'المدة (د)' : 'Duration (min)',
+                    child: TextField(controller: duration, keyboardType: TextInputType.number),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: V2FormField(
+                    label: ar ? 'الانتقال (ج.م)' : 'Travel (EGP)',
+                    child: TextField(controller: travel, keyboardType: TextInputType.number),
+                  ),
+                ),
+              ]),
+              if (kind == 'cleaning') ...[
+                const SizedBox(height: 10),
+                Row(children: [
+                  Expanded(
+                    child: V2FormField(
+                      label: ar ? 'من (م٢)' : 'From (sqm)',
+                      child: TextField(controller: sizeFrom, keyboardType: TextInputType.number),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: V2FormField(
+                      label: ar ? 'إلى (م٢ — فاضي = مفتوح)' : 'To (sqm — blank = open)',
+                      child: TextField(controller: sizeTo, keyboardType: TextInputType.number),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: V2FormField(
+                      label: ar ? 'عاملات' : 'Workers',
+                      child: TextField(controller: workers, keyboardType: TextInputType.number),
+                    ),
+                  ),
+                ]),
+              ],
+              const SizedBox(height: 10),
+              V2FormField(
+                label: ar ? 'الخدمة شاملة إيه (سطر لكل ميزة)' : "What's included (one line each)",
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (var i = 0; i < benefitCtls.length; i++)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Row(children: [
+                          Expanded(child: TextField(controller: benefitCtls[i])),
+                          IconButton(
+                            icon: const Icon(Icons.close, size: 16, color: Ops.muted),
+                            onPressed: () => sb(() => benefitCtls.removeAt(i).dispose()),
+                          ),
+                        ]),
+                      ),
+                    if (benefitCtls.length < 12)
+                      Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: V2Btn.ghost(ar ? '+ سطر' : '+ Line',
+                            onPressed: () => sb(() => benefitCtls.add(TextEditingController())),
+                            size: V2BtnSize.sm),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+              V2FormField(
+                label: ar ? 'حالة المراجعة' : 'Review state',
+                child: DropdownButtonFormField<String>(
+                  initialValue: state,
+                  isExpanded: true,
+                  items: [
+                    DropdownMenuItem(value: 'approved', child: Text(ar ? 'معتمدة (تظهر للعميلات)' : 'Approved (visible to clients)')),
+                    DropdownMenuItem(value: 'pending', child: Text(ar ? 'قيد المراجعة' : 'Pending review')),
+                    DropdownMenuItem(value: 'changes_requested', child: Text(ar ? 'مطلوب تعديل' : 'Changes requested')),
+                    DropdownMenuItem(value: 'rejected', child: Text(ar ? 'مرفوضة' : 'Rejected')),
+                  ],
+                  onChanged: (v) => sb(() => state = v ?? 'approved'),
+                ),
+              ),
+              if (state == 'rejected' || state == 'changes_requested') ...[
+                const SizedBox(height: 10),
+                V2FormField(
+                  label: ar ? 'السبب (هتشوفه المهنية)' : 'Reason (the provider sees this)',
+                  child: TextField(controller: note, maxLines: 2),
+                ),
+              ],
+              const SizedBox(height: 6),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(ar ? 'مفعّلة' : 'Active',
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                value: active,
+                onChanged: (v) => sb(() => active = v),
+              ),
             ],
           ),
         ),
+        onValidate: () {
+          if (categoryId.isEmpty) {
+            v2Toast(context, ar ? 'اختاري تخصص' : 'Pick a specialty', error: true);
+            return false;
+          }
+          if ((int.tryParse(price.text.trim()) ?? 0) <= 0) {
+            v2Toast(context, ar ? 'لازم سعر' : 'A price is required', error: true);
+            return false;
+          }
+          // Matches the server's own bounds, so a bad value is caught here
+          // rather than coming back as a 400 after the dialog has closed.
+          final d = int.tryParse(duration.text.trim()) ?? 0;
+          if (d < 15 || d > 480) {
+            v2Toast(context, ar ? 'المدة بين ١٥ و٤٨٠ دقيقة' : 'Duration must be 15–480 minutes', error: true);
+            return false;
+          }
+          if ((state == 'rejected' || state == 'changes_requested') && note.text.trim().isEmpty) {
+            v2Toast(context, ar ? 'لازم تكتبي السبب' : 'A reason is required', error: true);
+            return false;
+          }
+          return true;
+        },
       );
-      if (ok) _patch('/admin/providers/${widget.providerId}', {'items': list}, lang == 'ar' ? 'تم تحديث الخدمات' : 'Services updated');
-    } finally {
-      for (final m in rowCtls) {
-        for (final c in m.values) {
-          c.dispose();
+      if (!ok || !mounted) return;
+
+      final sizeToRaw = sizeTo.text.trim();
+      final body = <String, dynamic>{
+        'name': {'en': nameEn.text.trim(), 'ar': nameAr.text.trim()},
+        'categoryId': categoryId,
+        'kind': kind,
+        'durationMin': int.tryParse(duration.text.trim()) ?? 60,
+        'price': ((int.tryParse(price.text.trim()) ?? 0) * 100),
+        'travelFee': ((int.tryParse(travel.text.trim()) ?? 0) * 100),
+        'active': active,
+        'approvalState': state,
+        'approvalNote': note.text.trim(),
+        'benefits': [
+          for (final c in benefitCtls)
+            if (c.text.trim().isNotEmpty) {'en': c.text.trim(), 'ar': c.text.trim()},
+        ],
+        if (kind == 'cleaning') ...{
+          'sizeFromSqm': int.tryParse(sizeFrom.text.trim()) ?? 0,
+          'workerCount': int.tryParse(workers.text.trim()) ?? 1,
+          if (sizeToRaw.isEmpty) 'clearSizeTo': true else 'sizeToSqm': int.tryParse(sizeToRaw),
+        },
+      };
+
+      try {
+        if (isEdit) {
+          await staffClient.patch(
+              '/admin/providers/${widget.providerId}/services/${existing['id']}',
+              data: body);
+        } else {
+          await staffClient.post('/admin/providers/${widget.providerId}/services', data: body);
         }
+        if (!mounted) return;
+        v2Toast(context, ar ? 'تم الحفظ' : 'Saved');
+        _load();
+      } on ApiException catch (e) {
+        if (mounted) v2Toast(context, e.message, error: true);
       }
+    } finally {
+      disposeAll();
     }
   }
 

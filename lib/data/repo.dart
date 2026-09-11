@@ -485,6 +485,25 @@ class Repo {
     await api.delete('/pro/categories/$id');
   }
 
+  // ---- Services (one at a time) ---------------------------------------
+  // patchPro still saves the whole profile in one shot, but it *replaces*
+  // the entire items array, so a single unsaveable service anywhere fails
+  // the whole request — including the edit she actually made. These touch
+  // exactly one service, so adding a haircut can't be blocked by a cleaning
+  // bundle still awaiting review under a different specialty.
+
+  Future<Map<String, dynamic>> proCreateService(Map<String, dynamic> item) =>
+      api.post('/pro/services', data: item);
+
+  Future<Map<String, dynamic>> proUpdateService(String itemId, Map<String, dynamic> item) =>
+      api.patch('/pro/services/$itemId', data: item);
+
+  Future<Map<String, dynamic>> proDeleteService(String itemId) =>
+      api.delete('/pro/services/$itemId');
+
+  Future<Map<String, dynamic>> proSetServiceActive(String itemId, bool active) =>
+      api.post('/pro/services/$itemId/active', data: {'active': active});
+
   // ---- Team (workers) -------------------------------------------------
 
   Future<List<Map<String, dynamic>>> proWorkers() async {

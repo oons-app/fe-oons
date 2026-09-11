@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:oons/core/pro_format.dart';
+import 'package:oons/data/models.dart';
 
 void main() {
   test('digit conversion round-trip', () {
@@ -52,5 +53,59 @@ void main() {
       cleaningSizesOverlap(aFrom: 191, aTo: null, bFrom: 200, bTo: null),
       isTrue,
     );
+  });
+
+  group('service benefits', () {
+    test('survive a JSON round-trip so what she typed is what she gets back', () {
+      final item = ServiceItem.fromJson({
+        'id': 42,
+        'name': {'en': 'Haircut', 'ar': 'قص شعر'},
+        'durationMin': 45,
+        'price': 20000,
+        'categoryId': 'cat-1',
+        'benefits': [
+          {'en': 'Wash and blow-dry', 'ar': 'غسيل وتصفيف'},
+          {'en': 'Products included', 'ar': 'المنتجات من عندنا'},
+        ],
+      });
+
+      expect(item.benefits.length, 2);
+      expect(item.benefits.first.of('ar'), 'غسيل وتصفيف');
+      expect(item.benefits.last.of('en'), 'Products included');
+
+      final json = item.toPatchJson();
+      expect(json['benefits'], [
+        {'en': 'Wash and blow-dry', 'ar': 'غسيل وتصفيف'},
+        {'en': 'Products included', 'ar': 'المنتجات من عندنا'},
+      ]);
+    });
+
+    test('a service with none omits the field rather than sending an empty list', () {
+      final item = ServiceItem.fromJson({
+        'id': 7,
+        'name': {'en': 'Manicure', 'ar': 'مانيكير'},
+        'durationMin': 30,
+        'price': 9000,
+      });
+
+      expect(item.benefits, isEmpty);
+      expect(item.toPatchJson().containsKey('benefits'), isFalse);
+    });
+
+    test('blank entries from the server are dropped, not rendered as empty bullets', () {
+      final item = ServiceItem.fromJson({
+        'id': 9,
+        'name': {'en': 'Facial', 'ar': 'تنظيف بشرة'},
+        'durationMin': 60,
+        'price': 15000,
+        'benefits': [
+          {'en': '', 'ar': ''},
+          {'en': 'Steam', 'ar': 'بخار'},
+        ],
+      });
+
+      expect(item.benefits.length, 1);
+      expect(item.benefits.single.of('en'), 'Steam');
+    });
   });
 }
