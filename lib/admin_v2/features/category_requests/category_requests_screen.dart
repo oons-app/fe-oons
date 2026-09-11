@@ -42,9 +42,20 @@ class _CategoryRequestsScreenState extends ConsumerState<CategoryRequestsScreen>
         loading = true;
         error = null;
       });
-      final data = await staffClient.get('/admin/provider-categories');
+      final results = await Future.wait([
+        staffClient.get('/admin/provider-categories'),
+        // A request bundled with real services (proAddCategoryWithServices)
+        // is reviewed on the Service requests screen instead, as one
+        // category-plus-services unit — exclude those bare rows here so a
+        // bundle isn't decided in two different, inconsistent places.
+        staffClient.get('/admin/service-requests').catchError((_) => <String, dynamic>{}),
+      ]);
+      final bundled = asMapList(results[1]['requests'])
+          .map((it) => '${it['providerId']}/${it['categoryId']}')
+          .toSet();
+      final all = asMapList(results[0]['requests'] ?? results[0]['providerCategories']);
       setState(() {
-        requests = asMapList(data['requests'] ?? data['providerCategories']);
+        requests = all.where((r) => !bundled.contains('${r['providerId']}/${r['categoryId']}')).toList();
         loading = false;
       });
     } on ApiException catch (e) {
