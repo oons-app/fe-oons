@@ -12,6 +12,7 @@ import 'package:oons/admin_v2/features/bookings/booking_detail_screen.dart';
 import 'package:oons/admin_v2/features/bookings/bookings_screen.dart';
 import 'package:oons/admin_v2/features/categories/categories_screen.dart';
 import 'package:oons/admin_v2/features/category_requests/category_requests_screen.dart';
+import 'package:oons/admin_v2/features/service_requests/service_requests_screen.dart';
 import 'package:oons/admin_v2/features/claims/claims_screen.dart';
 import 'package:oons/admin_v2/features/corporate/corporate_screen.dart';
 import 'package:oons/admin_v2/features/coupons/coupons_screen.dart';
@@ -103,6 +104,7 @@ final v2RouterProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(path: V2Paths.claims, builder: (_, __) => const ClaimsScreen()),
           GoRoute(path: V2Paths.categoryRequests, builder: (_, __) => const CategoryRequestsScreen()),
+          GoRoute(path: V2Paths.serviceRequests, builder: (_, __) => const ServiceRequestsScreen()),
           GoRoute(path: V2Paths.payouts, builder: (_, __) => const PayoutsScreen()),
           GoRoute(path: V2Paths.ledger, builder: (_, __) => const LedgerScreen()),
           GoRoute(path: V2Paths.coupons, builder: (_, __) => const CouponsScreen()),

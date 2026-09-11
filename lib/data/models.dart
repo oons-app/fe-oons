@@ -262,6 +262,7 @@ class ServiceItem {
     this.sizeToSqm,
     this.workerCount = 0,
     this.excludedTaskIds = const [],
+    this.approvalState = '',
   });
   final String id;
   final Loc name;
@@ -276,8 +277,12 @@ class ServiceItem {
   final int? sizeToSqm;
   final int workerCount;
   final List<String> excludedTaskIds;
+  // Server-owned: "" / "approved" = live, "pending" = awaiting staff
+  // activation, "rejected" = declined. Never sent back to the server.
+  final String approvalState;
 
   bool get isCleaning => kind == 'cleaning';
+  bool get isPendingApproval => approvalState == 'pending';
 
   factory ServiceItem.fromJson(Map j) => ServiceItem(
         id: '${j['id']}',
@@ -296,6 +301,7 @@ class ServiceItem {
             .map((e) => '$e')
             .where((e) => e.isNotEmpty)
             .toList(),
+        approvalState: '${j['approvalState'] ?? ''}',
       );
 
   Map<String, dynamic> toPatchJson() => {

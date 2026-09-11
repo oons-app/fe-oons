@@ -200,6 +200,7 @@ class _ProServicesScreenState extends ConsumerState<ProServicesScreen> {
             sizeToSqm: it.sizeToSqm,
             workerCount: it.workerCount > 0 ? it.workerCount : 1,
             excludedTaskIds: it.excludedTaskIds.toSet(),
+            approvalState: it.approvalState,
           )));
     areas
       ..clear()
@@ -260,6 +261,13 @@ class _ProServicesScreenState extends ConsumerState<ProServicesScreen> {
         }
       }
     });
+    if (existing == null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(
+        lang == 'ar'
+            ? 'خدمتك هتتبعت لفريق أُنس للموافقة بعد ما تحفظي — مش هتظهر للعميلات لحد ما تتفعّل (٢٤–٤٨ ساعة).'
+            : "Your new service goes to Oons for review once you save — it won't show to clients until it's activated (24–48h).",
+      )));
+    }
   }
 
   void _duplicate(ProServiceDraft d) {
@@ -583,7 +591,10 @@ class _ProServicesScreenState extends ConsumerState<ProServicesScreen> {
   }
 
   Widget _serviceCard(String lang, Map m, ProServiceDraft d) {
-    final pending = _categoryPending(d.categoryId);
+    // Either the whole category is awaiting staff approval, or — new — this
+    // one service is (added or duplicated, not yet activated). Same "not
+    // bookable yet" treatment either way.
+    final pending = _categoryPending(d.categoryId) || d.isPendingApproval;
     final price = d.priceEgp;
     final travel = d.travelEgp;
     final net = price > 0 ? netAfterCommission(priceEgp: price, travelEgp: travel, commissionRate: commissionRate) : null;

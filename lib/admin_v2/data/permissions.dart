@@ -77,6 +77,7 @@ bool staffCan(String role, String perm) {
     case 'areas.write':
       return role == roleOps;
     case 'provider_categories.write':
+    case 'service_requests.write':
       return role == roleVendor || role == roleOps;
     case 'claims.read':
       return role == roleOps || role == roleFinance;
@@ -98,7 +99,7 @@ bool canSeeScreen(String role, String screenId) {
   // staff / matrix / corporate — super only (early return above)
   const ops = {
     'home', 'live', 'bookings', 'booking', 'claims', 'customers', 'customer',
-    'providers', 'provider', 'categoryRequests', 'batches', 'heatmap', 'vetting', 'audit',
+    'providers', 'provider', 'categoryRequests', 'serviceRequests', 'batches', 'heatmap', 'vetting', 'audit',
     'coupons', 'categories', 'areas', 'impersonate',
     'refunds', 'analytics', 'liveMap',
   };
@@ -107,7 +108,7 @@ bool canSeeScreen(String role, String screenId) {
     'refunds',
   };
   const vendor = {
-    'home', 'providers', 'provider', 'categoryRequests', 'vetting', 'heatmap',
+    'home', 'providers', 'provider', 'categoryRequests', 'serviceRequests', 'vetting', 'heatmap',
   };
   const am = {
     'home', 'bookings', 'booking', 'customers', 'customer', 'providers', 'provider',
@@ -146,6 +147,7 @@ const allPermKeys = [
   'categories.write',
   'areas.write',
   'provider_categories.write',
+  'service_requests.write',
   'payments.settings',
   'staff.write',
   'corporate.write',

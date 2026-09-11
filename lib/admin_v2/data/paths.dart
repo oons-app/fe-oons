@@ -9,6 +9,7 @@ abstract final class V2Paths {
   static const providers = '/providers';
   static const claims = '/claims';
   static const categoryRequests = '/category-requests';
+  static const serviceRequests = '/service-requests';
   static const payouts = '/payouts';
   static const ledger = '/ledger';
   static const coupons = '/coupons';
@@ -62,6 +63,7 @@ const v2Nav = [
     NavItem('customers', V2Paths.customers, 'Customers', 'العميلات'),
     NavItem('providers', V2Paths.providers, 'Providers', 'المهنيات'),
     NavItem('categoryRequests', V2Paths.categoryRequests, 'Category requests', 'طلبات التخصص'),
+    NavItem('serviceRequests', V2Paths.serviceRequests, 'Service requests', 'خدمات قيد الموافقة'),
   ]),
   NavGroup('Money', 'المال', [
     NavItem('payouts', V2Paths.payouts, 'Payouts', 'السحوبات'),

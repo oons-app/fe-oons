@@ -22,6 +22,7 @@ class ProServiceDraft {
     this.sizeToSqm = 150,
     this.workerCount = 1,
     Set<String>? excludedTaskIds,
+    this.approvalState = '',
   })  : name = name ?? const Loc('', ''),
         priceCtrl = TextEditingController(text: priceEgp > 0 ? '$priceEgp' : ''),
         travelCtrl = TextEditingController(text: travelEgp > 0 ? '$travelEgp' : ''),
@@ -40,12 +41,16 @@ class ProServiceDraft {
   int? sizeToSqm;
   int workerCount;
   final Set<String> excludedTaskIds;
+  // Server-owned; "" for a not-yet-saved draft. copyAsNew() resets it since a
+  // duplicate is a brand-new service and always starts pending review again.
+  final String approvalState;
   final TextEditingController priceCtrl;
   final TextEditingController travelCtrl;
   final TextEditingController sizeFromCtrl;
   final TextEditingController sizeToCtrl;
 
   bool get isCleaning => kind == 'cleaning';
+  bool get isPendingApproval => approvalState == 'pending';
 
   int get priceEgp => int.tryParse(toWesternDigits(priceCtrl.text.trim())) ?? 0;
   int get travelEgp => int.tryParse(toWesternDigits(travelCtrl.text.trim())) ?? 0;
