@@ -99,7 +99,7 @@ bool canSeeScreen(String role, String screenId) {
   // staff / matrix / corporate — super only (early return above)
   const ops = {
     'home', 'live', 'bookings', 'booking', 'claims', 'customers', 'customer',
-    'providers', 'provider', 'categoryRequests', 'serviceRequests', 'batches', 'heatmap', 'vetting', 'audit',
+    'providers', 'provider', 'categoryRequests', 'serviceRequests', 'batches', 'heatmap', 'vetting', 'workerVetting', 'audit',
     'coupons', 'categories', 'areas', 'impersonate',
     'refunds', 'analytics', 'liveMap',
   };
@@ -108,7 +108,7 @@ bool canSeeScreen(String role, String screenId) {
     'refunds',
   };
   const vendor = {
-    'home', 'providers', 'provider', 'categoryRequests', 'serviceRequests', 'vetting', 'heatmap',
+    'home', 'providers', 'provider', 'categoryRequests', 'serviceRequests', 'vetting', 'workerVetting', 'heatmap',
   };
   const am = {
     'home', 'bookings', 'booking', 'customers', 'customer', 'providers', 'provider',

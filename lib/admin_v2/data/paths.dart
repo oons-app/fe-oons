@@ -23,6 +23,7 @@ abstract final class V2Paths {
   static const audit = '/audit';
   static const heatmap = '/heatmap';
   static const vetting = '/vetting';
+  static const workerVetting = '/worker-vetting';
   static const impersonate = '/impersonate';
   static const refunds = '/refunds';
   static const analytics = '/analytics';
@@ -85,5 +86,6 @@ const v2Nav = [
     NavItem('heatmap', V2Paths.heatmap, 'Heatmap', 'الخريطة الحرارية'),
     NavItem('liveMap', V2Paths.liveMap, 'Live map', 'الخريطة المباشرة'),
     NavItem('vetting', V2Paths.vetting, 'Vetting SLA', 'مهلة التحقق'),
+    NavItem('workerVetting', V2Paths.workerVetting, 'Team vetting', 'توثيق فرق العمل'),
   ]),
 ];

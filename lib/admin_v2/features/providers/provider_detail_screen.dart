@@ -16,11 +16,12 @@ import 'package:oons/admin_v2/ui/buttons.dart';
 import 'package:oons/core/format.dart';
 import 'package:oons/data/api.dart';
 
-const _tabs = ['Overview', 'Documents', 'Services', 'Coverage', 'Portfolio', 'Money'];
+const _tabs = ['Overview', 'Documents', 'Team', 'Services', 'Coverage', 'Portfolio', 'Money'];
 
 class ProviderDetailScreen extends ConsumerStatefulWidget {
-  const ProviderDetailScreen({super.key, required this.providerId});
+  const ProviderDetailScreen({super.key, required this.providerId, this.initialTab});
   final String providerId;
+  final String? initialTab;
 
   @override
   ConsumerState<ProviderDetailScreen> createState() => _ProviderDetailScreenState();
@@ -34,10 +35,14 @@ class _ProviderDetailScreenState extends ConsumerState<ProviderDetailScreen> {
   String? error;
   String tab = 'Overview';
   List<Map<String, dynamic>> areas = [];
+  List<Map<String, dynamic>> workers = [];
 
   @override
   void initState() {
     super.initState();
+    if (widget.initialTab != null && _tabs.contains(widget.initialTab)) {
+      tab = widget.initialTab!;
+    }
     _load();
   }
 
@@ -56,12 +61,16 @@ class _ProviderDetailScreenState extends ConsumerState<ProviderDetailScreen> {
         staffClient
             .get('/admin/bookings', query: {'providerId': widget.providerId, 'limit': 20})
             .catchError((_) => <String, dynamic>{}),
+        staffClient
+            .get('/admin/providers/${widget.providerId}/workers')
+            .catchError((_) => <String, dynamic>{}),
       ]);
       final led = asMapList(results[0]['ledgers'] ?? results[0]['ledger']);
       setState(() {
         p = unwrapEntity(data, const ['provider']);
         ledger = led.isNotEmpty ? led.first : {};
         jobs = asMapList(results[1]['bookings']);
+        workers = asMapList(results[2]['workers']);
         loading = false;
       });
     } on ApiException catch (e) {
@@ -350,6 +359,7 @@ class _ProviderDetailScreenState extends ConsumerState<ProviderDetailScreen> {
 
           if (tab == 'Overview') _overview(prov, lang, canWrite),
           if (tab == 'Documents') _documents(prov, lang, canVet),
+          if (tab == 'Team') _team(lang, canVet),
           if (tab == 'Services') _services(prov, lang, canWrite),
           if (tab == 'Coverage') _coverage(prov, lang, canVet),
           if (tab == 'Portfolio') _portfolio(prov, lang, canVet),
@@ -563,6 +573,114 @@ class _ProviderDetailScreenState extends ConsumerState<ProviderDetailScreen> {
       _post('/admin/providers/${widget.providerId}/docs/$kind',
           data: {'status': 'rejected', if (note.trim().isNotEmpty) 'note': note.trim()},
           okMsg: '$label ${lang == 'ar' ? 'مرفوض' : 'rejected'}');
+    }
+  }
+
+  // ---- Team (workers) ----------------------------------------------------
+
+  Widget _team(String lang, bool canVet) {
+    return V2SectionCard(
+      title: lang == 'ar' ? 'الفريق' : 'Team',
+      child: workers.isEmpty
+          ? Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Text(
+                lang == 'ar' ? 'لا يوجد أعضاء فريق مسجّلين' : 'No team members on record',
+                style: const TextStyle(fontSize: 13, color: Ops.muted),
+              ),
+            )
+          : Column(
+              children: [
+                for (final w in workers) ...[
+                  _workerCard(w, lang, canVet),
+                  const SizedBox(height: 16),
+                ],
+              ],
+            ),
+    );
+  }
+
+  Widget _workerCard(Map w, String lang, bool canVet) {
+    final name = '${w['firstName'] ?? ''} ${w['lastName'] ?? ''}'.trim();
+    final vetted = w['vetted'] == true;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE6DED6)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(child: Text(name.isEmpty ? '—' : name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700))),
+              V2StatusPill.forLabel(vetted ? 'Vetted' : 'Pending review'),
+            ],
+          ),
+          if ('${w['phone'] ?? ''}'.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text('${w['phone']}', style: const TextStyle(fontSize: 12, color: Ops.muted, fontFamily: Ops.mono)),
+            ),
+          if ('${w['address'] ?? ''}'.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text('${w['address']}', style: const TextStyle(fontSize: 12, color: Ops.muted)),
+            ),
+          const SizedBox(height: 12),
+          LayoutBuilder(builder: (context, box) {
+            final cols = box.maxWidth > 480 ? 2 : 1;
+            final docs = <(String key, String label, String? url, String status)>[
+              ('id', lang == 'ar' ? 'الرقم القومي' : 'National ID', _nonEmpty(w['idPhotoUrl']), '${w['idDocStatus'] ?? 'unknown'}'),
+              ('fish', lang == 'ar' ? 'الفيش الجنائي' : 'FISH (criminal record)', _nonEmpty(w['fishPhotoUrl']), '${w['fishDocStatus'] ?? 'unknown'}'),
+            ];
+            return Wrap(
+              spacing: 13,
+              runSpacing: 13,
+              children: [
+                for (final d in docs)
+                  SizedBox(
+                    width: (box.maxWidth - (cols - 1) * 13) / cols,
+                    child: _DocCard(
+                      label: d.$2,
+                      status: d.$4,
+                      url: d.$3,
+                      canAct: canVet,
+                      onAccept: () => _postWorkerDoc('${w['id']}', d.$1, 'accepted', d.$2, lang),
+                      onReject: () => _rejectWorkerDoc('${w['id']}', d.$1, d.$2, lang),
+                    ),
+                  ),
+              ],
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _postWorkerDoc(String workerId, String kind, String status, String label, String lang, {String? note}) async {
+    await _post(
+      '/admin/workers/${widget.providerId}/$workerId/docs/$kind',
+      data: {'status': status, if (note != null && note.isNotEmpty) 'note': note},
+      okMsg: '$label ${status == 'accepted' ? (lang == 'ar' ? 'مقبول' : 'accepted') : (lang == 'ar' ? 'مرفوض' : 'rejected')}',
+    );
+  }
+
+  Future<void> _rejectWorkerDoc(String workerId, String kind, String label, String lang) async {
+    var note = '';
+    final ok = await v2Form(
+      context,
+      title: lang == 'ar' ? 'رفض المستند' : 'Reject document',
+      confirmLabel: lang == 'ar' ? 'رفض' : 'Reject',
+      danger: true,
+      bodyBuilder: (ctx, _) => V2FormField(
+        label: lang == 'ar' ? 'السبب' : 'Reason',
+        child: TextField(onChanged: (v) => note = v, maxLines: 2),
+      ),
+    );
+    if (ok) {
+      await _postWorkerDoc(workerId, kind, 'rejected', label, lang, note: note.trim());
     }
   }
 

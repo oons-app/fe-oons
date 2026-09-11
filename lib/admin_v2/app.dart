@@ -33,6 +33,7 @@ import 'package:oons/admin_v2/features/refunds/refunds_screen.dart';
 import 'package:oons/admin_v2/features/staff/matrix_screen.dart';
 import 'package:oons/admin_v2/features/staff/staff_screen.dart';
 import 'package:oons/admin_v2/features/vetting/vetting_screen.dart';
+import 'package:oons/admin_v2/features/vetting/worker_vetting_screen.dart';
 import 'package:oons/admin_v2/l10n/copy.dart';
 import 'package:oons/admin_v2/theme/theme.dart';
 
@@ -100,7 +101,7 @@ final v2RouterProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: '${V2Paths.providers}/:id',
-            builder: (_, s) => ProviderDetailScreen(providerId: s.pathParameters['id']!),
+            builder: (_, s) => ProviderDetailScreen(providerId: s.pathParameters['id']!, initialTab: s.uri.queryParameters['tab']),
           ),
           GoRoute(path: V2Paths.claims, builder: (_, __) => const ClaimsScreen()),
           GoRoute(path: V2Paths.categoryRequests, builder: (_, __) => const CategoryRequestsScreen()),
@@ -119,6 +120,7 @@ final v2RouterProvider = Provider<GoRouter>((ref) {
           GoRoute(path: V2Paths.heatmap, builder: (_, __) => const HeatmapScreen()),
           GoRoute(path: V2Paths.liveMap, builder: (_, __) => const LiveMapScreen()),
           GoRoute(path: V2Paths.vetting, builder: (_, __) => const VettingScreen()),
+          GoRoute(path: V2Paths.workerVetting, builder: (_, __) => const WorkerVettingScreen()),
           GoRoute(path: V2Paths.refunds, builder: (_, __) => const RefundsScreen()),
           GoRoute(path: V2Paths.analytics, builder: (_, __) => const AnalyticsScreen()),
           GoRoute(
