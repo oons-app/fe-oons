@@ -47,8 +47,14 @@ class _BookScreenState extends ConsumerState<BookScreen> {
   int slot = 2;
   final notes = TextEditingController();
   final homeSqm = TextEditingController();
+  final coupon = TextEditingController();
   String? instructionId;
   bool saveInstr = false;
+  bool _couponBusy = false;
+  bool _couponOk = false;
+  String? _appliedCouponCode;
+  int _couponDiscount = 0;
+  String? _couponMessage;
   List<Map<String, dynamic>> days = [];
   bool busy = false;
   String? addressId;
@@ -65,6 +71,7 @@ class _BookScreenState extends ConsumerState<BookScreen> {
     notes.removeListener(_onNotesChanged);
     notes.dispose();
     homeSqm.dispose();
+    coupon.dispose();
     for (final g in guests) {
       g.dispose();
     }
@@ -150,6 +157,68 @@ class _BookScreenState extends ConsumerState<BookScreen> {
 
   bool get _hasCleaningItems => p?.items.any((e) => e.isCleaning) ?? false;
 
+  Address? _selectedAddress() {
+    final addrs = ref.read(sessionProvider).user?.addresses ?? const <Address>[];
+    for (final a in addrs) {
+      if (addressId != null && a.id == addressId) return a;
+    }
+    if (addrs.isEmpty) return null;
+    final defaults = addrs.where((a) => a.isDefault);
+    return defaults.isEmpty ? addrs.first : defaults.first;
+  }
+
+  Future<void> _applyCoupon() async {
+    final code = coupon.text.trim();
+    final lang = langOf(ref);
+    if (code.isEmpty || p == null || busy) return;
+    setState(() {
+      _couponBusy = true;
+      _couponMessage = null;
+    });
+    int servicesTotal = 0;
+    for (final g in guests) {
+      servicesTotal += _guestServicesMoney(g);
+    }
+    final categoryIds = <String>{};
+    for (final g in guests) {
+      for (final id in g.serviceCounts.keys) {
+        final it = _itemById(id);
+        if (it?.categoryId != null && it!.categoryId!.isNotEmpty) categoryIds.add(it.categoryId!);
+      }
+    }
+    try {
+      final r = await ref.read(repoProvider).validateCoupon(
+            code: code,
+            providerId: p!.id,
+            serviceTotal: servicesTotal,
+            vertical: p!.service,
+            area: _selectedAddress()?.area,
+            categoryIds: categoryIds.toList(),
+          );
+      if (!mounted) return;
+      final ok = r['ok'] == true;
+      final label = r['label'];
+      setState(() {
+        _couponOk = ok;
+        _appliedCouponCode = ok ? code : null;
+        _couponDiscount = ok ? ((r['discount'] as num?)?.toInt() ?? 0) : 0;
+        _couponMessage = ok
+            ? (label is Map ? '${label[lang] ?? label['en'] ?? ''}' : (lang == 'ar' ? 'تم تطبيق الكوبون' : 'Coupon applied'))
+            : ('${r['message'] ?? (lang == 'ar' ? 'الكوبون مش شغال' : 'This coupon isn\'t valid')}');
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _couponOk = false;
+        _appliedCouponCode = null;
+        _couponDiscount = 0;
+        _couponMessage = friendlyError(e, lang);
+      });
+    } finally {
+      if (mounted) setState(() => _couponBusy = false);
+    }
+  }
+
   int? get _parsedHomeSqm {
     final n = int.tryParse(toWesternDigits(homeSqm.text.trim()).replaceAll(RegExp(r'[^0-9]'), ''));
     if (n == null || n <= 0) return null;
@@ -197,16 +266,8 @@ class _BookScreenState extends ConsumerState<BookScreen> {
     final stepsMap = t['steps'] as Map;
     final steps = ['${stepsMap['service']}', '${stepsMap['details']}', '${stepsMap['payment']}'];
     final bar = t['ctaBar'] as Map;
-    final user = ref.watch(sessionProvider).user;
-    final addrs = user?.addresses ?? const <Address>[];
-    Address? addr;
-    for (final a in addrs) {
-      if (addressId != null && a.id == addressId) {
-        addr = a;
-        break;
-      }
-    }
-    addr ??= addrs.where((a) => a.isDefault).isEmpty ? (addrs.isEmpty ? null : addrs.first) : addrs.firstWhere((a) => a.isDefault);
+    final addrs = ref.watch(sessionProvider).user?.addresses ?? const <Address>[];
+    final addr = _selectedAddress();
     if (p == null) {
       return const Scaffold(backgroundColor: Client.bg, body: Center(child: CircularProgressIndicator(color: Client.plum)));
     }
@@ -216,7 +277,9 @@ class _BookScreenState extends ConsumerState<BookScreen> {
     }
     // Trust fee comes from admin free-trial setting (default: 100 EGP applies).
     final trustFee = ref.watch(sessionProvider).trustFee;
-    final total = servicesTotal + trustFee;
+    final discount = _couponOk ? _couponDiscount : 0;
+    final rawTotal = servicesTotal + trustFee - discount;
+    final total = rawTotal < 0 ? 0 : rawTotal;
     return Scaffold(
       backgroundColor: Client.bg,
       body: SafeArea(
@@ -751,6 +814,52 @@ class _BookScreenState extends ConsumerState<BookScreen> {
                             ),
                           ),
                         ],
+                        const SizedBox(height: 20),
+                        ClientKicker(lang == 'ar' ? 'كوبون خصم' : 'Coupon'),
+                        const SizedBox(height: 8),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: coupon,
+                                textCapitalization: TextCapitalization.characters,
+                                onChanged: (v) {
+                                  if (_couponOk && v.trim().toUpperCase() != _appliedCouponCode) {
+                                    setState(() {
+                                      _couponOk = false;
+                                      _appliedCouponCode = null;
+                                      _couponDiscount = 0;
+                                      _couponMessage = null;
+                                    });
+                                  }
+                                },
+                                decoration: InputDecoration(
+                                  hintText: lang == 'ar' ? 'اكتبي كود الكوبون' : 'Enter coupon code',
+                                  filled: true,
+                                  fillColor: Client.card,
+                                  enabledBorder: const OutlineInputBorder(borderRadius: BorderRadius.zero, borderSide: BorderSide(color: Client.ink, width: Client.rule)),
+                                  focusedBorder: const OutlineInputBorder(borderRadius: BorderRadius.zero, borderSide: BorderSide(color: Client.plum, width: Client.rule)),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            SizedBox(
+                              height: 48,
+                              child: ClientGhostButton(
+                                label: _couponBusy ? '…' : (lang == 'ar' ? 'تطبيق' : 'Apply'),
+                                onTap: _couponBusy ? () {} : _applyCoupon,
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (_couponMessage != null) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            _couponMessage!,
+                            style: TextStyle(fontSize: 12.5, color: _couponOk ? Client.plum : Client.muted, fontWeight: _couponOk ? FontWeight.w700 : FontWeight.w400),
+                          ),
+                        ],
                         const SizedBox(height: 96),
                       ],
                     ),
@@ -836,6 +945,7 @@ class _BookScreenState extends ConsumerState<BookScreen> {
                         instructionId: instructionId,
                         saveInstruction: saveInstr && instructionId == null,
                         guests: guestPayload,
+                        couponCode: _couponOk ? _appliedCouponCode : null,
                       );
                   await ref.read(sessionProvider.notifier).refreshMe();
                   if (mounted) context.push('/checkout/${created.booking.id}');

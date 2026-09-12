@@ -383,6 +383,7 @@ class Repo {
     String? instructionId,
     bool saveInstruction = false,
     List<Map<String, dynamic>>? guests,
+    String? couponCode,
   }) async {
     final r = await api.post('/bookings', data: {
       'providerId': providerId,
@@ -396,6 +397,7 @@ class Repo {
         'instructionTitle': notes!.trim().split('\n').first,
       },
       if (guests != null && guests.isNotEmpty) 'guests': guests,
+      if (couponCode != null && couponCode.trim().isNotEmpty) 'couponCode': couponCode.trim(),
     });
     final bundle = BookingBundle.fromJson(r);
     final addr = bundle.booking.address;
@@ -413,6 +415,28 @@ class Repo {
       isGroup: bundle.booking.isGroup,
     );
     return bundle;
+  }
+
+  /// Live pre-booking check for a coupon code — mirrors the eligibility rules
+  /// applied for real at booking time, so the client sees the same verdict
+  /// before committing to a slot.
+  Future<Map<String, dynamic>> validateCoupon({
+    required String code,
+    required String providerId,
+    required int serviceTotal,
+    String? vertical,
+    String? area,
+    List<String>? categoryIds,
+  }) async {
+    final r = await api.post('/coupons/validate', data: {
+      'code': code,
+      'providerId': providerId,
+      'serviceTotal': serviceTotal,
+      if (vertical != null && vertical.isNotEmpty) 'vertical': vertical,
+      if (area != null && area.isNotEmpty) 'area': area,
+      if (categoryIds != null && categoryIds.isNotEmpty) 'categoryIds': categoryIds,
+    });
+    return Map<String, dynamic>.from(r);
   }
 
   Future<List<Map<String, dynamic>>> categories({
