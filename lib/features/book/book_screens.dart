@@ -1645,6 +1645,14 @@ class ConfirmedScreen extends ConsumerWidget {
                     _row(lang == 'ar' ? 'المدفوع' : 'Paid', '${money(b.total, lang)} · ${lang == 'ar' ? 'واقفة' : 'Held'}'),
                     _row(lang == 'ar' ? 'المتخصصة' : 'Professional', p?.name(lang) ?? ''),
                   ],
+                  if (b?.idUploadDeadline != null && ref.watch(sessionProvider).user?.hasIdPhoto != true) ...[
+                    const SizedBox(height: 16),
+                    ClientIDUploadBanner(
+                      deadline: b!.idUploadDeadline!,
+                      lang: lang,
+                      onTap: () => context.push('/me/identity'),
+                    ),
+                  ],
                   const Spacer(),
                   ClientPrimaryButton(
                     label: '${c['cta']}',

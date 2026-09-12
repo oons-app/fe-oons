@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:oons/core/glyphs.dart';
+import 'package:oons/core/pro_format.dart';
 import 'package:oons/core/tokens.dart';
 import 'package:oons/core/widgets.dart';
 
@@ -229,6 +232,71 @@ class ClientTrustBanner extends StatelessWidget {
               child: Text(text, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, height: 1.45, color: Client.bg)),
             ),
             Text(link, style: TextStyle(fontFamily: T.mono, fontSize: 12, fontWeight: FontWeight.w500, color: Client.bg.withValues(alpha: 0.85))),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Warns that a paid booking needs a national ID photo on file within the
+/// server's window (be-oons markPaid/tickIDUploadDeadlines) or it gets
+/// auto-cancelled and refunded. Ticks its own remaining-time label every
+/// minute — 8 hours is coarse enough that a minute's resolution is plenty,
+/// and only this small widget rebuilds, not its whole host screen.
+class ClientIDUploadBanner extends StatefulWidget {
+  const ClientIDUploadBanner({super.key, required this.deadline, required this.lang, required this.onTap});
+  final DateTime deadline;
+  final String lang;
+  final VoidCallback onTap;
+
+  @override
+  State<ClientIDUploadBanner> createState() => _ClientIDUploadBannerState();
+}
+
+class _ClientIDUploadBannerState extends State<ClientIDUploadBanner> {
+  Timer? _t;
+
+  @override
+  void initState() {
+    super.initState();
+    _t = Timer.periodic(const Duration(minutes: 1), (_) => mounted ? setState(() {}) : null);
+  }
+
+  @override
+  void dispose() {
+    _t?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ar = widget.lang == 'ar';
+    final left = widget.deadline.difference(DateTime.now());
+    final hours = left.isNegative ? 0 : left.inHours;
+    final mins = left.isNegative ? 0 : left.inMinutes % 60;
+    final remaining = hours > 0
+        ? (ar ? '${toArabicDigits(hours)} س ${toArabicDigits(mins)} د' : '${hours}h ${mins}m')
+        : (ar ? '${toArabicDigits(mins)} د' : '${mins}m');
+    return InkWell(
+      onTap: widget.onTap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        color: Client.terracotta,
+        child: Row(
+          children: [
+            const Text('⚠', style: TextStyle(fontSize: 14, color: Client.bg)),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                ar
+                    ? 'ارفعي صورة بطاقتك خلال $remaining، وإلا هيتلغي حجزك وترجعلك فلوسك.'
+                    : 'Upload your ID photo within $remaining, or your booking will be cancelled and refunded.',
+                style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, height: 1.45, color: Client.bg),
+              ),
+            ),
+            Text(ar ? 'ارفعي ›' : 'Upload ›', style: const TextStyle(fontFamily: T.mono, fontSize: 12, fontWeight: FontWeight.w500, color: Client.bg)),
           ],
         ),
       ),

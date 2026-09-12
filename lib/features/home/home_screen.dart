@@ -180,36 +180,57 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 FutureBuilder<List<BookingBundle>>(
                   future: ref.read(repoProvider).bookings('upcoming'),
                   builder: (context, upSnap) {
-                    final upcoming = (upSnap.data ?? []).isNotEmpty ? upSnap.data!.first : null;
-                    if (upcoming == null) return const SizedBox.shrink();
+                    final all = upSnap.data ?? const <BookingBundle>[];
+                    Widget? idBanner;
+                    if (user?.hasIdPhoto != true) {
+                      DateTime? soonest;
+                      for (final bundle in all) {
+                        final d = bundle.booking.idUploadDeadline;
+                        if (d != null && (soonest == null || d.isBefore(soonest))) soonest = d;
+                      }
+                      if (soonest != null) {
+                        idBanner = Padding(
+                          padding: const EdgeInsets.fromLTRB(0, 20, 0, 0),
+                          child: ClientIDUploadBanner(deadline: soonest, lang: lang, onTap: () => context.push('/me/identity')),
+                        );
+                      }
+                    }
+                    final upcoming = all.isNotEmpty ? all.first : null;
+                    if (upcoming == null) return idBanner ?? const SizedBox.shrink();
                     final b = upcoming.booking;
                     final states = Copy.of(lang)['states'] as Map;
                     final st = (states[b.status] as Map?) ?? {};
-                    return Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (idBanner != null) idBanner,
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                (lang == 'ar' ? 'زيارتك الجاية' : 'Your next visit').toUpperCase(),
-                                style: const TextStyle(fontFamily: T.mono, fontSize: 11, fontWeight: FontWeight.w500, letterSpacing: 1.4, color: Client.muted2),
+                              Row(
+                                children: [
+                                  Text(
+                                    (lang == 'ar' ? 'زيارتك الجاية' : 'Your next visit').toUpperCase(),
+                                    style: const TextStyle(fontFamily: T.mono, fontSize: 11, fontWeight: FontWeight.w500, letterSpacing: 1.4, color: Client.muted2),
+                                  ),
+                                  const Spacer(),
+                                  GestureDetector(
+                                    onTap: () => context.go('/bookings'),
+                                    child: Text(
+                                      lang == 'ar' ? 'كل الحجوزات' : 'All bookings',
+                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Client.plum, decoration: TextDecoration.underline, decorationColor: Client.plum),
+                                    ),
+                                  ),
+                                ],
                               ),
-                              const Spacer(),
-                              GestureDetector(
-                                onTap: () => context.go('/bookings'),
-                                child: Text(
-                                  lang == 'ar' ? 'كل الحجوزات' : 'All bookings',
-                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Client.plum, decoration: TextDecoration.underline, decorationColor: Client.plum),
-                                ),
-                              ),
+                              const SizedBox(height: 10),
+                              _UpcomingCard(bundle: upcoming, lang: lang, statusLabel: '${st['code'] ?? b.status}'),
                             ],
                           ),
-                          const SizedBox(height: 10),
-                          _UpcomingCard(bundle: upcoming, lang: lang, statusLabel: '${st['code'] ?? b.status}'),
-                        ],
-                      ),
+                        ),
+                      ],
                     );
                   },
                 ),

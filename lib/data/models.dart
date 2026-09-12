@@ -516,6 +516,7 @@ class Booking {
     this.trustFeeAmount = 0,
     this.commissionAmount = 0,
     this.relationshipTier,
+    this.idUploadDeadline,
   });
   final String id;
   final String ref;
@@ -549,6 +550,9 @@ class Booking {
   final int trustFeeAmount;
   final int commissionAmount;
   final String? relationshipTier;
+  // KYC: she must have a national ID photo on file by this time or the
+  // booking is auto-cancelled and refunded (see book screen / home banner).
+  final DateTime? idUploadDeadline;
 
   bool get canReleasePay => status == 'completed' && escrow == 'held' && releasedAt == null;
   bool get isGroup => kind == 'group' || items.length > 1;
@@ -619,6 +623,7 @@ class Booking {
         relationshipTier: j['relationshipTier'] == null || '${j['relationshipTier']}'.isEmpty
             ? null
             : '${j['relationshipTier']}',
+        idUploadDeadline: j['idUploadDeadline'] == null ? null : DateTime.tryParse('${j['idUploadDeadline']}')?.toLocal(),
       );
 
   Booking withLocation(double lat, double lng) => Booking(
@@ -654,6 +659,7 @@ class Booking {
         trustFeeAmount: trustFeeAmount,
         commissionAmount: commissionAmount,
         relationshipTier: relationshipTier,
+        idUploadDeadline: idUploadDeadline,
       );
 }
 
