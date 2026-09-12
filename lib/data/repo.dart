@@ -48,16 +48,18 @@ class SessionState {
     this.role = 'client',
     this.online = true,
     this.feeWaived = false,
-    this.trustFee = 10000,
+    this.trustFee = 0,
   });
   final String? token;
   final UserMe? user;
   final ProviderP? provider;
   final String role;
   final bool online;
-  /// Admin-activated platform free trial (0 trust fee + 0 commission).
+  /// Admin-activated platform free trial (0 commission during the trial).
   final bool feeWaived;
-  /// Trust fee in piastres for booking drafts (10000 = 100 EGP when fees apply).
+  /// Trust fee in piastres for booking drafts. Permanently 0 server-side
+  /// (money.TrustFeeDisabled) — kept as a real field, not deleted, in case
+  /// that policy ever changes.
   final int trustFee;
   bool get authed => token != null;
   bool get isProvider => role == 'provider';
@@ -107,7 +109,10 @@ class Session extends StateNotifier<SessionState> {
       provider: me['provider'] is Map ? ProviderP.fromJson(me['provider'] as Map) : null,
       online: state.online,
       feeWaived: me['feeWaived'] == true,
-      trustFee: (me['trustFee'] as num?)?.toInt() ?? (me['feeWaived'] == true ? 0 : 10000),
+      // The server always sends this now (it's permanently 0 — see
+      // money.TrustFeeDisabled), but a 100 EGP fallback for a missing field
+      // is a landmine for a fee that no longer applies. Default to 0.
+      trustFee: (me['trustFee'] as num?)?.toInt() ?? 0,
     );
   }
 

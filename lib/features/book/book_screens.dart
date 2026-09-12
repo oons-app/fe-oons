@@ -275,7 +275,9 @@ class _BookScreenState extends ConsumerState<BookScreen> {
     for (final g in guests) {
       servicesTotal += _guestServicesMoney(g);
     }
-    // Trust fee comes from admin free-trial setting (default: 100 EGP applies).
+    // Trust fee is permanently 0 (server-side kill switch) — kept as a real
+    // read, not a hardcoded 0, so nothing here silently drifts if that
+    // ever changes.
     final trustFee = ref.watch(sessionProvider).trustFee;
     final discount = _couponOk ? _couponDiscount : 0;
     final rawTotal = servicesTotal + trustFee - discount;
