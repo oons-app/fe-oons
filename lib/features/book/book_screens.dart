@@ -845,6 +845,7 @@ class _BookScreenState extends ConsumerState<BookScreen> {
                             ),
                             const SizedBox(width: 10),
                             SizedBox(
+                              width: 104,
                               height: 48,
                               child: ClientGhostButton(
                                 label: _couponBusy ? '…' : (lang == 'ar' ? 'تطبيق' : 'Apply'),
