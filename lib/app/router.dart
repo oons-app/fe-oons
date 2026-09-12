@@ -15,6 +15,7 @@ import 'package:oons/features/me/me_screens.dart';
 import 'package:oons/features/bookings/bookings_screens.dart';
 import 'package:oons/features/browse/browse_screens.dart';
 import 'package:oons/features/pro/handshake_scan.dart';
+import 'package:oons/features/pro/pro_coupons_screen.dart';
 import 'package:oons/features/pro/pro_screens.dart';
 import 'package:oons/features/pro/pro_team_screen.dart';
 import 'package:oons/features/profile/alerts_screen.dart';
@@ -136,6 +137,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/register', builder: (c, s) => ClientRegisterScreen(phone: s.uri.queryParameters['phone'] ?? '', code: s.uri.queryParameters['code'] ?? '')),
       GoRoute(path: '/pro/register', builder: (c, s) => ProRegisterScreen(phone: s.uri.queryParameters['phone'] ?? '', code: s.uri.queryParameters['code'] ?? '')),
       GoRoute(path: '/pro/team', builder: (c, s) => const ProTeamScreen()),
+      GoRoute(path: '/pro/coupons', builder: (c, s) => const ProCouponsScreen()),
       GoRoute(path: '/pro/job/:id', builder: (c, s) => ProJobScreen(id: s.pathParameters['id']!)),
       GoRoute(path: '/pro/handshake/:id', builder: (c, s) => HandshakeScanScreen(bookingId: s.pathParameters['id']!)),
       GoRoute(path: '/pro/rate/:id', builder: (c, s) => ProRateScreen(bookingId: s.pathParameters['id']!)),

@@ -1771,6 +1771,31 @@ class _ProAccountScreenState extends ConsumerState<ProAccountScreen> {
             ),
           ),
           const SizedBox(height: 20),
+          ProSectionLabel(lang == 'ar' ? 'كوبوناتي' : 'My coupons'),
+          const SizedBox(height: 10),
+          ProCard(
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    lang == 'ar'
+                        ? 'اعملي أكواد خصم خاصة بيكي لعميلاتك.'
+                        : 'Create your own discount codes for your clients.',
+                    style: const TextStyle(fontSize: 12.5, color: Pro.muted, height: 1.4),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                InkWell(
+                  onTap: () => context.push('/pro/coupons'),
+                  child: Text(
+                    lang == 'ar' ? 'إدارة الكوبونات' : 'Manage coupons',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Pro.plum),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
           ProSectionLabel(lang == 'ar' ? 'الإعدادات' : 'Settings'),
           const SizedBox(height: 10),
           ClipRRect(

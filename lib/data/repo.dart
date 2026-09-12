@@ -553,6 +553,21 @@ class Repo {
   Future<Map<String, dynamic>> uploadWorkerFish(String workerId, List<int> bytes, {String filename = 'fish.jpg', void Function(double)? onProgress}) =>
       api.upload('/pro/workers/$workerId/fish', 'fish', bytes, filename: filename, onProgress: onProgress);
 
+  // ---- Coupons (provider-owned) ----------------------------------------
+
+  Future<List<Map<String, dynamic>>> proCoupons() async {
+    final r = await api.get('/pro/coupons');
+    return ((r['coupons'] as List?) ?? []).cast<Map<String, dynamic>>();
+  }
+
+  Future<Map<String, dynamic>> proCreateCoupon(Map<String, dynamic> body) async {
+    return api.post('/pro/coupons', data: body);
+  }
+
+  Future<Map<String, dynamic>> proPatchCoupon(String id, Map<String, dynamic> body) async {
+    return api.patch('/pro/coupons/$id', data: body);
+  }
+
   Future<Map<String, dynamic>> assignWorkers(String bookingId, List<String> workerIds) async {
     return api.post('/bookings/$bookingId/assign-workers', data: {'workerIds': workerIds});
   }
