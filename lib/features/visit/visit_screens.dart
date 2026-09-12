@@ -365,8 +365,13 @@ class _VisitScreenState extends ConsumerState<VisitScreen> {
                         if (b?.status == 'in_progress') ...[
                           const SizedBox(height: 12),
                           ClientPrimaryButton(label: '${(t['rate'] as Map)['checkout']}', onTap: () async {
-                            await ref.read(repoProvider).checkout(widget.bookingId);
-                            if (context.mounted) context.go('/rate/${widget.bookingId}');
+                            try {
+                              await ref.read(repoProvider).checkout(widget.bookingId);
+                              if (context.mounted) context.go('/rate/${widget.bookingId}');
+                            } catch (e) {
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendlyError(e, lang))));
+                            }
                           }),
                         ],
                       ],
@@ -499,8 +504,17 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
               ClientPrimaryButton(
                 label: '${s['cta']}',
                 onTap: () async {
-                  await ref.read(repoProvider).share(widget.bookingId, selected.toList());
-                  if (context.mounted) context.pop();
+                  try {
+                    await ref.read(repoProvider).share(widget.bookingId, selected.toList());
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(lang == 'ar' ? 'اتبعتلهم تفاصيل الزيارة.' : 'They can now see this visit.')),
+                    );
+                    context.pop();
+                  } catch (e) {
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendlyError(e, lang))));
+                  }
                 },
               ),
             ],
@@ -771,9 +785,14 @@ class _CancelScreenState extends ConsumerState<CancelScreen> {
               ClientPrimaryButton(
                 label: lang == 'ar' ? 'الغي ورجّعي ${money(p?.refundAmount ?? 0, lang)}' : 'Cancel and refund ${money(p?.refundAmount ?? 0, lang)}',
                 onTap: () async {
-                  final r = await ref.read(repoProvider).cancel(widget.bookingId, refundTo);
-                  tapSuccess();
-                  if (context.mounted) context.go('/booking/${r.booking.id}');
+                  try {
+                    final r = await ref.read(repoProvider).cancel(widget.bookingId, refundTo);
+                    tapSuccess();
+                    if (context.mounted) context.go('/booking/${r.booking.id}');
+                  } catch (e) {
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendlyError(e, lang))));
+                  }
                 },
               ),
               const SizedBox(height: 4),
@@ -909,8 +928,13 @@ class ProviderCancelScreen extends ConsumerWidget {
                               Expanded(
                                 child: InkWell(
                                   onTap: () async {
-                                    await ref.read(repoProvider).acceptReplacement(bookingId);
-                                    if (context.mounted) context.go('/visit/$bookingId');
+                                    try {
+                                      await ref.read(repoProvider).acceptReplacement(bookingId);
+                                      if (context.mounted) context.go('/visit/$bookingId');
+                                    } catch (e) {
+                                      if (!context.mounted) return;
+                                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendlyError(e, lang))));
+                                    }
                                   },
                                   child: Container(
                                     constraints: const BoxConstraints(minHeight: 52),
@@ -924,8 +948,13 @@ class ProviderCancelScreen extends ConsumerWidget {
                               Expanded(
                                 child: InkWell(
                                   onTap: () async {
-                                    await ref.read(repoProvider).declineReplacement(bookingId);
-                                    if (context.mounted) context.go('/booking/$bookingId');
+                                    try {
+                                      await ref.read(repoProvider).declineReplacement(bookingId);
+                                      if (context.mounted) context.go('/booking/$bookingId');
+                                    } catch (e) {
+                                      if (!context.mounted) return;
+                                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendlyError(e, lang))));
+                                    }
                                   },
                                   child: Container(
                                     constraints: const BoxConstraints(minHeight: 52),
@@ -1038,6 +1067,10 @@ class _DisputeScreenState extends ConsumerState<DisputeScreen> {
                       await ref.read(repoProvider).dispute(widget.bookingId, reason: reason.text);
                       tapSuccess();
                       if (mounted) setState(() => done = true);
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendlyError(e, lang))));
+                      }
                     } finally {
                       if (mounted) setState(() => busy = false);
                     }

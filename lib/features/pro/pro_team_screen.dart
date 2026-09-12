@@ -48,7 +48,14 @@ class _ProTeamScreenState extends ConsumerState<ProTeamScreen> {
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
       builder: (ctx) => _WorkerEditorSheet(lang: lang, existing: existing, repo: ref.read(repoProvider)),
     );
-    if (changed == true) _load();
+    if (changed == true) {
+      await _load();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(
+          lang == 'ar' ? 'اتحدّث الفريق.' : 'Team updated.',
+        )));
+      }
+    }
   }
 
   @override
@@ -291,8 +298,8 @@ class _WorkerEditorSheetState extends State<_WorkerEditorSheet> {
     try {
       await widget.repo.proDeleteWorker(workerId!);
       if (mounted) Navigator.pop(context, true);
-    } on ApiException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendlyError(e, widget.lang))));
     } finally {
       if (mounted) setState(() => busy = false);
     }

@@ -137,9 +137,16 @@ class _AreasScreenState extends ConsumerState<AreasScreen> {
   }
 
   Future<void> _toggleLock(Map a) async {
+    final lang = ref.read(localeCodeProvider);
+    final willLock = !_locked(a);
     try {
-      await staffClient.patch('/admin/areas/${idOf(a)}', data: {'status': _locked(a) ? 'active' : 'locked_teaser'});
+      await staffClient.patch('/admin/areas/${idOf(a)}', data: {'status': willLock ? 'locked_teaser' : 'active'});
       _load();
+      if (mounted) {
+        v2Toast(context, willLock
+            ? (lang == 'ar' ? 'اتقفلت المنطقة' : 'Area locked')
+            : (lang == 'ar' ? 'اتفتحت المنطقة' : 'Area unlocked'));
+      }
     } on ApiException catch (e) {
       if (mounted) v2Toast(context, e.message, error: true);
     }

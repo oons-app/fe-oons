@@ -4,9 +4,9 @@ import 'package:intl/intl.dart';
 import 'package:oons/core/locale.dart';
 import 'package:oons/core/pro_format.dart';
 import 'package:oons/core/tokens.dart';
-import 'package:oons/data/api.dart';
 import 'package:oons/data/repo.dart';
 import 'package:oons/features/pro/pro_chrome.dart';
+import 'package:oons/l10n/errors.dart';
 
 /// "كوبوناتي" — a provider's own discount codes. Always kind "provider" and
 /// scoped to this provider's bookings only (ownerProviderId is implicit
@@ -52,7 +52,14 @@ class _ProCouponsScreenState extends ConsumerState<ProCouponsScreen> {
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
       builder: (ctx) => _CouponEditorSheet(lang: lang, existing: existing, repo: ref.read(repoProvider)),
     );
-    if (changed == true) _load();
+    if (changed == true) {
+      await _load();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(
+          lang == 'ar' ? 'اتحفظ الكوبون.' : 'Coupon saved.',
+        )));
+      }
+    }
   }
 
   bool _isPercent(Map c) => '${c['discountType']}' == 'percent';
@@ -278,8 +285,8 @@ class _CouponEditorSheetState extends State<_CouponEditorSheet> {
         await widget.repo.proCreateCoupon(body);
       }
       if (mounted) Navigator.pop(context, true);
-    } on ApiException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendlyError(e, widget.lang))));
     } finally {
       if (mounted) setState(() => busy = false);
     }

@@ -153,11 +153,18 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
   }
 
   Future<void> _toggleLock(Map c) async {
+    final lang = ref.read(localeCodeProvider);
     // Server state lives in `status`: flip active <-> locked_teaser.
-    final next = _isLocked(c) ? 'active' : 'locked_teaser';
+    final locking = !_isLocked(c);
+    final next = locking ? 'locked_teaser' : 'active';
     try {
       await staffClient.patch('/admin/categories/${idOf(c)}', data: {'status': next});
       _load();
+      if (mounted) {
+        v2Toast(context, locking
+            ? (lang == 'ar' ? 'اتقفل التصنيف' : 'Category locked')
+            : (lang == 'ar' ? 'اتفتح التصنيف' : 'Category unlocked'));
+      }
     } on ApiException catch (e) {
       if (mounted) v2Toast(context, e.message, error: true);
     }
@@ -166,6 +173,7 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
   Future<void> _reorder(List<Map<String, dynamic>> ordered, int i, {required bool up}) async {
     final j = up ? i - 1 : i + 1;
     if (j < 0 || j >= ordered.length) return;
+    final lang = ref.read(localeCodeProvider);
     final next = [...ordered];
     final tmp = next[i];
     next[i] = next[j];
@@ -175,6 +183,7 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
     try {
       await staffClient.post('/admin/categories/reorder', data: {'order': order});
       _load();
+      if (mounted) v2Toast(context, lang == 'ar' ? 'اترتب' : 'Order updated');
     } on ApiException catch (e) {
       if (mounted) v2Toast(context, e.message, error: true);
     }

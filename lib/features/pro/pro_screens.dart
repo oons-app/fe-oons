@@ -1351,6 +1351,10 @@ class _ProJobScreenState extends ConsumerState<ProJobScreen> {
         final label = doneKey != null ? '${p[doneKey] ?? p['doneSave']}' : _statusDoneLabel(b.booking.status, p);
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(label)));
       }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendlyError(e, lang))));
+      }
     } finally {
       if (mounted) setState(() => busy = false);
     }
@@ -1676,6 +1680,10 @@ class _ProAccountScreenState extends ConsumerState<ProAccountScreen> {
                       }
                       tapSuccess();
                       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${p['doneSaveProfile']}')));
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendlyError(e, langOf(ref)))));
+                      }
                     } finally {
                       if (mounted) setState(() => busy = false);
                     }
@@ -1699,12 +1707,18 @@ class _ProAccountScreenState extends ConsumerState<ProAccountScreen> {
                     onLongPress: () async {
                       if (me == null || e.key >= me.portfolio.length) return;
                       final lang = langOf(ref);
-                      final r = await ref.read(repoProvider).deleteProPortfolio(e.key);
-                      if (r['provider'] is Map) {
-                        ref.read(sessionProvider.notifier).setProvider(ProviderP.fromJson(r['provider'] as Map));
-                      }
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${(Copy.of(lang)['pro'] as Map)['doneDeletePhoto']}')));
+                      try {
+                        final r = await ref.read(repoProvider).deleteProPortfolio(e.key);
+                        if (r['provider'] is Map) {
+                          ref.read(sessionProvider.notifier).setProvider(ProviderP.fromJson(r['provider'] as Map));
+                        }
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${(Copy.of(lang)['pro'] as Map)['doneDeletePhoto']}')));
+                        }
+                      } catch (err) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendlyError(err, lang))));
+                        }
                       }
                     },
                     child: ClipRRect(
@@ -1822,7 +1836,29 @@ class _ProAccountScreenState extends ConsumerState<ProAccountScreen> {
           ProSoftButton(
             label: '${profile['delete']}',
             danger: true,
-            onTap: () => ref.read(sessionProvider.notifier).deleteAccount(),
+            onTap: () async {
+              final ok = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: Text('${profile['delete']}', style: const TextStyle(fontWeight: FontWeight.w800)),
+                  content: Text('${profile['deleteBody']}'),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('${profile['keep']}')),
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: Text('${profile['delete']}', style: const TextStyle(color: Pro.danger)),
+                    ),
+                  ],
+                ),
+              );
+              if (ok != true) return;
+              try {
+                await ref.read(sessionProvider.notifier).deleteAccount();
+              } catch (e) {
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendlyError(e, lang))));
+              }
+            },
           ),
         ],
       ),

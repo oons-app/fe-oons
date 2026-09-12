@@ -30,7 +30,11 @@ class _ProEarningsScreenState extends ConsumerState<ProEarningsScreen> {
   Map<String, dynamic>? summary;
   List<Map<String, dynamic>> settlements = [];
   bool busy = false;
-  String? err;
+  // Object?, not String — friendlyError() needs the real exception (e.g. an
+  // ApiException) to pick a specific message; stringifying it here first
+  // (as this used to do) meant every failure on this screen showed the same
+  // generic fallback text regardless of what actually went wrong.
+  Object? err;
 
   @override
   void initState() {
@@ -50,7 +54,7 @@ class _ProEarningsScreenState extends ConsumerState<ProEarningsScreen> {
         err = null;
       });
     } catch (e) {
-      if (mounted) setState(() => err = '$e');
+      if (mounted) setState(() => err = e);
     }
   }
 
@@ -384,8 +388,13 @@ class _ProEarningsScreenState extends ConsumerState<ProEarningsScreen> {
     try {
       await ref.read(repoProvider).setSettlementCadence(next);
       await _load();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(
+          lang == 'ar' ? 'اتغيرت دورة التسوية.' : 'Settlement cadence updated.',
+        )));
+      }
     } catch (e) {
-      if (mounted) setState(() => err = '$e');
+      if (mounted) setState(() => err = e);
     } finally {
       if (mounted) setState(() => busy = false);
     }

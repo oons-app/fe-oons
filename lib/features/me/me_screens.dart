@@ -335,6 +335,10 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
                         } else {
                           context.pop(saved);
                         }
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendlyError(e, lang))));
+                        }
                       } finally {
                         if (mounted) setState(() => busy = false);
                       }
@@ -420,8 +424,17 @@ class _InstructionsScreenState extends ConsumerState<InstructionsScreen> {
                           trailing: IconButton(
                             icon: const Icon(Icons.delete_outline, color: T.danger),
                             onPressed: () async {
-                              final u = await ref.read(repoProvider).deleteInstruction(i.id);
-                              ref.read(sessionProvider.notifier).setUser(u);
+                              try {
+                                final u = await ref.read(repoProvider).deleteInstruction(i.id);
+                                ref.read(sessionProvider.notifier).setUser(u);
+                                if (!mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(
+                                  lang == 'ar' ? 'اتشالت.' : 'Deleted.',
+                                )));
+                              } catch (e) {
+                                if (!mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendlyError(e, lang))));
+                              }
                             },
                           ),
                         ),

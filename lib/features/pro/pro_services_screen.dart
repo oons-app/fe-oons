@@ -1427,6 +1427,9 @@ class _ProServicesScreenState extends ConsumerState<ProServicesScreen> {
                                     if (r['provider'] is Map) {
                                       ref.read(sessionProvider.notifier).setProvider(ProviderP.fromJson(r['provider'] as Map));
                                     }
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(lang == 'ar' ? 'اتشال.' : 'Removed.')));
+                                    }
                                   } catch (e) {
                                     if (mounted) {
                                       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendlyError(e, lang))));
@@ -1565,6 +1568,9 @@ class _ProServicesScreenState extends ConsumerState<ProServicesScreen> {
                       try {
                         await ref.read(repoProvider).proRemoveCategory(id);
                         await _loadCategories();
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(lang == 'ar' ? 'اتشالت.' : 'Removed.')));
+                        }
                       } catch (e) {
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendlyError(e, lang))));

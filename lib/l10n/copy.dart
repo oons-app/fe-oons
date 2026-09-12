@@ -276,6 +276,7 @@ class Copy {
       'checkout': 'End the visit',
       'releaseCta': 'Release payment now',
       'releaseNote': 'She gets paid right away. You can still open a dispute within 48 hours.',
+      'releaseDone': 'Payment released.',
       'addPhotos': 'Add photos',
     },
     'cancel': {
@@ -1415,6 +1416,7 @@ class Copy {
       'checkout': 'خلّصي الزيارة',
       'releaseCta': 'فرّجي الفلوس دلوقتي',
       'releaseNote': 'فلوسها هتوصلها على طول. لسه تقدري تفتحي اعتراض خلال ٤٨ ساعة.',
+      'releaseDone': 'اتفرجت الفلوس.',
       'addPhotos': 'زودي صور',
     },
     'cancel': {

@@ -424,6 +424,7 @@ class _StatusScreenState extends ConsumerState<StatusScreen> {
                             data = updated;
                             releasing = false;
                           });
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${rateCopy['releaseDone']}')));
                         } catch (e) {
                           if (!mounted) return;
                           setState(() => releasing = false);

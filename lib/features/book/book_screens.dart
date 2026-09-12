@@ -1430,6 +1430,10 @@ class _FawryScreenState extends ConsumerState<FawryScreen> {
     super.dispose();
   }
 
+  // Silent — this also runs on a 3s timer in the background, so an error
+  // here must not surface anywhere (it would spam a toast every 3s on any
+  // brief connectivity hiccup). _manualRefresh below is what gives the
+  // "Refresh now"/"I've paid" buttons their own explicit feedback.
   Future<void> _load() async {
     final b = await ref.read(repoProvider).checkPay(widget.bookingId);
     if (!mounted) return;
@@ -1439,6 +1443,33 @@ class _FawryScreenState extends ConsumerState<FawryScreen> {
       await ref.read(repoProvider).ensurePurchaseTracked(b);
       if (!mounted) return;
       context.go('/confirmed/${b.booking.id}');
+    }
+  }
+
+  /// The button-tap version of _load(): same check, but this one is a
+  /// deliberate user action, so it gets its own feedback — an error toast if
+  /// the check itself fails, and (since a successful payment already
+  /// navigates away on its own) a short "still waiting" note when it
+  /// succeeds but nothing has changed, so tapping the button never feels
+  /// like it did nothing.
+  Future<void> _manualRefresh(String lang) async {
+    try {
+      final b = await ref.read(repoProvider).checkPay(widget.bookingId);
+      if (!mounted) return;
+      setState(() => data = b);
+      if (b.booking.status == 'paid') {
+        t?.cancel();
+        await ref.read(repoProvider).ensurePurchaseTracked(b);
+        if (!mounted) return;
+        context.go('/confirmed/${b.booking.id}');
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(
+        lang == 'ar' ? 'لسه مفيش تأكيد دفع.' : 'No payment confirmation yet.',
+      )));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendlyError(e, lang))));
     }
   }
 
@@ -1486,10 +1517,7 @@ class _FawryScreenState extends ConsumerState<FawryScreen> {
                 const Spacer(),
                 ClientGhostButton(
                   label: lang == 'ar' ? 'حدّث الآن' : 'Refresh now',
-                  onTap: () async {
-                    await ref.read(repoProvider).checkPay(widget.bookingId);
-                    await _load();
-                  },
+                  onTap: () => _manualRefresh(lang),
                 ),
               ] else ...[
               Container(
@@ -1553,10 +1581,7 @@ class _FawryScreenState extends ConsumerState<FawryScreen> {
               const Spacer(),
               ClientGhostButton(
                 label: '${f['paid']}',
-                onTap: () async {
-                  await ref.read(repoProvider).checkPay(widget.bookingId);
-                  await _load();
-                },
+                onTap: () => _manualRefresh(lang),
               ),
               TextButton(onPressed: () => context.push('/cancel/${widget.bookingId}'), child: Text('${f['cancel']}', style: const TextStyle(color: Client.muted))),
               ],

@@ -13,6 +13,7 @@ import 'package:oons/features/client/client_chrome.dart';
 import 'package:oons/features/client/client_tour.dart';
 import 'package:oons/features/legal/legal_widgets.dart';
 import 'package:oons/l10n/copy.dart';
+import 'package:oons/l10n/errors.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -239,7 +240,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       ),
     );
     if (ok == true) {
-      await ref.read(sessionProvider.notifier).deleteAccount();
+      final lang = langOf(ref);
+      try {
+        await ref.read(sessionProvider.notifier).deleteAccount();
+      } catch (e) {
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendlyError(e, lang))));
+      }
     }
   }
 }
@@ -265,7 +272,18 @@ class AddressesScreen extends ConsumerWidget {
                   ...addrs.map((a) {
                   return InkWell(
                     onTap: () => context.push('/me/addresses/edit', extra: a),
-                    onLongPress: () => ref.read(sessionProvider.notifier).patchMe(defaultAddressId: a.id),
+                    onLongPress: () async {
+                      try {
+                        await ref.read(sessionProvider.notifier).patchMe(defaultAddressId: a.id);
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(
+                          lang == 'ar' ? 'بقى العنوان الأساسي.' : 'Set as default.',
+                        )));
+                      } catch (e) {
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendlyError(e, lang))));
+                      }
+                    },
                     child: Container(
                     padding: const EdgeInsets.all(20),
                     decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Client.ink, width: Client.rule))),
@@ -301,8 +319,13 @@ class AddressesScreen extends ConsumerWidget {
                         if (addrs.length > 1)
                           IconButton(
                             onPressed: () async {
-                              final u = await ref.read(repoProvider).deleteAddress(a.id);
-                              ref.read(sessionProvider.notifier).setUser(u);
+                              try {
+                                final u = await ref.read(repoProvider).deleteAddress(a.id);
+                                ref.read(sessionProvider.notifier).setUser(u);
+                              } catch (e) {
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendlyError(e, lang))));
+                              }
                             },
                             icon: const Icon(Icons.delete_outline, color: T.danger),
                           ),

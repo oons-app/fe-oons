@@ -376,9 +376,11 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
   }
 
   Future<void> _setDefault(Map a) async {
+    final lang = ref.read(localeCodeProvider);
     try {
       await staffClient.patch('/admin/users/${widget.customerId}/addresses/${idOf(a)}', data: {'isDefault': true});
       _load();
+      if (mounted) v2Toast(context, lang == 'ar' ? 'بقى العنوان الأساسي' : 'Set as default');
     } on ApiException catch (e) {
       if (mounted) v2Toast(context, e.message, error: true);
     }

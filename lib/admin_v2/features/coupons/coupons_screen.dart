@@ -213,9 +213,16 @@ class _CouponsScreenState extends ConsumerState<CouponsScreen> {
   }
 
   Future<void> _toggle(Map c) async {
+    final lang = ref.read(localeCodeProvider);
+    final activating = !_active(c);
     try {
-      await staffClient.patch('/admin/coupons/${idOf(c)}', data: {'active': !_active(c)});
+      await staffClient.patch('/admin/coupons/${idOf(c)}', data: {'active': activating});
       _load();
+      if (mounted) {
+        v2Toast(context, activating
+            ? (lang == 'ar' ? 'اتفعّل الكوبون' : 'Coupon activated')
+            : (lang == 'ar' ? 'اتعطّل الكوبون' : 'Coupon deactivated'));
+      }
     } on ApiException catch (e) {
       if (mounted) v2Toast(context, e.message, error: true);
     }
