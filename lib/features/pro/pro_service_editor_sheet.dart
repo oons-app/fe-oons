@@ -146,7 +146,7 @@ List<Widget> cleaningTaskChecklist({
             Row(
               children: [
                 Expanded(child: Text(roomName, style: const TextStyle(fontWeight: FontWeight.w700, color: Pro.ink))),
-                Text('${toArabicDigits(onCount)}/${toArabicDigits(tasks.length)}', style: const TextStyle(fontFamily: T.mono, fontSize: 12, color: Pro.muted)),
+                Text('${digits(onCount, ar: lang == 'ar')}/${digits(tasks.length, ar: lang == 'ar')}', style: const TextStyle(fontFamily: T.mono, fontSize: 12, color: Pro.muted)),
               ],
             ),
             const SizedBox(height: 8),
@@ -740,7 +740,7 @@ class _ProServiceEditorSheetState extends State<_ProServiceEditorSheet> {
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Text(
-                    '${m['suggestedDur'] ?? (ar ? 'مقترح' : 'Suggested')}: ${toArabicDigits(suggested)} ${ar ? 'د' : 'min'}',
+                    '${m['suggestedDur'] ?? (ar ? 'مقترح' : 'Suggested')}: ${digits(suggested, ar: ar)} ${ar ? 'د' : 'min'}',
                     style: const TextStyle(fontSize: 12, color: Pro.muted),
                   ),
                 ),

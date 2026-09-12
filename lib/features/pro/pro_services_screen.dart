@@ -444,7 +444,7 @@ class _ProServicesScreenState extends ConsumerState<ProServicesScreen> {
             ...preview.take(8).map((e) => Padding(
                   padding: const EdgeInsets.only(bottom: 6),
                   child: Text(
-                    '${e.key.name.of(lang)}: ${toArabicDigits(e.key.priceEgp)} → ${toArabicDigits(e.value)}',
+                    '${e.key.name.of(lang)}: ${digits(e.key.priceEgp, ar: lang == 'ar')} → ${digits(e.value, ar: lang == 'ar')}',
                     style: const TextStyle(fontFamily: T.mono, fontSize: 13),
                   ),
                 )),
@@ -713,7 +713,14 @@ class _ProServicesScreenState extends ConsumerState<ProServicesScreen> {
       Row(
         children: [
           Expanded(child: ProSectionWithHelp('${m['servicesTitle']}', help: '${m['tipList']}')),
-          ProSoftButton(label: '${m['addService']}', onTap: () => _openEditor()),
+          // ProSoftButton renders width: double.infinity internally, so as a
+          // bare Row child (no Expanded/bounded width) it gets unbounded
+          // width constraints and Flutter fails that layout pass — which
+          // took this whole Row down with it, including the title beside
+          // it, leaving a blank gap where both used to render. IntrinsicWidth
+          // gives it a concrete width sized to its own label instead of a
+          // guessed constant, since "addService" varies a lot by language.
+          IntrinsicWidth(child: ProSoftButton(label: '${m['addService']}', onTap: () => _openEditor())),
         ],
       ),
       const SizedBox(height: 10),
@@ -723,9 +730,9 @@ class _ProServicesScreenState extends ConsumerState<ProServicesScreen> {
       const SizedBox(height: 8),
       Row(
         children: [
-          Expanded(child: ProSoftButton(label: '−١٠٪', onTap: () => _bulkPrice(0.9))),
+          Expanded(child: ProSoftButton(label: lang == 'ar' ? '−١٠٪' : '−10%', onTap: () => _bulkPrice(0.9))),
           const SizedBox(width: 8),
-          Expanded(child: ProSoftButton(label: '+١٠٪', onTap: () => _bulkPrice(1.1))),
+          Expanded(child: ProSoftButton(label: lang == 'ar' ? '+١٠٪' : '+10%', onTap: () => _bulkPrice(1.1))),
         ],
       ),
       const SizedBox(height: 14),
@@ -768,7 +775,7 @@ class _ProServicesScreenState extends ConsumerState<ProServicesScreen> {
                 Padding(
                   padding: const EdgeInsetsDirectional.only(end: 8),
                   child: ProChip(
-                    label: '${_categoryLabel(e.key, lang)} (${toArabicDigits(e.value)})',
+                    label: '${_categoryLabel(e.key, lang)} (${digits(e.value, ar: lang == 'ar')})',
                     on: catFilter == e.key,
                     onTap: () => setState(() => catFilter = catFilter == e.key ? null : e.key),
                   ),
@@ -869,9 +876,9 @@ class _ProServicesScreenState extends ConsumerState<ProServicesScreen> {
     final meta = d.isCleaning
         ? cleaningSizeMeta(fromSqm: d.sizeFromSqm, toSqm: d.sizeToSqm, workers: d.workerCount, ar: ar)
         : [
-            if (d.duration > 0) '${toArabicDigits(d.duration)}${ar ? ' د' : ' min'}',
-            if (price > 0) '${toArabicDigits(price)} ${ar ? 'ج.م' : 'EGP'}',
-            if (net != null) '· ${m['net']} ${toArabicDigits(net)}',
+            if (d.duration > 0) '${digits(d.duration, ar: ar)}${ar ? ' د' : ' min'}',
+            if (price > 0) '${digits(price, ar: ar)} ${ar ? 'ج.م' : 'EGP'}',
+            if (net != null) '· ${m['net']} ${digits(net, ar: ar)}',
           ].join(' · ');
     final hours = d.duration >= 60 ? (d.duration / 60) : d.duration;
     final durLabel = d.duration >= 60
@@ -909,13 +916,13 @@ class _ProServicesScreenState extends ConsumerState<ProServicesScreen> {
             if (!d.isCleaning && price > 0 && net != null) ...[
               const SizedBox(height: 4),
               Text(
-                '${toArabicDigits(price)} ${ar ? 'ج.م' : 'EGP'} · ${m['net']} ${toArabicDigits(net)}',
+                '${digits(price, ar: ar)} ${ar ? 'ج.م' : 'EGP'} · ${m['net']} ${digits(net, ar: ar)}',
                 style: const TextStyle(fontFamily: T.mono, fontSize: 12, color: Pro.soft),
               ),
             ],
             if (travel > 0) ...[
               const SizedBox(height: 4),
-              Text('${m['travel']} ${toArabicDigits(travel)} ${ar ? 'ج.م' : 'EGP'}', style: const TextStyle(fontSize: 12, color: Pro.muted)),
+              Text('${m['travel']} ${digits(travel, ar: ar)} ${ar ? 'ج.م' : 'EGP'}', style: const TextStyle(fontSize: 12, color: Pro.muted)),
             ],
             if (d.benefits.isNotEmpty) ...[
               const SizedBox(height: 8),
@@ -1003,7 +1010,7 @@ class _ProServicesScreenState extends ConsumerState<ProServicesScreen> {
     final counts = tiers.map((t) => (18 - t.excludedTaskIds.length)).toSet();
     final diverges = counts.length > 1;
     final packageLabel = diverges
-        ? '${m['tierPackageLine']} ${toArabicDigits(counts.reduce((a, b) => a < b ? a : b))}–${toArabicDigits(counts.reduce((a, b) => a > b ? a : b))} ${ar ? 'مهمة' : 'tasks'}'
+        ? '${m['tierPackageLine']} ${digits(counts.reduce((a, b) => a < b ? a : b), ar: ar)}–${digits(counts.reduce((a, b) => a > b ? a : b), ar: ar)} ${ar ? 'مهمة' : 'tasks'}'
         : '${m['tierPackageLine']} ${pluralTasks(counts.isEmpty ? 18 : counts.first, ar: ar)}';
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
@@ -1137,7 +1144,7 @@ class _ProServicesScreenState extends ConsumerState<ProServicesScreen> {
                 Expanded(child: _tierPriceField(t)),
                 const SizedBox(width: 8),
                 if (net != null)
-                  Text('${m['net']} ${toArabicDigits(net)}', style: const TextStyle(fontFamily: T.mono, fontSize: 12, color: Pro.soft)),
+                  Text('${m['net']} ${digits(net, ar: ar)}', style: const TextStyle(fontFamily: T.mono, fontSize: 12, color: Pro.soft)),
                 IconButton(
                   onPressed: () => setState(() => _confirmDeleteTierId = t.id),
                   icon: const Icon(Icons.delete_outline, size: 18, color: Pro.muted),
@@ -2048,7 +2055,7 @@ class _CategoryServicesSheetState extends State<_CategoryServicesSheet> {
                 final label = name.isEmpty ? _catLabel : name;
                 final meta = d.isCleaning
                     ? cleaningSizeMeta(fromSqm: d.sizeFromSqm, toSqm: d.sizeToSqm, workers: d.workerCount, ar: ar)
-                    : '${toArabicDigits(d.duration)}${ar ? ' د' : ' min'} · ${toArabicDigits(d.priceEgp)} ${ar ? 'ج.م' : 'EGP'}';
+                    : '${digits(d.duration, ar: ar)}${ar ? ' د' : ' min'} · ${digits(d.priceEgp, ar: ar)} ${ar ? 'ج.م' : 'EGP'}';
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: InkWell(

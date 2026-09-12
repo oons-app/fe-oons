@@ -15,6 +15,14 @@ String toArabicDigits(Object? value) {
   return buf.toString();
 }
 
+/// toArabicDigits itself has no language awareness — it converts whatever
+/// you give it. Several call sites branch the surrounding unit/currency
+/// text by `ar` (' EGP' vs 'ج.م') but call toArabicDigits unconditionally,
+/// so an English-language screen still shows Arabic-Indic numerals mixed
+/// into otherwise-English copy. Use this wherever `ar` is already in
+/// scope instead of calling toArabicDigits directly.
+String digits(Object? value, {required bool ar}) => ar ? toArabicDigits(value) : '$value';
+
 String toWesternDigits(String input) {
   final buf = StringBuffer();
   for (final cu in input.runes) {

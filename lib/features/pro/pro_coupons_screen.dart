@@ -103,7 +103,7 @@ class _ProCouponsScreenState extends ConsumerState<ProCouponsScreen> {
     final ar = lang == 'ar';
     final percent = _isPercent(c);
     final amount = _num(c['amount']);
-    final valueLabel = percent ? '${toArabicDigits(amount)}%' : '${toArabicDigits(amount ~/ 100)} ${ar ? 'ج.م' : 'EGP'}';
+    final valueLabel = percent ? '${digits(amount, ar: ar)}%' : '${digits(amount ~/ 100, ar: ar)} ${ar ? 'ج.م' : 'EGP'}';
     final redeemed = _num(c['redeemedCount']);
     final limit = _num(c['maxRedemptions']);
     final ends = c['endsAt'];
@@ -132,7 +132,7 @@ class _ProCouponsScreenState extends ConsumerState<ProCouponsScreen> {
               Text(
                 [
                   valueLabel,
-                  '${ar ? 'استخدام' : 'used'} ${toArabicDigits(redeemed)}${limit > 0 ? '/${toArabicDigits(limit)}' : ''}',
+                  '${ar ? 'استخدام' : 'used'} ${digits(redeemed, ar: ar)}${limit > 0 ? '/${digits(limit, ar: ar)}' : ''}',
                   if (ends != null) '${ar ? 'تنتهي' : 'ends'} ${_fmtDate(ends)}',
                 ].join(' · '),
                 style: const TextStyle(fontSize: 12, color: Pro.muted, fontFamily: T.mono),
