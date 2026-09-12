@@ -672,37 +672,44 @@ class ProviderScreen extends ConsumerWidget {
                           ],
                         ),
                       ),
-                      const ClientDivider(),
-                      Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            ClientKicker('${pcopy['portfolio']}'),
-                            const SizedBox(height: 12),
-                            GridView.count(
-                              crossAxisCount: 3,
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              mainAxisSpacing: 6,
-                              crossAxisSpacing: 6,
-                              children: List.generate(6, (i) {
-                                final shots = Face.shotsOf(service: p.service, portfolio: p.portfolio);
-                                return InkWell(
-                                  onTap: () => openGallery(context, shots, index: i % shots.length),
-                                  child: Container(
-                                    decoration: BoxDecoration(border: Border.all(color: Client.ink, width: Client.rule)),
-                                    clipBehavior: Clip.hardEdge,
-                                    child: MediaThumb(shots[i % shots.length]),
-                                  ),
-                                );
-                              }),
-                            ),
-                            const SizedBox(height: 10),
-                            ClientKicker('${pcopy['portfolioNote']}'),
-                          ],
+                      // Only ever show photos this provider actually uploaded — no
+                      // stock/demo fallback. A blank portfolio used to fall back to
+                      // generic stock shots (and even other providers' portraits),
+                      // presented to shoppers as if they were this provider's real
+                      // work. Now the whole section is simply hidden when she has
+                      // nothing real to show.
+                      if (p.portfolio.isNotEmpty) ...[
+                        const ClientDivider(),
+                        Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              ClientKicker('${pcopy['portfolio']}'),
+                              const SizedBox(height: 12),
+                              GridView.count(
+                                crossAxisCount: 3,
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                mainAxisSpacing: 6,
+                                crossAxisSpacing: 6,
+                                children: List.generate(p.portfolio.length, (i) {
+                                  return InkWell(
+                                    onTap: () => openGallery(context, p.portfolio, index: i),
+                                    child: Container(
+                                      decoration: BoxDecoration(border: Border.all(color: Client.ink, width: Client.rule)),
+                                      clipBehavior: Clip.hardEdge,
+                                      child: MediaThumb(p.portfolio[i]),
+                                    ),
+                                  );
+                                }),
+                              ),
+                              const SizedBox(height: 10),
+                              ClientKicker('${pcopy['portfolioNote']}'),
+                            ],
+                          ),
                         ),
-                      ),
+                      ],
                       Padding(
                         padding: const EdgeInsets.all(20),
                         child: Column(

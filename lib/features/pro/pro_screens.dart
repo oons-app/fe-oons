@@ -1421,12 +1421,10 @@ class _ProAccountScreenState extends ConsumerState<ProAccountScreen> {
     final me = ref.watch(sessionProvider).provider;
     _prime(me);
     // Her own upload manager — must show only what she actually uploaded.
-    // Face.shotsOf falls back to generic stock/demo shots (hair.png, other
-    // providers' portraits, a stock living room) when portfolio is empty;
-    // that fallback belongs on the customer-facing browse/profile preview
-    // (browse_screens.dart) so an empty profile doesn't look bare to
-    // shoppers — it must never leak into her own editor, where it reads as
-    // "these are your photos" for uploads she never made.
+    // (The stock/demo-shot fallback that used to exist for an empty
+    // portfolio has been removed everywhere, including the customer-facing
+    // browse/profile preview — it presented other providers' portraits and
+    // generic stock photos as if they were a real provider's own work.)
     final shots = me?.portfolio ?? const <String>[];
     final vetted = me?.vetted == true;
 

@@ -193,17 +193,6 @@ class MediaThumb extends StatelessWidget {
   }
 }
 
-List<String> portfolioOf(ProviderLike p) {
-  if (p.shots.isNotEmpty) return p.shots;
-  return Face.work(p.service);
-}
-
-class ProviderLike {
-  ProviderLike(this.service, this.shots);
-  final String service;
-  final List<String> shots;
-}
-
 void openGallery(BuildContext context, List<String> shots, {int index = 0}) {
   if (shots.isEmpty) return;
   Navigator.of(context).push(PageRouteBuilder(
@@ -275,36 +264,7 @@ class Face extends StatelessWidget {
     'nour': 'assets/images/providers/nour.png',
   };
 
-  static List<String> shotsOf({required String service, List<String> portfolio = const []}) {
-    if (portfolio.isNotEmpty) return portfolio;
-    return work(service);
-  }
-
   static const clientKey = 'client';
-
-  static List<String> work(String service) {
-    switch (service) {
-      case 'chef':
-        return const [
-          'assets/images/work/food.png',
-          'assets/images/providers/heba.png',
-          'assets/images/work/home.png',
-        ];
-      case 'cleaning':
-        return const [
-          'assets/images/work/home.png',
-          'assets/images/providers/doaa.png',
-          'assets/images/work/food.png',
-        ];
-      default:
-        return const [
-          'assets/images/work/hair.png',
-          'assets/images/providers/salma.png',
-          'assets/images/providers/nourhan.png',
-          'assets/images/work/home.png',
-        ];
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
