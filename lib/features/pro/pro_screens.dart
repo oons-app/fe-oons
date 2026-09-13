@@ -1225,7 +1225,38 @@ class _ProJobScreenState extends ConsumerState<ProJobScreen> {
     if (data?.booking.entryPhotoUrl != null && data!.booking.entryPhotoUrl!.isNotEmpty) {
       return;
     }
-    final file = await ImagePicker().pickImage(source: ImageSource.camera, maxWidth: 1600);
+    XFile? file;
+    try {
+      file = await ImagePicker().pickImage(source: ImageSource.camera, maxWidth: 1600);
+    } catch (_) {
+      // Camera capture on the web depends on the browser/device actually
+      // supporting it and granting permission — when it doesn't, this used
+      // to throw with nothing shown to her at all, which reads exactly like
+      // "the button does nothing." Offer the one thing that reliably works
+      // everywhere instead of leaving her stuck.
+      if (!mounted) return;
+      final useGallery = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(lang == 'ar' ? 'الكاميرا مش متاحة' : 'Camera unavailable'),
+          content: Text(lang == 'ar'
+              ? 'مقدرناش نفتح الكاميرا على الجهاز ده. تحبي ترفعي صورة بدل ما تاخديها دلوقتي؟'
+              : "Couldn't open the camera on this device. Upload a photo instead?"),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(lang == 'ar' ? 'إلغاء' : 'Cancel')),
+            TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(lang == 'ar' ? 'ارفعي صورة' : 'Upload a photo')),
+          ],
+        ),
+      );
+      if (useGallery != true) return;
+      try {
+        file = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 1600);
+      } catch (e2) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendlyError(e2, lang))));
+        return;
+      }
+    }
     if (file == null) return;
     setState(() => busy = true);
     try {
@@ -1239,8 +1270,13 @@ class _ProJobScreenState extends ConsumerState<ProJobScreen> {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${p['doneArrive']}')));
       }
     } catch (e) {
+      // GeoException (location off / permission denied) has its own clear,
+      // actionable copy via geoMessage — friendlyError doesn't know about
+      // it and was falling back to a generic "something went wrong", which
+      // is how a plain "turn on Location Services" fix read as the whole
+      // at-the-door flow being broken.
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendlyError(e, lang))));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e is GeoException ? geoMessage(e, lang) : friendlyError(e, lang))));
       }
     } finally {
       if (mounted) setState(() => busy = false);
