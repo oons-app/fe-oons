@@ -15,6 +15,28 @@ import 'package:oons/admin_v2/ui/grid_table.dart';
 import 'package:oons/admin_v2/ui/list_view.dart';
 import 'package:oons/data/api.dart';
 
+/// Maps a raw backend ProviderCategoryStatus key to the label this screen's
+/// filter/count/pill logic groups it under. Pulled out to a top-level
+/// function (rather than inline in the State, as it was) so it's directly
+/// unit-testable — this exact mapping has already had two different bugs
+/// (a literal "active" never matching "approved" wording, then a fix for
+/// that broadly matching the substring "approv" and mislabeling the
+/// genuinely-pending "pending_addition_approval" as Approved too).
+String categoryRequestStatusLabel(String rawStatus) {
+  final s = rawStatus.toLowerCase();
+  // The real backend key for an approved grant is the exact string "active"
+  // (models.PCActive), never literally "approved" — checking for that word
+  // never matched. A substring check for "approv" was tried instead, but
+  // "pending_addition_approval" contains "approv" too (it's pending an
+  // approval, not carrying one) and got mislabeled as Approved right along
+  // with genuinely active ones. Exact match only.
+  if (s == 'active') return 'Approved';
+  // "rejected" has no such collision — nothing else in this status set
+  // contains "reject" as a substring, so this stays safe.
+  if (s.contains('reject')) return 'Rejected';
+  return 'Requested';
+}
+
 class CategoryRequestsScreen extends ConsumerStatefulWidget {
   const CategoryRequestsScreen({super.key});
 
@@ -67,15 +89,7 @@ class _CategoryRequestsScreenState extends ConsumerState<CategoryRequestsScreen>
     }
   }
 
-  String _status(Map r) {
-    final s = '${r['status']}'.toLowerCase();
-    // The real backend key for an approved grant is "active" (models.PCActive),
-    // never literally "approved" — this never matched, so every approved
-    // category request was silently mislabeled/miscounted as "Requested".
-    if (s.contains('approv') || s == 'active') return 'Approved';
-    if (s.contains('reject')) return 'Rejected';
-    return 'Requested';
-  }
+  String _status(Map r) => categoryRequestStatusLabel('${r['status']}');
 
   int _count(String f) => f == 'All' ? requests.length : requests.where((r) => _status(r) == f).length;
 
