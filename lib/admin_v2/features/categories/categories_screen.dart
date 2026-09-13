@@ -79,6 +79,13 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
 
   int _count(String f) => f == 'All' ? categories.length : categories.where((c) => _status(c) == f).length;
 
+  String _parentName(Map c, String lang) {
+    final pid = '${c['parentId'] ?? ''}';
+    if (pid.isEmpty) return '—';
+    final parent = categories.where((cat) => idOf(cat) == pid).firstOrNull;
+    return parent == null ? '—' : locName(parent['name'], lang);
+  }
+
   List<Map<String, dynamic>> get _rows {
     var list = categories;
     if (filter != 'All') list = list.where((c) => _status(c) == filter).toList();
@@ -95,6 +102,13 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
     final ar = TextEditingController(text: '${asMap(c?['name'])?['ar'] ?? ''}');
     final slug = TextEditingController(text: '${c?['slug'] ?? ''}');
     var vertical = '${c?['vertical'] ?? 'beauty'}';
+    var parentId = '${c?['parentId'] ?? ''}';
+    // A category becomes a selectable service name under its parent, rather
+    // than its own specialty a provider must separately request (see
+    // pro_catalog.go's nameCatalog) — e.g. "Haircut" under "Hair Salon".
+    List<Map<String, dynamic>> topLevelIn(String v) => categories
+        .where((cat) => '${cat['vertical']}' == v && '${cat['parentId'] ?? ''}'.isEmpty && idOf(cat) != idOf(c ?? {}))
+        .toList();
     try {
       final ok = await v2Form(
         context,
@@ -113,7 +127,23 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
               child: DropdownButtonFormField<String>(
                 initialValue: vertical,
                 items: [for (final v in _verticals) DropdownMenuItem(value: v.$1, child: Text(v.$2))],
-                onChanged: (v) => vertical = v ?? 'beauty',
+                onChanged: (v) => setLocal(() {
+                  vertical = v ?? 'beauty';
+                  // A parent from a different vertical no longer applies.
+                  if (topLevelIn(vertical).every((cat) => idOf(cat) != parentId)) parentId = '';
+                }),
+              ),
+            ),
+            const SizedBox(height: 12),
+            V2FormField(
+              label: lang == 'ar' ? 'الفئة الأم (اختياري)' : 'Parent category (optional)',
+              child: DropdownButtonFormField<String>(
+                initialValue: parentId.isEmpty ? '' : parentId,
+                items: [
+                  DropdownMenuItem(value: '', child: Text(lang == 'ar' ? 'بلا — فئة مستقلة' : 'None — top-level')),
+                  for (final p in topLevelIn(vertical)) DropdownMenuItem(value: idOf(p), child: Text(locName(p['name'], lang))),
+                ],
+                onChanged: (v) => setLocal(() => parentId = v ?? ''),
               ),
             ),
           ],
@@ -131,6 +161,7 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
         'name': {'en': en.text.trim(), 'ar': ar.text.trim()},
         'slug': slug.text.trim(),
         'vertical': vertical,
+        'parentId': parentId,
       };
       try {
         if (c == null) {
@@ -235,6 +266,7 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
       ],
       columns: [
         V2Col(lang == 'ar' ? 'الفئة' : 'Category', flex: 1),
+        V2Col(lang == 'ar' ? 'الفئة الأم' : 'Parent', flex: 1),
         V2Col('Slug', flex: 1),
         V2Col(lang == 'ar' ? 'الخدمات' : 'Services', fixed: 90),
         V2Col(lang == 'ar' ? 'الحالة' : 'Status', fixed: 110),
@@ -245,6 +277,8 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
             cells: [
               Text(locName(visible[i]['name'], lang),
                   maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+              Text(_parentName(visible[i], lang),
+                  maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12.5, color: Ops.inkSoft)),
               Text('${visible[i]['slug'] ?? ''}',
                   maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12.5, fontFamily: Ops.mono, color: Ops.inkSoft)),
               Text('${asInt(visible[i]['providerCount'] ?? visible[i]['serviceCount'])}',
