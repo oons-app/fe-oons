@@ -68,7 +68,7 @@ class ReviewCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Face(id: review.providerId, ini: '', size: 36),
+                Face(id: review.providerId, ini: review.providerInitials.of(lang), photo: review.providerPhoto, size: 36),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Column(

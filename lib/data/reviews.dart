@@ -5,6 +5,8 @@ class Review {
   const Review({
     required this.providerId,
     required this.providerName,
+    required this.providerPhoto,
+    required this.providerInitials,
     required this.author,
     required this.area,
     required this.stars,
@@ -15,6 +17,8 @@ class Review {
   });
   final String providerId;
   final Loc providerName;
+  final String? providerPhoto;
+  final Loc providerInitials;
   final Loc author;
   final Loc area;
   final int stars;
@@ -38,6 +42,8 @@ class Review {
     return Review(
       providerId: '${j['providerId']}',
       providerName: Loc.fromJson(j['providerName'] ?? {}),
+      providerPhoto: j['providerPhoto'] as String?,
+      providerInitials: Loc.fromJson(j['providerInitials'] ?? {}),
       author: Loc.fromJson(j['author'] ?? {}),
       area: Loc(areaName(areaId, 'en'), areaName(areaId, 'ar')),
       stars: (j['stars'] as num?)?.toInt() ?? 0,
