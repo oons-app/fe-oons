@@ -4,14 +4,21 @@
   <link rel="preconnect" href="https://api.oons.app" crossorigin>
   <link rel="dns-prefetch" href="https://www.googletagmanager.com">
 
-  <!-- Consent Mode v2 (Advanced) — must run before Google tag config -->
-  <script src="consent.js"></script>
-  <!-- Google tag (gtag.js) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=GT-TQT5V342"></script>
-  <script src="gtag_boot.js" defer></script>
-  <script src="consent_banner.js" defer></script>
-
   <!--
+    <base> must come before any relative-URL <script src> below it — a
+    plain <a href="/p/slug"> link (the provider landing page's own "Book
+    now" button, not a client-side SPA route push) loads this document
+    fresh with the browser's URL already at /p/slug. A script tag's src is
+    resolved against the document's own URL the moment the parser reaches
+    it, base-href or not, if <base> hasn't been parsed yet — so
+    consent.js/gtag_boot.js/consent_banner.js all resolved to
+    /p/consent.js etc. and failed to load on every such deep link,
+    "Refused to execute script ... MIME type ('text/html')" (Caddy's SPA
+    fallback serving index.html for the nonexistent path). Harmless on
+    lady.oons.app, where every session starts at "/" and everything after
+    is client-side routing — this only ever bit a *.oons.app vanity
+    subdomain's own booking link.
+
     If you are serving your web app in a path other than the root, change the
     href value below to reflect the base path you are serving from.
 
@@ -25,6 +32,13 @@
     the `--base-href` argument provided to `flutter build`.
   -->
   <base href="$FLUTTER_BASE_HREF">
+
+  <!-- Consent Mode v2 (Advanced) — must run before Google tag config -->
+  <script src="consent.js"></script>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=GT-TQT5V342"></script>
+  <script src="gtag_boot.js" defer></script>
+  <script src="consent_banner.js" defer></script>
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
