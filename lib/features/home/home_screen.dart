@@ -385,7 +385,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             decoration: BoxDecoration(border: Border.all(color: Client.ink, width: Client.rule)),
                             child: Row(
                               children: [
-                                Face(id: pid, ini: ini.of(lang), size: 44),
+                                Face(id: pid, ini: ini.of(lang), photo: r['photo'] as String?, size: 44),
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Column(
