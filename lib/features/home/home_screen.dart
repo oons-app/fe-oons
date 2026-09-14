@@ -250,7 +250,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             decoration: BoxDecoration(border: Border.all(color: Client.ink, width: Client.rule)),
                             child: Row(
                               children: [
-                                _monoAvatar(ini.of(lang)),
+                                Face(ini: ini.of(lang), photo: r['photo'] as String?, size: 48),
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Column(
@@ -526,16 +526,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ],
         );
       },
-    );
-  }
-
-  Widget _monoAvatar(String ini) {
-    return Container(
-      width: 48,
-      height: 48,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(color: Client.sand, border: Border.all(color: Client.ink, width: Client.rule)),
-      child: Text(ini, style: const TextStyle(fontFamily: T.mono, fontSize: 13, fontWeight: FontWeight.w600, color: Client.ink)),
     );
   }
 
