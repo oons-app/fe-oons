@@ -7,28 +7,19 @@ import UserNotifications
   private static var pushChannel: FlutterMethodChannel?
   private static var pendingToken: String?
   private var privacyOverlay: UIView?
-  private var captureObserver: NSObjectProtocol?
 
   override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
     UNUserNotificationCenter.current().delegate = self
-    // APNs is registered only after Apple Push entitlements and a .p8 key exist.
-    captureObserver = NotificationCenter.default.addObserver(
-      forName: UIScreen.capturedDidChangeNotification,
-      object: nil,
-      queue: .main
-    ) { [weak self] _ in
-      self?.updateCaptureProtection()
+    UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, _ in
+      guard granted else { return }
+      DispatchQueue.main.async {
+        application.registerForRemoteNotifications()
+      }
     }
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
-  }
-
-  deinit {
-    if let captureObserver {
-      NotificationCenter.default.removeObserver(captureObserver)
-    }
   }
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
@@ -45,15 +36,11 @@ import UserNotifications
     if let token = AppDelegate.pendingToken {
       channel.invokeMethod("token", arguments: token)
     }
-    DispatchQueue.main.async { [weak self] in
-      self?.updateCaptureProtection()
-    }
   }
 
   override func applicationDidBecomeActive(_ application: UIApplication) {
     super.applicationDidBecomeActive(application)
     hidePrivacyOverlay()
-    updateCaptureProtection()
   }
 
   override func applicationWillResignActive(_ application: UIApplication) {
@@ -83,14 +70,6 @@ import UserNotifications
     UIApplication.shared.connectedScenes
       .compactMap { $0 as? UIWindowScene }
       .flatMap { $0.windows }
-  }
-
-  private func updateCaptureProtection() {
-    if UIScreen.main.isCaptured {
-      showPrivacyOverlay()
-    } else if UIApplication.shared.applicationState == .active {
-      hidePrivacyOverlay()
-    }
   }
 
   private func showPrivacyOverlay() {
