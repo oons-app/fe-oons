@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:oons/admin_v2/chrome/modal.dart';
 import 'package:oons/admin_v2/chrome/toast.dart';
 import 'package:oons/admin_v2/data/maps.dart';
@@ -15,11 +16,16 @@ import 'package:oons/admin_v2/ui/buttons.dart';
 import 'package:oons/core/format.dart';
 import 'package:oons/data/api.dart';
 
+// Keys must match the backend's BookingStatus enum (models.bookingStatusMeta)
+// exactly — adminForceStatus rejects anything else with a 400. 'confirmed'
+// and bare 'cancelled' aren't real statuses (the real ones are 'paid' and
+// 'cancelled_client'); sending those always 400'd, which is why staff
+// couldn't force a booking to "Confirmed" or "Cancelled by client" before.
 const _forceStatuses = <(String key, String en, String ar)>[
-  ('confirmed', 'Confirmed', 'مؤكد'),
+  ('paid', 'Confirmed', 'مؤكد'),
   ('in_progress', 'In progress', 'جارية'),
   ('completed', 'Completed', 'مكتملة'),
-  ('cancelled', 'Cancelled by client', 'ملغاة'),
+  ('cancelled_client', 'Cancelled by client', 'ملغاة'),
 ];
 
 class BookingDetailScreen extends ConsumerStatefulWidget {
@@ -84,6 +90,67 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen> {
   }
 
   String bookingRefOf() => booking == null ? '' : bookingRef(booking!);
+
+  Future<void> _confirmPayment() async {
+    final lang = ref.read(localeCodeProvider);
+    XFile? receipt;
+    final ok = await v2Form(
+      context,
+      title: lang == 'ar' ? 'تأكيد الدفع' : 'Confirm payment',
+      confirmLabel: lang == 'ar' ? 'تأكيد الدفع' : 'Confirm payment',
+      bodyBuilder: (ctx, setLocal) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              lang == 'ar'
+                  ? 'ده لتحويل وصل مباشرة برة Paymob (زي إنستاباي على حساب أُنس). أرفقي لقطة المعاملة عشان تتسجل مع الحجز.'
+                  : 'For a transfer that reached Oons outside Paymob (e.g. straight InstaPay). Attach the transaction screenshot — it\'s stored on the booking.',
+              style: const TextStyle(fontSize: 12.5, color: Ops.mutedSoft, height: 1.5),
+            ),
+            const SizedBox(height: 12),
+            V2FormField(
+              label: lang == 'ar' ? 'لقطة المعاملة (مطلوبة)' : 'Transaction screenshot (required)',
+              child: OutlinedButton.icon(
+                onPressed: () async {
+                  final f = await ImagePicker().pickImage(source: ImageSource.gallery);
+                  setLocal(() => receipt = f);
+                },
+                icon: const Icon(Icons.attach_file, size: 16),
+                label: Text(receipt == null
+                    ? (lang == 'ar' ? 'أرفقي لقطة الشاشة' : 'Attach screenshot')
+                    : (lang == 'ar' ? 'تم الإرفاق' : 'Attached')),
+              ),
+            ),
+          ],
+        );
+      },
+      onValidate: () {
+        if (receipt == null) {
+          v2Toast(context, lang == 'ar' ? 'اللقطة مطلوبة' : 'Screenshot is required', error: true);
+          return false;
+        }
+        return true;
+      },
+    );
+    if (!ok || receipt == null) return;
+    try {
+      final bytes = await receipt!.readAsBytes();
+      await staffClient.postMultipart(
+        '/admin/bookings/${widget.bookingId}/confirm-payment',
+        fields: const {},
+        fileField: 'receipt',
+        bytes: bytes,
+        filename: receipt!.name.isNotEmpty ? receipt!.name : 'receipt.jpg',
+      );
+      if (mounted) {
+        v2Toast(context, lang == 'ar' ? 'تم تأكيد الدفع' : 'Payment confirmed');
+        _load();
+      }
+    } on ApiException catch (e) {
+      if (mounted) v2Toast(context, e.message, error: true);
+    }
+  }
 
   Future<void> _resolveDispute(String outcome, String title, String detail, {bool danger = false}) async {
     final lang = ref.read(localeCodeProvider);
@@ -281,7 +348,53 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen> {
         ),
     ];
 
+    final receiptUrl = '${b['paymentReceiptUrl'] ?? ''}';
     final right = <Widget>[
+      if (canWrite && ('${b['status']}' == 'pending_payment' || receiptUrl.isNotEmpty))
+        V2SectionCard(
+          title: lang == 'ar' ? 'الدفع' : 'Payment',
+          subtitle: receiptUrl.isNotEmpty
+              ? (lang == 'ar' ? 'تم تأكيده يدويًا' : 'Confirmed manually')
+              : (lang == 'ar' ? 'بانتظار الدفع' : 'Awaiting payment'),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if ('${b['status']}' == 'pending_payment')
+                V2Btn(
+                  label: lang == 'ar' ? 'تأكيد الدفع' : 'Confirm payment',
+                  kind: V2BtnKind.primary,
+                  expand: true,
+                  onPressed: _confirmPayment,
+                ),
+              if (receiptUrl.isNotEmpty) ...[
+                if ('${b['status']}' == 'pending_payment') const SizedBox(height: 7),
+                V2Btn(
+                  label: lang == 'ar' ? 'عرض إيصال المعاملة' : 'View transaction screenshot',
+                  kind: V2BtnKind.ghost,
+                  expand: true,
+                  onPressed: () async {
+                    final bytes = await staffClient.uploadBytes(receiptUrl);
+                    if (bytes == null || !context.mounted) {
+                      if (context.mounted) {
+                        v2Toast(context, lang == 'ar' ? 'تعذر عرض الإيصال' : 'Could not load the screenshot', error: true);
+                      }
+                      return;
+                    }
+                    showDialog<void>(
+                      context: context,
+                      builder: (_) => Dialog(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 640, maxHeight: 820),
+                          child: InteractiveViewer(child: Image.memory(bytes, fit: BoxFit.contain)),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ],
+          ),
+        ),
       if (canWrite)
         Container(
           padding: const EdgeInsets.all(17),
@@ -307,7 +420,7 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen> {
                     _StatusButton(
                       label: lang == 'ar' ? s.$3 : s.$2,
                       current: status.toLowerCase() == (lang == 'ar' ? s.$3 : s.$2).toLowerCase(),
-                      cancel: s.$1 == 'cancelled',
+                      cancel: s.$1 == 'cancelled_client',
                       onTap: () => _forceStatus(s.$1, lang == 'ar' ? s.$3 : s.$2),
                     ),
                 ],

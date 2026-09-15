@@ -306,8 +306,20 @@ String statusLabel(String? status, String lang) {
       return lang == 'ar' ? 'مكتملة' : 'Completed';
     case 'cancelled':
     case 'canceled':
-    case 'cancelled_by_client':
-      return lang == 'ar' ? 'ملغاة' : 'Cancelled';
+    case 'cancelled_client':
+      return lang == 'ar' ? 'ملغاة' : 'Cancelled by client';
+    case 'cancelled_provider':
+      return lang == 'ar' ? 'ألغتها المهنية' : 'Cancelled by provider';
+    case 'disputed':
+      return lang == 'ar' ? 'محل نزاع' : 'Disputed';
+    case 'refunded':
+      return lang == 'ar' ? 'مُسترد' : 'Refunded';
+    case 'rescheduled':
+      return lang == 'ar' ? 'أُجّلت' : 'Rescheduled';
+    case 'released':
+      return lang == 'ar' ? 'أُطلقت' : 'Released';
+    case 'no_show_client':
+      return lang == 'ar' ? 'العميلة لم تحضر' : 'Client no-show';
     case 'active':
       return lang == 'ar' ? 'نشطة' : 'Active';
     case 'locked':
@@ -357,10 +369,19 @@ V2Tone statusTone(String? status) {
       return V2Tone.warn;
     case 'cancelled':
     case 'canceled':
+    case 'cancelled_client':
+    case 'cancelled_provider':
+    case 'disputed':
+    case 'no_show_client':
     case 'rejected':
     case 'suspended':
     case 'open':
       return V2Tone.bad;
+    case 'rescheduled':
+      return V2Tone.warn;
+    case 'refunded':
+    case 'released':
+      return V2Tone.neutral;
     default:
       return V2Tone.neutral;
   }
