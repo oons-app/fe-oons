@@ -81,12 +81,16 @@ class AlertInbox extends StateNotifier<List<InboxAlert>> {
   void upsert(InboxAlert row) => apply([row]);
 }
 
-final alertInboxProvider = StateNotifierProvider<AlertInbox, List<InboxAlert>>((ref) => AlertInbox());
+final alertInboxProvider =
+    StateNotifierProvider<AlertInbox, List<InboxAlert>>((ref) => AlertInbox());
 
-List<InboxAlert> mergeInbox(List<InboxAlert> current, List<InboxAlert> incoming) {
+List<InboxAlert> mergeInbox(
+    List<InboxAlert> current, List<InboxAlert> incoming) {
   final map = <String, InboxAlert>{};
   void put(InboxAlert r) {
-    final k = r.id.isNotEmpty ? r.id : '${r.title}|${r.body}|${r.at?.millisecondsSinceEpoch ?? 0}';
+    final k = r.id.isNotEmpty
+        ? r.id
+        : '${r.title}|${r.body}|${r.at?.millisecondsSinceEpoch ?? 0}';
     map[k] = r;
   }
 
@@ -107,13 +111,18 @@ List<InboxAlert> mergeInbox(List<InboxAlert> current, List<InboxAlert> incoming)
 }
 
 List<InboxAlert> freshAlerts(List<InboxAlert> prev, List<InboxAlert> next) {
-  final seen = {for (final r in prev) if (r.id.isNotEmpty) r.id};
+  final seen = {
+    for (final r in prev)
+      if (r.id.isNotEmpty) r.id
+  };
   return next.where((r) => r.id.isNotEmpty && !seen.contains(r.id)).toList();
 }
 
 void openAlertVisit(BuildContext context, WidgetRef ref, String? bookingId) {
   if (bookingId == null || bookingId.isEmpty) return;
-  final path = ref.read(sessionProvider).isProvider ? '/pro/job/$bookingId' : '/visit/$bookingId';
+  final path = ref.read(sessionProvider).isProvider
+      ? '/pro/job/$bookingId'
+      : '/visit/$bookingId';
   context.push(path);
 }
 
@@ -140,8 +149,15 @@ class PushController {
 
   bool _sseLive = false;
   bool _polling = false;
+  String? _sseToken;
+  int _sseBackoffSec = 3;
 
   Future<void> start() async {
+    final token = _ref.read(sessionProvider).token;
+    if (_alive && _sseLive && token != null && token == _sseToken) {
+      unawaited(_pollInbox());
+      return;
+    }
     stop();
     _alive = true;
     await _initLocal();
@@ -152,12 +168,15 @@ class PushController {
         }
       });
       final existing = await _channel.invokeMethod<String>('getToken');
-      if (existing != null && existing.isNotEmpty) await _registerToken(existing);
+      if (existing != null && existing.isNotEmpty) {
+        await _registerToken(existing);
+      }
     } catch (_) {}
     _firstPoll = true;
     await _pollInbox();
     // SSE carries live alerts; HTTP poll is a slow backup (was 4s and made the lab feel laggy).
-    _poll = Timer.periodic(const Duration(seconds: 25), (_) => unawaited(_pollInbox()));
+    _poll = Timer.periodic(
+        const Duration(seconds: 25), (_) => unawaited(_pollInbox()));
     unawaited(_listenSse());
   }
 
@@ -170,6 +189,8 @@ class PushController {
     _hideToast = null;
     _toasted.clear();
     _firstPoll = true;
+    _sseToken = null;
+    _sseBackoffSec = 3;
     _ref.read(alertInboxProvider.notifier).clear();
     _ref.read(alertToastProvider.notifier).state = null;
   }
@@ -192,9 +213,11 @@ class PushController {
       requestBadgePermission: true,
       requestSoundPermission: true,
     );
-    await _plugin.initialize(const InitializationSettings(android: android, iOS: ios));
     await _plugin
-        .resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>()
+        .initialize(const InitializationSettings(android: android, iOS: ios));
+    await _plugin
+        .resolvePlatformSpecificImplementation<
+            IOSFlutterLocalNotificationsPlugin>()
         ?.requestPermissions(alert: true, badge: true, sound: true);
     _ready = true;
   }
@@ -203,7 +226,8 @@ class PushController {
     if (token.isEmpty) return;
     try {
       await api.post('/me/devices', data: {
-        'platform': defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android',
+        'platform':
+            defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android',
         'token': token,
       });
     } catch (_) {}
@@ -218,7 +242,10 @@ class PushController {
       final r = await api.get('/me/alerts');
       final raw = r['alerts'];
       if (raw is! List) return;
-      final rows = raw.whereType<Map>().map((m) => InboxAlert.fromMap(Map<String, dynamic>.from(m))).toList();
+      final rows = raw
+          .whereType<Map>()
+          .map((m) => InboxAlert.fromMap(Map<String, dynamic>.from(m)))
+          .toList();
       final fresh = _ref.read(alertInboxProvider.notifier).apply(rows);
       if (_firstPoll) {
         _firstPoll = false;
@@ -233,10 +260,21 @@ class PushController {
     }
   }
 
-  void _retrySse(Duration wait) {
+  void _retrySse() {
+    final wait = Duration(seconds: _sseBackoffSec);
+    _sseBackoffSec = (_sseBackoffSec * 2).clamp(3, 30);
     Future<void>.delayed(wait, () {
       if (_alive) unawaited(_listenSse());
     });
+  }
+
+  String _eventsUrl() {
+    final host = apiHost();
+    if (host.isEmpty) {
+      if (kIsWeb) return '${Uri.base.origin}/api/v1/me/events';
+      return '/api/v1/me/events';
+    }
+    return '$host/api/v1/me/events';
   }
 
   Future<void> _listenSse() async {
@@ -244,21 +282,22 @@ class PushController {
     if (!_alive) return;
     final token = _ref.read(sessionProvider).token;
     if (token == null) return;
-    final uri = Uri.parse('${apiHost()}/api/v1/me/events');
+    _sseToken = token;
+    final uri = Uri.parse(_eventsUrl());
     _http = http.Client();
     try {
       final req = http.Request('GET', uri);
       req.headers['Authorization'] = 'Bearer $token';
       req.headers['Accept'] = 'text/event-stream';
-      // Avoid Cache-Control on the request — browsers preflight it and some
-      // proxies strip SSE; Accept is enough for event-stream negotiation.
+      req.headers['Accept-Encoding'] = 'identity';
       final res = await _http!.send(req);
       if (res.statusCode != 200) {
         _sseLive = false;
-        _retrySse(const Duration(seconds: 4));
+        _retrySse();
         return;
       }
       _sseLive = true;
+      _sseBackoffSec = 3;
       final buf = StringBuffer();
       _sse = res.stream.transform(utf8.decoder).listen((chunk) {
         buf.write(chunk);
@@ -275,14 +314,14 @@ class PushController {
           ..write(data);
       }, onError: (_) {
         _sseLive = false;
-        _retrySse(const Duration(seconds: 3));
+        _retrySse();
       }, onDone: () {
         _sseLive = false;
-        _retrySse(const Duration(seconds: 3));
+        _retrySse();
       });
     } catch (_) {
       _sseLive = false;
-      _retrySse(const Duration(seconds: 4));
+      _retrySse();
     }
   }
 
@@ -305,8 +344,10 @@ class PushController {
   void _present(InboxAlert row, {required bool sound}) {
     if (row.id.isNotEmpty && !_toasted.add(row.id)) return;
     final lang = _ref.read(localeProvider).languageCode;
-    final loc = row.localized(lang, provider: _ref.read(sessionProvider).isProvider);
-    _ref.read(alertToastProvider.notifier).state = AlertToast(title: loc.$1, body: loc.$2, bookingId: row.bookingId);
+    final loc =
+        row.localized(lang, provider: _ref.read(sessionProvider).isProvider);
+    _ref.read(alertToastProvider.notifier).state =
+        AlertToast(title: loc.$1, body: loc.$2, bookingId: row.bookingId);
     _hideToast?.cancel();
     _hideToast = Timer(const Duration(seconds: 6), () {
       _ref.read(alertToastProvider.notifier).state = null;
@@ -322,8 +363,12 @@ class PushController {
         title,
         body,
         const NotificationDetails(
-          android: AndroidNotificationDetails('oons', 'oons', importance: Importance.high, playSound: true, icon: '@mipmap/ic_launcher'),
-          iOS: DarwinNotificationDetails(presentAlert: true, presentSound: true, sound: 'default'),
+          android: AndroidNotificationDetails('oons', 'oons',
+              importance: Importance.high,
+              playSound: true,
+              icon: '@mipmap/ic_launcher'),
+          iOS: DarwinNotificationDetails(
+              presentAlert: true, presentSound: true, sound: 'default'),
         ),
       );
     } catch (_) {}
