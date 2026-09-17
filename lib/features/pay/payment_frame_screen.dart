@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:oons/core/analytics.dart';
 import 'package:oons/core/format.dart';
 import 'package:oons/core/locale.dart';
@@ -284,8 +285,15 @@ class _PaymentFrameScreenState extends ConsumerState<PaymentFrameScreen> with Wi
                                 ),
                                 const SizedBox(height: 10),
                                 Text(
-                                  error == 'error'
-                                      ? (lang == 'ar' ? 'جرّبي تاني بعد شوية.' : 'Please try again in a moment.')
+                                  // A cancelled/expired-hold message is already localized and
+                                  // safe to show as-is; anything else came straight from the
+                                  // backend's ApiException.message (English, technical — e.g.
+                                  // "Could not start InstaPay. Try again.") and must never be
+                                  // shown to the client verbatim.
+                                  (error == 'error' || data?.booking.status != 'cancelled_client')
+                                      ? (lang == 'ar'
+                                          ? 'جرّبي تاني بعد شوية، أو تواصلي معانا لو استمرت المشكلة.'
+                                          : 'Please try again in a moment, or contact us if this keeps happening.')
                                       : error!,
                                   style: const TextStyle(fontSize: 14, height: 1.45, color: Client.body),
                                 ),
@@ -295,11 +303,20 @@ class _PaymentFrameScreenState extends ConsumerState<PaymentFrameScreen> with Wi
                                     label: lang == 'ar' ? 'ارجعي للحجوزات' : 'Back to bookings',
                                     onTap: () => context.go('/bookings'),
                                   )
-                                else
+                                else ...[
                                   ClientPrimaryButton(
                                     label: lang == 'ar' ? 'حاولي تاني' : 'Try again',
                                     onTap: _start,
                                   ),
+                                  const SizedBox(height: 10),
+                                  ClientGhostButton(
+                                    label: lang == 'ar' ? 'تواصلي معانا على واتساب' : 'Contact us on WhatsApp',
+                                    onTap: () => launchUrl(
+                                      Uri.parse('https://wa.me/201117198333'),
+                                      mode: LaunchMode.externalApplication,
+                                    ),
+                                  ),
+                                ],
                               ],
                             ),
                           )

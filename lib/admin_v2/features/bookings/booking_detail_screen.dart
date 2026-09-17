@@ -349,8 +349,9 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen> {
     ];
 
     final receiptUrl = '${b['paymentReceiptUrl'] ?? ''}';
+    final lastPaymentError = '${b['lastPaymentError'] ?? ''}';
     final right = <Widget>[
-      if (canWrite && ('${b['status']}' == 'pending_payment' || receiptUrl.isNotEmpty))
+      if (canWrite && ('${b['status']}' == 'pending_payment' || receiptUrl.isNotEmpty || lastPaymentError.isNotEmpty))
         V2SectionCard(
           title: lang == 'ar' ? 'الدفع' : 'Payment',
           subtitle: receiptUrl.isNotEmpty
@@ -359,6 +360,29 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (lastPaymentError.isNotEmpty) ...[
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(10),
+                  margin: const EdgeInsets.only(bottom: 10),
+                  decoration: BoxDecoration(
+                    color: Ops.impBg,
+                    borderRadius: BorderRadius.circular(9),
+                    border: Border.all(color: const Color(0xFFD9BFB4)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        lang == 'ar' ? 'آخر خطأ في محاولة الدفع الحية (Paymob)' : 'Last live payment attempt error (Paymob)',
+                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Ops.muted),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(lastPaymentError, style: const TextStyle(fontSize: 11.5, fontFamily: Ops.mono, height: 1.4)),
+                    ],
+                  ),
+                ),
+              ],
               if ('${b['status']}' == 'pending_payment')
                 V2Btn(
                   label: lang == 'ar' ? 'تأكيد الدفع' : 'Confirm payment',
