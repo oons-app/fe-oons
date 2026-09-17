@@ -137,8 +137,9 @@ bool cleaningSizesOverlap({
 }
 
 /// Inclusive size match for cleaning packages. `toSqm == null` = no upper bound.
+/// `fromSqm == 0` is a valid open lower bound ("up to Xm²"), not "unset".
 bool cleaningSqmMatches({required int sqm, required int fromSqm, int? toSqm}) {
-  if (fromSqm <= 0 || sqm <= 0) return false;
+  if (fromSqm < 0 || sqm <= 0) return false;
   if (sqm < fromSqm) return false;
   if (toSqm == null) return true;
   return sqm <= toSqm;

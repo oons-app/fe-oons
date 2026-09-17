@@ -70,6 +70,7 @@ class _BookScreenState extends ConsumerState<BookScreen> {
   String? _activeVertical;
   bool _toolsFromProvider = false;
   final _noteChipIds = <String>{};
+  Object? _loadError;
 
   static const _noteChips = <(String id, String en, String ar)>[
     ('no_elevator', 'No elevator', 'مفيش أسانسير'),
@@ -104,10 +105,18 @@ class _BookScreenState extends ConsumerState<BookScreen> {
   }
 
   Future<void> _load() async {
-    final repo = ref.read(repoProvider);
+    setState(() => _loadError = null);
+    final ({ProviderP provider, List<Map<String, dynamic>> days}) boot;
+    try {
+      final repo = ref.read(repoProvider);
+      await ref.read(sessionProvider.notifier).refreshMe();
+      boot = await repo.bookBootstrap(widget.providerId);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loadError = e);
+      return;
+    }
     final lang = langOf(ref);
-    await ref.read(sessionProvider.notifier).refreshMe();
-    final boot = await repo.bookBootstrap(widget.providerId);
     final prov = boot.provider;
     final av = boot.days;
     if (!mounted) return;
@@ -311,6 +320,28 @@ class _BookScreenState extends ConsumerState<BookScreen> {
     final bar = t['ctaBar'] as Map;
     final addrs = ref.watch(sessionProvider).user?.addresses ?? const <Address>[];
     final addr = _selectedAddress();
+    if (p == null && _loadError != null) {
+      return Scaffold(
+        backgroundColor: Client.bg,
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  friendlyError(_loadError!, lang),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 14, height: 1.45, color: Client.body),
+                ),
+                const SizedBox(height: 16),
+                ClientPrimaryButton(label: lang == 'ar' ? 'حاولي تاني' : 'Try again', onTap: _load),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
     if (p == null) {
       return const Scaffold(backgroundColor: Client.bg, body: Center(child: CircularProgressIndicator(color: Client.plum)));
     }
@@ -559,7 +590,11 @@ class _BookScreenState extends ConsumerState<BookScreen> {
                                   final on = _parsedHomeSqm != null && _matchCleaningTier(_parsedHomeSqm!)?.id == tier.id;
                                   return InkWell(
                                     onTap: () => setState(() {
-                                      homeSqm.text = '${tier.sizeFromSqm}';
+                                      // sizeFromSqm can be 0 for an open-ended "up to Xm²" tier;
+                                      // _parsedHomeSqm treats 0 as unset, which would clear the
+                                      // pick this chip is meant to make instead of applying it.
+                                      final repSqm = tier.sizeFromSqm > 0 ? tier.sizeFromSqm : (tier.sizeToSqm ?? 1);
+                                      homeSqm.text = '$repSqm';
                                       _applyHomeSqmToGuests();
                                     }),
                                     child: Container(
