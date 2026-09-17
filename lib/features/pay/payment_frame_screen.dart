@@ -15,6 +15,7 @@ import 'package:oons/data/models.dart';
 import 'package:oons/data/repo.dart';
 import 'package:oons/features/client/client_chrome.dart';
 import 'package:oons/features/pay/pay_checkout_frame.dart';
+import 'package:oons/features/book/book_widgets.dart';
 import 'package:oons/l10n/copy.dart';
 
 /// Dedicated frame per payment method: card / mobile wallet / Fawry (legacy).
@@ -37,10 +38,12 @@ class _PaymentFrameScreenState extends ConsumerState<PaymentFrameScreen> with Wi
   BookingBundle? data;
   String? checkoutUrl;
   String? error;
+  String? reasonCode;
   bool starting = true;
   bool finishedPaid = false;
   bool abandoning = false;
   Timer? poll;
+  Timer? tick;
 
   String get method {
     final m = widget.method.toLowerCase().trim();
@@ -67,6 +70,7 @@ class _PaymentFrameScreenState extends ConsumerState<PaymentFrameScreen> with Wi
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     poll?.cancel();
+    tick?.cancel();
     // Fire-and-forget: tab closed / route disposed before pay completed.
     if (!finishedPaid && !abandoning) {
       unawaited(_abandonSilent());
@@ -124,13 +128,14 @@ class _PaymentFrameScreenState extends ConsumerState<PaymentFrameScreen> with Wi
     setState(() {
       starting = true;
       error = null;
+      reasonCode = null;
       abandoning = false;
     });
     try {
       unawaited(AppAnalytics.addPaymentInfo(
         bookingId: widget.bookingId,
         method: method,
-        value: data?.booking.total != null ? data!.booking.total / 100.0 : null,
+        value: data == null ? null : data!.booking.amountDue(processingFee: data!.processingFeeFor(method)) / 100.0,
       ));
       final launch = await ref.read(repoProvider).pay(widget.bookingId, method);
       if (!mounted) return;
@@ -140,13 +145,7 @@ class _PaymentFrameScreenState extends ConsumerState<PaymentFrameScreen> with Wi
         return;
       }
       if (launch.bundle.booking.status == 'cancelled_client') {
-        setState(() {
-          starting = false;
-          error = langOf(ref) == 'ar'
-              ? 'انتهى وقت الحجز غير المدفوع. احجزي الميعاد تاني.'
-              : 'The unpaid hold expired. Book the slot again.';
-          data = launch.bundle;
-        });
+        _dropExpired(launch.bundle);
         return;
       }
       setState(() {
@@ -165,16 +164,22 @@ class _PaymentFrameScreenState extends ConsumerState<PaymentFrameScreen> with Wi
         context.go('/offline');
         return;
       }
+      unawaited(AppAnalytics.paymentFailed(bookingId: widget.bookingId, reasonCode: e.reasonCode, method: method));
       setState(() {
         starting = false;
-        error = e.message;
+        error = e.reasonCode;
+        reasonCode = e.reasonCode;
       });
+      _beginTick();
     } catch (_) {
       if (!mounted) return;
+      unawaited(AppAnalytics.paymentFailed(bookingId: widget.bookingId, reasonCode: 'network', method: method));
       setState(() {
         starting = false;
-        error = 'error';
+        error = 'network';
+        reasonCode = 'network';
       });
+      _beginTick();
     }
   }
 
@@ -198,13 +203,30 @@ class _PaymentFrameScreenState extends ConsumerState<PaymentFrameScreen> with Wi
       }
       if (b.booking.status == 'cancelled_client') {
         poll?.cancel();
-        setState(() {
-          error = langOf(ref) == 'ar'
-              ? 'انتهى وقت الحجز غير المدفوع. احجزي الميعاد تاني.'
-              : 'The unpaid hold expired. Book the slot again.';
-        });
+        _dropExpired(b);
       }
     } catch (_) {}
+  }
+
+  void _beginTick() {
+    tick?.cancel();
+    tick = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      setState(() {});
+    });
+  }
+
+  void _dropExpired(BookingBundle bundle) {
+    abandoning = true;
+    finishedPaid = false;
+    unawaited(AppAnalytics.paymentFailed(bookingId: widget.bookingId, reasonCode: 'hold_expired', method: method));
+    final pid = bundle.booking.providerId ?? bundle.provider?.id;
+    if (!mounted) return;
+    if (pid != null) {
+      context.go('/book/$pid?notice=hold_expired');
+    } else {
+      context.go('/bookings');
+    }
   }
 
   String _title(String lang, Map co) {
@@ -222,12 +244,14 @@ class _PaymentFrameScreenState extends ConsumerState<PaymentFrameScreen> with Wi
   Widget build(BuildContext context) {
     final lang = langOf(ref);
     final t = Copy.of(lang);
+    final bf = Copy.bookFlow(lang);
     final co = t['co'] as Map;
     final f = t['fawry'] as Map;
     final b = data?.booking;
     final hasFawryCode = b?.fawryCode != null && b!.fawryCode!.isNotEmpty;
     final showIframe = checkoutUrl != null && checkoutUrl!.isNotEmpty;
     final hold = b?.paymentHoldUntil ?? b?.fawryExpiresAt;
+    final holdGone = hold != null && hold.isBefore(DateTime.now());
 
     return PopScope(
       canPop: false,
@@ -239,7 +263,7 @@ class _PaymentFrameScreenState extends ConsumerState<PaymentFrameScreen> with Wi
         body: SafeArea(
           child: Column(
             children: [
-              ClientBackHeader(
+              ClientFlowHeader(
                 title: _title(lang, co),
                 onBack: () => unawaited(_leaveUnpaid()),
               ),
@@ -272,7 +296,7 @@ class _PaymentFrameScreenState extends ConsumerState<PaymentFrameScreen> with Wi
                       Text(
                         // Same fee-inclusive figure Checkout showed — never a
                         // second, different-looking number at this stage.
-                        money(b.total + (data?.processingFeeFor(method) ?? 0), lang),
+                        money(b.amountDue(processingFee: data?.processingFeeFor(method) ?? 0), lang),
                         style: const TextStyle(fontFamily: T.mono, fontSize: 18, fontWeight: FontWeight.w800),
                       ),
                     ],
@@ -281,69 +305,88 @@ class _PaymentFrameScreenState extends ConsumerState<PaymentFrameScreen> with Wi
               const ClientDivider(),
               Expanded(
                 child: starting
-                    ? const Center(child: CircularProgressIndicator(color: Client.plum))
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(28),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const CircularProgressIndicator(color: Client.plum),
+                              const SizedBox(height: 18),
+                              Text(bf['payOpening'] ?? '', textAlign: TextAlign.center, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                              const SizedBox(height: 8),
+                              Text(bf['payHold'] ?? '', textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, height: 1.45, color: Client.muted)),
+                            ],
+                          ),
+                        ),
+                      )
                     : error != null
                         ? Padding(
                             padding: const EdgeInsets.all(20),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  lang == 'ar' ? 'ما قدرناش نكمل الدفع' : 'Could not complete payment',
-                                  style: Theme.of(context).textTheme.headlineMedium,
-                                ),
+                                Text(bf['errTitle'] ?? '', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, height: 1.3)),
                                 const SizedBox(height: 10),
                                 Text(
-                                  // A cancelled/expired-hold message is already localized and
-                                  // safe to show as-is; anything else came straight from the
-                                  // backend's ApiException.message (English, technical — e.g.
-                                  // "Could not start InstaPay. Try again.") and must never be
-                                  // shown to the client verbatim.
-                                  (error == 'error' || data?.booking.status != 'cancelled_client')
-                                      ? (lang == 'ar'
-                                          ? 'جرّبي تاني بعد شوية، أو تواصلي معانا لو استمرت المشكلة.'
-                                          : 'Please try again in a moment, or contact us if this keeps happening.')
-                                      : error!,
+                                  method == 'card' ? (bf['errCard'] ?? '') : (bf['errWallet'] ?? ''),
                                   style: const TextStyle(fontSize: 14, height: 1.45, color: Client.body),
                                 ),
-                                if (data?.booking.status != 'cancelled_client') ...[
-                                  const SizedBox(height: 10),
+                                const SizedBox(height: 8),
+                                Text(bf['errNoneTaken'] ?? '', style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700)),
+                                if (hold != null && b != null) ...[
+                                  const SizedBox(height: 8),
                                   Text(
-                                    hold != null
-                                        ? (lang == 'ar'
-                                            ? 'مفيش أي مبلغ اتسحب منك. ميعادك لسه محجوز لحد ${_holdLabel(hold, lang)}.'
-                                            : 'Nothing was charged. Your slot is still held until ${_holdLabel(hold, lang)}.')
-                                        : (lang == 'ar' ? 'مفيش أي مبلغ اتسحب منك.' : 'Nothing was charged.'),
+                                    holdGone ? (bf['holdExpired'] ?? '') : heldSlotLine(slot: b.slotStart, hold: hold, lang: lang, bf: bf),
                                     style: const TextStyle(fontSize: 13, height: 1.4, color: Client.muted, fontWeight: FontWeight.w600),
                                   ),
                                 ],
+                                const SizedBox(height: 8),
+                                Text(bf['errHint'] ?? '', style: const TextStyle(fontSize: 12.5, height: 1.4, color: Client.muted)),
                                 const Spacer(),
-                                if (data?.booking.status == 'cancelled_client')
+                                if (holdGone)
                                   ClientPrimaryButton(
-                                    label: lang == 'ar' ? 'ارجعي للحجوزات' : 'Back to bookings',
-                                    onTap: () => context.go('/bookings'),
+                                    label: bf['needSlot'] ?? '',
+                                    onTap: () {
+                                      unawaited(AppAnalytics.paymentRecovery(bookingId: widget.bookingId, action: 'hold_expired'));
+                                      final pid = b?.providerId ?? data?.provider?.id;
+                                      if (pid != null) {
+                                        context.go('/book/$pid?notice=hold_expired');
+                                      } else {
+                                        context.go('/bookings');
+                                      }
+                                    },
                                   )
                                 else ...[
                                   ClientPrimaryButton(
-                                    label: lang == 'ar' ? 'حاولي تاني بنفس الطريقة' : 'Try again, same method',
-                                    onTap: _start,
+                                    label: bf['errRetry'] ?? '',
+                                    onTap: () {
+                                      unawaited(AppAnalytics.paymentRecovery(bookingId: widget.bookingId, action: 'retry_same'));
+                                      _start();
+                                    },
                                   ),
                                   const SizedBox(height: 10),
                                   ClientGhostButton(
-                                    label: lang == 'ar' ? 'جرّبي ${_otherMethodLabel(lang)}' : 'Try ${_otherMethodLabel(lang)}',
-                                    onTap: () => context.pushReplacement('/pay/${widget.bookingId}/$_otherMethod'),
+                                    label: '${bf['errOther'] ?? ''} ${_otherMethodLabel(lang)}',
+                                    onTap: () {
+                                      unawaited(AppAnalytics.paymentRecovery(bookingId: widget.bookingId, action: 'other_method'));
+                                      context.pushReplacement('/pay/${widget.bookingId}/$_otherMethod');
+                                    },
                                   ),
                                   const SizedBox(height: 10),
-                                  ClientGhostButton(
-                                    label: lang == 'ar' ? 'ارجعي وغيّري طريقة الدفع' : 'Back and change payment method',
-                                    onTap: () => unawaited(_leaveUnpaid()),
-                                  ),
-                                  const SizedBox(height: 10),
-                                  ClientGhostButton(
-                                    label: lang == 'ar' ? 'تواصلي معانا على واتساب' : 'Contact us on WhatsApp',
-                                    onTap: () => launchUrl(
-                                      Uri.parse('https://wa.me/201117198333'),
-                                      mode: LaunchMode.externalApplication,
+                                  Material(
+                                    color: Client.terracotta,
+                                    child: InkWell(
+                                      onTap: () {
+                                        unawaited(AppAnalytics.paymentRecovery(bookingId: widget.bookingId, action: 'support'));
+                                        unawaited(launchUrl(Uri.parse('https://wa.me/201117198333'), mode: LaunchMode.externalApplication));
+                                      },
+                                      child: Container(
+                                        width: double.infinity,
+                                        constraints: const BoxConstraints(minHeight: 54),
+                                        alignment: Alignment.center,
+                                        child: Text(bf['errSupport'] ?? '', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Client.bg)),
+                                      ),
                                     ),
                                   ),
                                 ],

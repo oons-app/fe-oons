@@ -51,16 +51,17 @@ String pluralService(int n, {required bool ar}) {
   return '${toArabicDigits(n)} خدمة';
 }
 
-/// عاملة واحدة / عاملتين / ٣ عاملات / ١١+ عاملة
+/// مُساعدة واحدة / مُساعدتين / ٣ مُساعدات / ١١+ مُساعدة
 String pluralWorkers(int n, {required bool ar}) {
   if (!ar) {
-    if (n == 1) return '1 worker';
-    return '$n workers';
+    if (n == 1) return '1 assistant';
+    if (n == 2) return '2 assistants';
+    return '$n assistants';
   }
-  if (n == 1) return 'عاملة واحدة';
-  if (n == 2) return 'عاملتين';
-  if (n >= 3 && n <= 10) return '${toArabicDigits(n)} عاملات';
-  return '${toArabicDigits(n)} عاملة';
+  if (n == 1) return 'مُساعدة واحدة';
+  if (n == 2) return 'مُساعدتين';
+  if (n >= 3 && n <= 10) return '${toArabicDigits(n)} مُساعدات';
+  return '${toArabicDigits(n)} مُساعدة';
 }
 
 /// مهمة / مهام

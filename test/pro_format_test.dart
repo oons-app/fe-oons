@@ -18,9 +18,9 @@ void main() {
   });
 
   test('plural workers ar', () {
-    expect(pluralWorkers(1, ar: true), 'عاملة واحدة');
-    expect(pluralWorkers(2, ar: true), 'عاملتين');
-    expect(pluralWorkers(3, ar: true), '٣ عاملات');
+    expect(pluralWorkers(1, ar: true), 'مُساعدة واحدة');
+    expect(pluralWorkers(2, ar: true), 'مُساعدتين');
+    expect(pluralWorkers(3, ar: true), '٣ مُساعدات');
   });
 
   test('plural tasks ar', () {

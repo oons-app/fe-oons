@@ -468,6 +468,7 @@ class BookingGuestItem {
     this.guestPhone,
     this.guestNotes,
     this.count = 1,
+    this.hairLength,
   });
   final String id;
   final String guestLabel;
@@ -478,6 +479,7 @@ class BookingGuestItem {
   final int durationMin;
   final int price;
   final int count;
+  final String? hairLength;
 
   int get lineTotal => price * (count < 1 ? 1 : count);
 
@@ -491,6 +493,7 @@ class BookingGuestItem {
         durationMin: (j['durationMin'] as num?)?.toInt() ?? 0,
         price: (j['price'] as num?)?.toInt() ?? 0,
         count: ((j['count'] as num?)?.toInt() ?? 1).clamp(1, 99),
+        hairLength: j['hairLength'] == null || '${j['hairLength']}'.isEmpty ? null : '${j['hairLength']}',
       );
 }
 
@@ -543,6 +546,10 @@ class Booking {
     this.commissionAmount = 0,
     this.relationshipTier,
     this.idUploadDeadline,
+    this.chargedAmount = 0,
+    this.paymentFeeAmount = 0,
+    this.providerId,
+    this.durationMin = 0,
   });
   final String id;
   final String ref;
@@ -579,6 +586,15 @@ class Booking {
   // KYC: she must have a national ID photo on file by this time or the
   // booking is auto-cancelled and refunded (see book screen / home banner).
   final DateTime? idUploadDeadline;
+  final int chargedAmount;
+  final int paymentFeeAmount;
+  final String? providerId;
+  final int durationMin;
+
+  int amountDue({int processingFee = 0}) {
+    if (chargedAmount > 0) return chargedAmount;
+    return total + processingFee;
+  }
 
   bool get canReleasePay => status == 'completed' && escrow == 'held' && releasedAt == null;
   bool get isGroup => kind == 'group' || items.length > 1;
@@ -650,6 +666,10 @@ class Booking {
             ? null
             : '${j['relationshipTier']}',
         idUploadDeadline: j['idUploadDeadline'] == null ? null : DateTime.tryParse('${j['idUploadDeadline']}')?.toLocal(),
+        chargedAmount: (j['chargedAmount'] as num?)?.toInt() ?? 0,
+        paymentFeeAmount: (j['paymentFeeAmount'] as num?)?.toInt() ?? 0,
+        providerId: j['providerId'] == null || '${j['providerId']}'.isEmpty ? null : '${j['providerId']}',
+        durationMin: (j['durationMin'] as num?)?.toInt() ?? 0,
       );
 
   Booking withLocation(double lat, double lng) => Booking(
@@ -686,6 +706,10 @@ class Booking {
         commissionAmount: commissionAmount,
         relationshipTier: relationshipTier,
         idUploadDeadline: idUploadDeadline,
+        chargedAmount: chargedAmount,
+        paymentFeeAmount: paymentFeeAmount,
+        providerId: providerId,
+        durationMin: durationMin,
       );
 }
 

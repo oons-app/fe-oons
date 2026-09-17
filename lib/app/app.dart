@@ -61,7 +61,6 @@ class _OonsAppState extends ConsumerState<OonsApp> {
   Widget build(BuildContext context) {
     final locale = ref.watch(localeProvider);
     final router = ref.watch(routerProvider);
-    final toast = ref.watch(alertToastProvider);
     final online = ref.watch(sessionProvider).online;
     ref.listen(sessionProvider, (prev, next) {
       if (next.authed && (prev == null || prev.token != next.token)) {
@@ -123,36 +122,11 @@ class _OonsAppState extends ConsumerState<OonsApp> {
                           child: Stack(
                             children: [
                               child ?? const SizedBox.shrink(),
-                              Positioned(
+                              const Positioned(
                                 top: 0,
                                 left: 0,
                                 right: 0,
-                                child: AnimatedSwitcher(
-                                  duration: const Duration(milliseconds: 280),
-                                  switchInCurve: Curves.easeOutCubic,
-                                  switchOutCurve: Curves.easeInCubic,
-                                  transitionBuilder: (child, anim) {
-                                    final slide = Tween<Offset>(begin: const Offset(0, -0.2), end: Offset.zero).animate(anim);
-                                    return FadeTransition(
-                                      opacity: anim,
-                                      child: SlideTransition(position: slide, child: child),
-                                    );
-                                  },
-                                  child: toast == null
-                                      ? const SizedBox.shrink(key: ValueKey('toast-empty'))
-                                      : AlertToastBanner(
-                                          key: ValueKey('toast-${toast.title}-${toast.body}'),
-                                          toast: toast,
-                                          onDismiss: () => ref.read(alertToastProvider.notifier).state = null,
-                                          onOpen: () {
-                                            final dest = toast.bookingId;
-                                            ref.read(alertToastProvider.notifier).state = null;
-                                            if (dest == null || dest.isEmpty) return;
-                                            final path = ref.read(sessionProvider).isProvider ? '/pro/job/$dest' : '/visit/$dest';
-                                            router.push(path);
-                                          },
-                                        ),
-                                ),
+                                child: _ToastOverlayHost(),
                               ),
                             ],
                           ),
@@ -167,6 +141,67 @@ class _OonsAppState extends ConsumerState<OonsApp> {
         );
       },
       routerConfig: router,
+    );
+  }
+}
+
+/// Hosts the alert toast in its own [Overlay] so `Tooltip`/`RawTooltip`
+/// widgets inside it (e.g. the dismiss [IconButton]) have an Overlay
+/// ancestor. This subtree sits as a sibling of the routed page in
+/// [OonsApp]'s `MaterialApp.router` builder, outside the Navigator that
+/// owns the app's real Overlay.
+class _ToastOverlayHost extends StatelessWidget {
+  const _ToastOverlayHost();
+
+  @override
+  Widget build(BuildContext context) {
+    return Overlay(
+      initialEntries: [
+        OverlayEntry(
+          // The Positioned above only constrains width, so this Overlay
+          // gets unbounded height and must size itself to its content.
+          canSizeOverlay: true,
+          builder: (context) => const _ToastOverlayContent(),
+        ),
+      ],
+    );
+  }
+}
+
+/// The actual toast UI, kept as a self-updating [ConsumerWidget] because
+/// [OverlayState] only reads `initialEntries` once in `initState` — an
+/// `OverlayEntry` built from values captured at that time would go stale.
+class _ToastOverlayContent extends ConsumerWidget {
+  const _ToastOverlayContent();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final toast = ref.watch(alertToastProvider);
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 280),
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      transitionBuilder: (child, anim) {
+        final slide = Tween<Offset>(begin: const Offset(0, -0.2), end: Offset.zero).animate(anim);
+        return FadeTransition(
+          opacity: anim,
+          child: SlideTransition(position: slide, child: child),
+        );
+      },
+      child: toast == null
+          ? const SizedBox.shrink(key: ValueKey('toast-empty'))
+          : AlertToastBanner(
+              key: ValueKey('toast-${toast.title}-${toast.body}'),
+              toast: toast,
+              onDismiss: () => ref.read(alertToastProvider.notifier).state = null,
+              onOpen: () {
+                final dest = toast.bookingId;
+                ref.read(alertToastProvider.notifier).state = null;
+                if (dest == null || dest.isEmpty) return;
+                final path = ref.read(sessionProvider).isProvider ? '/pro/job/$dest' : '/visit/$dest';
+                ref.read(routerProvider).push(path);
+              },
+            ),
     );
   }
 }

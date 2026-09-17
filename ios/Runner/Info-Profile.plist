@@ -32,7 +32,11 @@
 		<key>ITSAppUsesNonExemptEncryption</key>
 		<false/>
 		<key>NSLocationWhenInUseUsageDescription</key>
-		<string>Oons uses your location during a visit handshake and to fill your address.</string>
+		<string>Oons uses your location during a visit handshake to confirm arrival, while a professional is traveling to a booking, and to fill your address when you add a home.</string>
+		<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+		<string>Oons uses your location during a visit handshake to confirm arrival, while a professional is traveling to a booking, and to fill your address when you add a home. Location is only used for those visit and address flows, not for advertising.</string>
+		<key>NSLocationAlwaysUsageDescription</key>
+		<string>Oons uses your location during a visit handshake to confirm arrival, while a professional is traveling to a booking, and to fill your address when you add a home.</string>
 		<key>NSPhotoLibraryUsageDescription</key>
 		<string>Oons uses photos you pick for your professional profile and portfolio.</string>
 		<key>NSPhotoLibraryAddUsageDescription</key>
@@ -92,6 +96,10 @@
 				</array>
 			</dict>
 		</dict>
+		<key>UIBackgroundModes</key>
+		<array>
+			<string>remote-notification</string>
+		</array>
 		<key>UIApplicationSupportsIndirectInputEvents</key>
 		<true/>
 		<key>UILaunchStoryboardName</key>

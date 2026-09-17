@@ -570,6 +570,63 @@ class AppAnalytics {
     await logEvent('booking_notes_added', {'provider_id': providerId});
   }
 
+  static Future<void> bookCategorySwitched({required String providerId, required String vertical}) async {
+    await logEvent('book_category_switched', {'provider_id': providerId, 'vertical': vertical, 'content_group': 'booking'});
+  }
+
+  static Future<void> bookServiceChanged({
+    required String providerId,
+    required String serviceItemId,
+    required int qty,
+    String? serviceName,
+  }) async {
+    await logEvent(qty > 0 ? 'book_service_added' : 'book_service_removed', {
+      'provider_id': providerId,
+      'service_item_id': serviceItemId,
+      'qty': qty,
+      if ((serviceName ?? '').trim().isNotEmpty) 'service_name': serviceName!.trim(),
+      'content_group': 'booking',
+    });
+  }
+
+  static Future<void> bookDetailsToggled({
+    required String providerId,
+    required String serviceItemId,
+    required bool open,
+  }) async {
+    await logEvent('book_details_toggled', {
+      'provider_id': providerId,
+      'service_item_id': serviceItemId,
+      'open': open ? 1 : 0,
+      'content_group': 'booking',
+    });
+  }
+
+  static Future<void> bookFieldChanged({required String providerId, required String field}) async {
+    await logEvent('book_field_changed', {'provider_id': providerId, 'field': field, 'content_group': 'booking'});
+  }
+
+  static Future<void> bookStepAdvanced({required String providerId, required int step}) async {
+    await logEvent('book_step_advanced', {'provider_id': providerId, 'step': step, 'content_group': 'booking'});
+  }
+
+  static Future<void> paymentFailed({
+    required String bookingId,
+    required String reasonCode,
+    String? method,
+  }) async {
+    await logEvent('payment_failed', {
+      'booking_id': bookingId,
+      'reason_code': reasonCode,
+      if (method != null && method.isNotEmpty) 'payment_method': normalizePaymentMethod(method),
+      'content_group': 'booking',
+    });
+  }
+
+  static Future<void> paymentRecovery({required String bookingId, required String action}) async {
+    await logEvent('payment_recovery', {'booking_id': bookingId, 'action': action, 'content_group': 'booking'});
+  }
+
   static Future<void> checkoutStarted({
     required String bookingId,
     num? value,

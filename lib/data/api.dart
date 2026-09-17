@@ -75,12 +75,28 @@ String apiHost() {
 }
 
 class ApiException implements Exception {
-  ApiException(this.status, this.message);
+  ApiException(this.status, this.message, {this.code});
   final int status;
   final String message;
+  final String? code;
   bool get isOffline => status == 0;
   bool get isPayFail => status == 402;
   bool get isNotFound => status == 404;
+  bool get isSlotTaken => code == 'slot_taken';
+  String get reasonCode {
+    switch (code) {
+      case 'card_declined':
+      case 'wallet_failed':
+      case 'hold_expired':
+      case 'slot_taken':
+      case 'network':
+        return code!;
+      default:
+        if (status == 0) return 'network';
+        if (isSlotTaken) return 'slot_taken';
+        return 'network';
+    }
+  }
 
   @override
   String toString() => message.isEmpty ? 'error' : message;
@@ -155,16 +171,20 @@ class ApiClient {
           e2e.clear();
         }
         String msg = e.message ?? 'error';
+        String? code;
         if (body is Map) {
           final err = body['error'];
           if (err is Map && err['message'] != null) {
             msg = '${err['message']}';
           }
+          if (err is Map && err['code'] != null) {
+            code = '${err['code']}';
+          }
         }
         h.reject(DioException(
           requestOptions: e.requestOptions,
           response: e.response,
-          error: ApiException(status, msg),
+          error: ApiException(status, msg, code: code),
         ));
       },
     ));

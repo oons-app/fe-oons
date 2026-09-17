@@ -490,6 +490,49 @@ class ClientScaffold extends StatelessWidget {
   }
 }
 
+class ClientFlowHeader extends StatelessWidget {
+  const ClientFlowHeader({super.key, required this.title, this.onBack});
+
+  final String title;
+  final VoidCallback? onBack;
+
+  @override
+  Widget build(BuildContext context) {
+    final rtl = Directionality.of(context) == TextDirection.rtl;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 2, 16, 12),
+      child: Row(
+        children: [
+          Semantics(
+            button: true,
+            label: rtl ? 'رجوع' : 'Back',
+            child: InkWell(
+              onTap: onBack ?? () => Navigator.maybePop(context),
+              child: const SizedBox(
+                width: 34,
+                height: 34,
+                child: Center(
+                  child: Text('›', style: TextStyle(fontFamily: T.mono, fontSize: 16, fontWeight: FontWeight.w500, color: Client.ink)),
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              title,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Client.ink),
+            ),
+          ),
+          const SizedBox(width: 34, height: 34),
+        ],
+      ),
+    );
+  }
+}
+
 class ClientBackHeader extends StatelessWidget {
   const ClientBackHeader({super.key, required this.title, this.meta, this.onBack});
 
@@ -629,55 +672,60 @@ class ClientFieldLabel extends StatelessWidget {
 }
 
 class ClientBookingStepper extends StatelessWidget {
-  const ClientBookingStepper({super.key, required this.step, required this.labels});
+  const ClientBookingStepper({
+    super.key,
+    required this.step,
+    required this.labels,
+    this.onSegmentTap,
+    this.cartReady = false,
+  });
 
   final int step;
   final List<String> labels;
+  final void Function(int step)? onSegmentTap;
+  final bool cartReady;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-      decoration: const BoxDecoration(
-        color: Client.card,
-        border: Border(bottom: BorderSide(color: Client.ink, width: Client.rule)),
-      ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
       child: Row(
         children: List.generate(labels.length, (i) {
           final n = i + 1;
-          final on = step == n;
+          final current = step == n;
           final done = step > n;
+          final upcoming = step < n;
+          final tappable = done || current || (upcoming && cartReady);
+          final bar = current ? Client.plum : done ? Client.olive : Client.line;
+          final fg = current ? Client.plum : done ? Client.oliveInk : Client.muted2;
           return Expanded(
-            child: Row(
-              children: [
-                Container(
-                  width: 22,
-                  height: 22,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: on || done ? Client.plum : Client.card,
-                    border: Border.all(color: Client.ink, width: Client.rule),
-                  ),
-                  child: Text(
-                    '$n',
-                    style: TextStyle(fontFamily: T.mono, fontSize: 11, fontWeight: FontWeight.w600, color: on || done ? Client.bg : Client.muted2),
+            child: Padding(
+              padding: EdgeInsetsDirectional.only(start: i == 0 ? 0 : 2),
+              child: Semantics(
+                button: tappable && onSegmentTap != null,
+                enabled: tappable,
+                label: labels[i],
+                child: InkWell(
+                  onTap: tappable && onSegmentTap != null ? () => onSegmentTap!(n) : null,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(height: 3, color: bar),
+                      const SizedBox(height: 6),
+                      Text(
+                        labels[i],
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: current ? FontWeight.w700 : FontWeight.w500,
+                          color: fg,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    labels[i],
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: on ? Client.plum : Client.muted2),
-                  ),
-                ),
-                if (i < labels.length - 1)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: Container(width: 8, height: 1, color: Client.line),
-                  ),
-              ],
+              ),
             ),
           );
         }),
@@ -687,12 +735,22 @@ class ClientBookingStepper extends StatelessWidget {
 }
 
 class ClientStickyBar extends StatelessWidget {
-  const ClientStickyBar({super.key, required this.label, required this.price, required this.cta, required this.note, required this.onTap, this.enabled = true});
+  const ClientStickyBar({
+    super.key,
+    required this.label,
+    required this.price,
+    required this.cta,
+    required this.onTap,
+    this.sub,
+    this.note,
+    this.enabled = true,
+  });
 
   final String label;
+  final String? sub;
   final String price;
   final String cta;
-  final String note;
+  final String? note;
   final VoidCallback onTap;
   final bool enabled;
 
@@ -700,28 +758,62 @@ class ClientStickyBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(color: Client.bg, border: Border(top: BorderSide(color: Client.ink, width: Client.rule))),
-      padding: EdgeInsets.fromLTRB(20, 12, 20, 10 + MediaQuery.paddingOf(context).bottom),
+      padding: EdgeInsets.fromLTRB(16, 11, 16, 22 + MediaQuery.paddingOf(context).bottom),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Row(
             children: [
-              ClientKicker(label),
-              const Spacer(),
-              Text(price, style: const TextStyle(fontFamily: T.mono, fontSize: 17, fontWeight: FontWeight.w600, color: Client.ink)),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: const TextStyle(fontFamily: T.mono, fontSize: 10.5, fontWeight: FontWeight.w500, letterSpacing: 1.2, color: Client.muted2),
+                    ),
+                    if (sub != null && sub!.isNotEmpty)
+                      Text(sub!, style: const TextStyle(fontSize: 11.5, color: Client.muted)),
+                  ],
+                ),
+              ),
+              Text(price, style: const TextStyle(fontFamily: T.mono, fontSize: 19, fontWeight: FontWeight.w600, color: Client.ink)),
             ],
           ),
-          const SizedBox(height: 10),
-          ClientPrimaryButton(label: cta, onTap: onTap, enabled: enabled),
           const SizedBox(height: 8),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('⛨', style: TextStyle(fontFamily: T.mono, fontSize: 12, color: Client.olive)),
-              const SizedBox(width: 8),
-              Expanded(child: Text(note, style: const TextStyle(fontSize: 11, height: 1.35, color: Client.muted))),
-            ],
+          Material(
+            color: enabled ? Client.plum : Client.line,
+            child: InkWell(
+              onTap: enabled ? onTap : null,
+              mouseCursor: enabled ? SystemMouseCursors.click : SystemMouseCursors.forbidden,
+              child: Container(
+                height: 54,
+                padding: const EdgeInsets.symmetric(horizontal: 18),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        cta,
+                        style: TextStyle(fontSize: 16.5, fontWeight: FontWeight.w700, color: enabled ? Client.bg : Client.muted2),
+                      ),
+                    ),
+                    Text('←', style: TextStyle(fontFamily: T.mono, fontSize: 16, color: enabled ? Client.bg : Client.muted2)),
+                  ],
+                ),
+              ),
+            ),
           ),
+          if (note != null && note!.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('⛨', style: TextStyle(fontFamily: T.mono, fontSize: 12, color: Client.olive)),
+                const SizedBox(width: 8),
+                Expanded(child: Text(note!, style: const TextStyle(fontSize: 11, height: 1.35, color: Client.muted))),
+              ],
+            ),
+          ],
         ],
       ),
     );

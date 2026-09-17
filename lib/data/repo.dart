@@ -11,6 +11,7 @@ import 'package:oons/data/api.dart';
 import 'package:oons/data/geocode.dart';
 import 'package:oons/data/models.dart';
 import 'package:oons/data/reviews.dart';
+import 'package:oons/features/book/book_pricing.dart';
 import 'package:uuid/uuid.dart';
 
 final sessionProvider = StateNotifierProvider<Session, SessionState>((ref) => Session());
@@ -374,8 +375,26 @@ class Repo {
     return ProviderP.fromJson(r);
   }
 
-  Future<List<Map<String, dynamic>>> availability(String id) async {
-    final r = await api.get('/providers/$id/availability');
+  Future<({ProviderP provider, List<Map<String, dynamic>> days, ProcessingFeeSchedule fees})> bookBootstrap(
+    String id, {
+    int? durationMin,
+    String? weekStart,
+  }) async {
+    final r = await api.get('/providers/$id/book-bootstrap', query: {
+      if (weekStart != null && weekStart.isNotEmpty) 'weekStart': weekStart,
+      if (durationMin != null && durationMin > 0) 'durationMin': '$durationMin',
+    });
+    final prov = ProviderP.fromJson(r['provider'] as Map);
+    final days = ((r['days'] as List?) ?? []).cast<Map<String, dynamic>>();
+    final feesRaw = r['processingFees'];
+    final fees = ProcessingFeeSchedule.fromJson(feesRaw is Map ? Map<String, dynamic>.from(feesRaw) : null);
+    return (provider: prov, days: days, fees: fees);
+  }
+
+  Future<List<Map<String, dynamic>>> availability(String id, {int? durationMin}) async {
+    final r = await api.get('/providers/$id/availability', query: {
+      if (durationMin != null && durationMin > 0) 'durationMin': '$durationMin',
+    });
     return ((r['days'] as List?) ?? []).cast<Map<String, dynamic>>();
   }
 
@@ -432,6 +451,7 @@ class Repo {
     required String providerId,
     required int serviceTotal,
     String? vertical,
+    List<String>? verticals,
     String? area,
     List<String>? categoryIds,
   }) async {
@@ -440,6 +460,7 @@ class Repo {
       'providerId': providerId,
       'serviceTotal': serviceTotal,
       if (vertical != null && vertical.isNotEmpty) 'vertical': vertical,
+      if (verticals != null && verticals.isNotEmpty) 'verticals': verticals,
       if (area != null && area.isNotEmpty) 'area': area,
       if (categoryIds != null && categoryIds.isNotEmpty) 'categoryIds': categoryIds,
     });
@@ -993,13 +1014,6 @@ class Repo {
       if (scope == 'past') ...{'skip': '$skip', 'limit': '$limit'},
     });
     return ((r['bookings'] as List?) ?? []).map((e) => BookingBundle.fromJson(e as Map)).toList();
-  }
-
-  Future<({ProviderP provider, List<Map<String, dynamic>> days})> bookBootstrap(String id) async {
-    final r = await api.get('/providers/$id/book-bootstrap');
-    final prov = ProviderP.fromJson(r['provider'] as Map);
-    final days = ((r['days'] as List?) ?? []).cast<Map<String, dynamic>>();
-    return (provider: prov, days: days);
   }
 
   Future<BookingBundle> proBooking(String id) async {
