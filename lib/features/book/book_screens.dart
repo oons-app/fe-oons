@@ -31,6 +31,8 @@ class _GuestDraft {
   final TextEditingController phone = TextEditingController();
   final TextEditingController notes = TextEditingController();
   final Map<String, int> serviceCounts = {};
+  // For items with ServiceItem.needsHairLength — id -> "short"|"medium"|"long".
+  final Map<String, String> hairLengths = {};
 
   int totalSelected() => serviceCounts.values.fold(0, (a, b) => a + b);
 
@@ -65,6 +67,16 @@ class _BookScreenState extends ConsumerState<BookScreen> {
   String? _lastServiceTracked;
   int? _lastSlotTracked;
   String? _lastAddressTracked;
+  String? _activeVertical;
+  bool _toolsFromProvider = false;
+  final _noteChipIds = <String>{};
+
+  static const _noteChips = <(String id, String en, String ar)>[
+    ('no_elevator', 'No elevator', 'مفيش أسانسير'),
+    ('has_pet', 'I have a pet', 'عندي حيوان أليف'),
+    ('ring_twice', 'Ring twice', 'دقّي مرتين'),
+    ('doorman_knows', 'The doorman knows', 'البواب عارف'),
+  ];
 
   @override
   void dispose() {
@@ -118,6 +130,7 @@ class _BookScreenState extends ConsumerState<BookScreen> {
       if (prov.items.isNotEmpty) {
         final pref = widget.itemId != null ? prov.items.where((e) => e.id == widget.itemId).toList() : const <ServiceItem>[];
         final first = pref.isNotEmpty ? pref.first : prov.items.first;
+        _activeVertical = first.vertical ?? prov.service;
         you.serviceCounts[first.id] = 1;
         _lastServiceTracked = first.id;
         unawaited(AppAnalytics.bookingServiceSelected(
@@ -146,16 +159,46 @@ class _BookScreenState extends ConsumerState<BookScreen> {
     return null;
   }
 
+  int _unitPriceFor(_GuestDraft g, ServiceItem it) {
+    final length = g.hairLengths[it.id];
+    if (it.needsHairLength && length != null) {
+      return it.price + (it.hairSurcharge[length] ?? 0);
+    }
+    return it.price;
+  }
+
   int _guestServicesMoney(_GuestDraft g) {
     var t = 0;
     for (final entry in g.serviceCounts.entries) {
       final it = _itemById(entry.key);
-      if (it != null) t += it.price * entry.value;
+      if (it != null) t += _unitPriceFor(g, it) * entry.value;
     }
     return t;
   }
 
-  bool get _hasCleaningItems => p?.items.any((e) => e.isCleaning) ?? false;
+  int get _toolsSurchargeIfApplied => (_hasCleaningItems && _toolsFromProvider) ? 5000 : 0;
+
+  /// Distinct verticals actually present in this provider's real items,
+  /// in first-seen order (her primary vertical's items load first from
+  /// bookBootstrap, so that vertical naturally comes first here too).
+  List<String> get _verticals {
+    if (p == null) return const [];
+    final seen = <String>[];
+    for (final it in p!.items) {
+      final v = it.vertical ?? p!.service;
+      if (!seen.contains(v)) seen.add(v);
+    }
+    return seen;
+  }
+
+  List<ServiceItem> get _visibleItems {
+    if (p == null) return const [];
+    if (_verticals.length <= 1) return p!.items;
+    final active = _activeVertical ?? _verticals.first;
+    return p!.items.where((e) => (e.vertical ?? p!.service) == active).toList();
+  }
+
+  bool get _hasCleaningItems => _visibleItems.any((e) => e.isCleaning);
 
   Address? _selectedAddress() {
     final addrs = ref.read(sessionProvider).user?.addresses ?? const <Address>[];
@@ -280,7 +323,7 @@ class _BookScreenState extends ConsumerState<BookScreen> {
     // ever changes.
     final trustFee = ref.watch(sessionProvider).trustFee;
     final discount = _couponOk ? _couponDiscount : 0;
-    final rawTotal = servicesTotal + trustFee - discount;
+    final rawTotal = servicesTotal + trustFee + _toolsSurchargeIfApplied - discount;
     final total = rawTotal < 0 ? 0 : rawTotal;
     return Scaffold(
       backgroundColor: Client.bg,
@@ -303,6 +346,37 @@ class _BookScreenState extends ConsumerState<BookScreen> {
                           lang == 'ar' ? 'اختاري الخدمات لكل ضيفة من قسم الضيوف تحت.' : 'Choose each guest services from the guests section below.',
                           style: const TextStyle(fontSize: 12, color: Client.muted),
                         ),
+                        if (_verticals.length > 1) ...[
+                          const SizedBox(height: 14),
+                          Builder(builder: (_) {
+                            final svc = t['svc'] as Map;
+                            return Row(
+                              children: _verticals.map((v) {
+                                final on = (_activeVertical ?? _verticals.first) == v;
+                                return Expanded(
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(right: 6),
+                                    child: InkWell(
+                                      onTap: () => setState(() => _activeVertical = v),
+                                      child: Container(
+                                        alignment: Alignment.center,
+                                        padding: const EdgeInsets.symmetric(vertical: 10),
+                                        decoration: BoxDecoration(
+                                          border: Border.all(color: Client.ink, width: Client.rule),
+                                          color: on ? Client.ink : Client.card,
+                                        ),
+                                        child: Text(
+                                          '${svc[v] ?? v}',
+                                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: on ? Client.bg : Client.ink),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            );
+                          }),
+                        ],
                       ],
                     ),
                   ),
@@ -469,6 +543,43 @@ class _BookScreenState extends ConsumerState<BookScreen> {
                           const SizedBox(height: 6),
                           Text('${b['homeSizeTip']}', style: const TextStyle(fontSize: 12, color: Client.muted, height: 1.35)),
                           const SizedBox(height: 8),
+                          Builder(builder: (_) {
+                            final tiers = _visibleItems.where((e) => e.isCleaning).toList()
+                              ..sort((a, c) => a.sizeFromSqm.compareTo(c.sizeFromSqm));
+                            if (tiers.isEmpty) return const SizedBox.shrink();
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: tiers.map((tier) {
+                                  final label = tier.sizeToSqm != null
+                                      ? '${tier.sizeFromSqm}–${tier.sizeToSqm} ${lang == 'ar' ? 'م²' : 'm²'}'
+                                      : '${tier.sizeFromSqm}+ ${lang == 'ar' ? 'م²' : 'm²'}';
+                                  final on = _parsedHomeSqm != null && _matchCleaningTier(_parsedHomeSqm!)?.id == tier.id;
+                                  return InkWell(
+                                    onTap: () => setState(() {
+                                      homeSqm.text = '${tier.sizeFromSqm}';
+                                      _applyHomeSqmToGuests();
+                                    }),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                                      decoration: BoxDecoration(
+                                        border: Border.all(color: Client.ink, width: Client.rule),
+                                        color: on ? Client.plum : Client.card,
+                                      ),
+                                      child: Text(label, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: on ? Client.bg : Client.ink)),
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
+                            );
+                          }),
+                          Text(
+                            lang == 'ar' ? 'أو اكتبي المساحة بالظبط' : 'Or type the exact size',
+                            style: const TextStyle(fontSize: 11.5, color: Client.muted),
+                          ),
+                          const SizedBox(height: 6),
                           TextField(
                             controller: homeSqm,
                             keyboardType: TextInputType.number,
@@ -497,6 +608,37 @@ class _BookScreenState extends ConsumerState<BookScreen> {
                               );
                             }),
                           ],
+                          const SizedBox(height: 14),
+                          Text(
+                            lang == 'ar' ? 'أدوات ومواد التنظيف' : 'Cleaning tools & supplies',
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              (false, lang == 'ar' ? 'موجودة عندي' : 'I have them'),
+                              (true, lang == 'ar' ? 'تجيبها معاها (+${money(5000, lang)})' : 'She brings them (+${money(5000, lang)})'),
+                            ].map((e) {
+                              final on = _toolsFromProvider == e.$1;
+                              return Expanded(
+                                child: Padding(
+                                  padding: const EdgeInsets.only(right: 6),
+                                  child: InkWell(
+                                    onTap: () => setState(() => _toolsFromProvider = e.$1),
+                                    child: Container(
+                                      alignment: Alignment.center,
+                                      padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 6),
+                                      decoration: BoxDecoration(
+                                        border: Border.all(color: Client.ink, width: Client.rule),
+                                        color: on ? Client.plumTint : Client.card,
+                                      ),
+                                      child: Text(e.$2, textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ),
                           const SizedBox(height: 12),
                         ],
                         ...List.generate(guests.length, (i) {
@@ -561,7 +703,7 @@ class _BookScreenState extends ConsumerState<BookScreen> {
                                     ),
                                   ),
                                   const SizedBox(height: 10),
-                                  ...p!.items.map((svc) {
+                                  ..._visibleItems.map((svc) {
                                     final n = g.serviceCounts[svc.id] ?? 0;
                                     final sqm = _parsedHomeSqm;
                                     final cleaningLocked = svc.isCleaning && sqm != null;
@@ -576,85 +718,130 @@ class _BookScreenState extends ConsumerState<BookScreen> {
                                             ar: lang == 'ar',
                                           )
                                         : null;
+                                    final unitPrice = _unitPriceFor(g, svc);
                                     return Padding(
                                       padding: const EdgeInsets.only(bottom: 6),
                                       child: Opacity(
                                         opacity: cleaningLocked && !cleaningMatch ? 0.45 : 1,
-                                        child: Row(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(svc.name.of(lang), style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
-                                                  if (meta != null)
-                                                    Text(meta, style: const TextStyle(fontSize: 11, color: Client.muted)),
-                                                  if (cleaningMatch)
-                                                    Text('${b['homeSizeMatch']}', style: const TextStyle(fontSize: 11, color: Client.plum, fontWeight: FontWeight.w600)),
-                                                  // What the provider says this service includes. A
-                                                  // cleaning package already lists its tasks through
-                                                  // the checklist, so this is for everything else.
-                                                  for (final ben in svc.benefits)
-                                                    Padding(
-                                                      padding: const EdgeInsets.only(top: 2),
-                                                      child: Row(
-                                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                                        children: [
-                                                          const Padding(
-                                                            padding: EdgeInsetsDirectional.only(end: 4, top: 2),
-                                                            child: Icon(Icons.check, size: 11, color: Client.plum),
-                                                          ),
-                                                          Expanded(
-                                                            child: Text(ben.of(lang),
-                                                                style: const TextStyle(fontSize: 11, color: Client.muted, height: 1.35)),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                    ),
-                                                ],
-                                              ),
-                                            ),
-                                            IconButton(
-                                              onPressed: cleaningLocked
-                                                  ? null
-                                                  : (n > 0
-                                                      ? () => setState(() {
-                                                            final m = n - 1;
-                                                            if (m <= 0) {
-                                                              g.serviceCounts.remove(svc.id);
-                                                            } else {
-                                                              g.serviceCounts[svc.id] = m;
+                                            Row(
+                                              children: [
+                                                Expanded(
+                                                  child: Text(svc.name.of(lang), style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+                                                ),
+                                                IconButton(
+                                                  onPressed: cleaningLocked
+                                                      ? null
+                                                      : (n > 0
+                                                          ? () => setState(() {
+                                                                final m = n - 1;
+                                                                if (m <= 0) {
+                                                                  g.serviceCounts.remove(svc.id);
+                                                                  g.hairLengths.remove(svc.id);
+                                                                } else {
+                                                                  g.serviceCounts[svc.id] = m;
+                                                                }
+                                                              })
+                                                          : null),
+                                                  icon: const Icon(Icons.remove_circle_outline, size: 20),
+                                                ),
+                                                Text('$n', style: const TextStyle(fontFamily: T.mono, fontSize: 13)),
+                                                IconButton(
+                                                  onPressed: cleaningLocked
+                                                      ? null
+                                                      : () {
+                                                          setState(() {
+                                                            g.serviceCounts[svc.id] = n + 1;
+                                                            if (svc.needsHairLength && !g.hairLengths.containsKey(svc.id)) {
+                                                              g.hairLengths[svc.id] = 'medium';
                                                             }
-                                                          })
-                                                      : null),
-                                              icon: const Icon(Icons.remove_circle_outline, size: 20),
+                                                          });
+                                                          if (_lastServiceTracked != svc.id && p != null) {
+                                                            _lastServiceTracked = svc.id;
+                                                            unawaited(AppAnalytics.bookingServiceSelected(
+                                                              providerId: p!.id,
+                                                              serviceItemId: svc.id,
+                                                              value: svc.price / 100,
+                                                              serviceName: svc.name.en.isNotEmpty ? svc.name.en : svc.name.ar,
+                                                            ));
+                                                          }
+                                                        },
+                                                  icon: const Icon(Icons.add_circle_outline, size: 20),
+                                                ),
+                                                SizedBox(
+                                                  width: 90,
+                                                  child: Text(
+                                                    n > 1 ? '${money(unitPrice, lang)} ×$n' : money(unitPrice, lang),
+                                                    textAlign: TextAlign.end,
+                                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                                                  ),
+                                                ),
+                                              ],
                                             ),
-                                            Text('$n', style: const TextStyle(fontFamily: T.mono, fontSize: 13)),
-                                            IconButton(
-                                              onPressed: cleaningLocked
-                                                  ? null
-                                                  : () {
-                                                      setState(() => g.serviceCounts[svc.id] = n + 1);
-                                                      if (_lastServiceTracked != svc.id && p != null) {
-                                                        _lastServiceTracked = svc.id;
-                                                        unawaited(AppAnalytics.bookingServiceSelected(
-                                                          providerId: p!.id,
-                                                          serviceItemId: svc.id,
-                                                          value: svc.price / 100,
-                                                          serviceName: svc.name.en.isNotEmpty ? svc.name.en : svc.name.ar,
-                                                        ));
-                                                      }
-                                                    },
-                                              icon: const Icon(Icons.add_circle_outline, size: 20),
-                                            ),
-                                            SizedBox(
-                                              width: 90,
-                                              child: Text(
-                                                n > 1 ? '${money(svc.price, lang)} ×$n' : money(svc.price, lang),
-                                                textAlign: TextAlign.end,
-                                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-                                              ),
-                                            ),
+                                            // Everything below only appears once she's actually
+                                            // added the service — open-on-add, not always visible.
+                                            if (n > 0) ...[
+                                              if (meta != null)
+                                                Text(meta, style: const TextStyle(fontSize: 11, color: Client.muted)),
+                                              if (cleaningMatch)
+                                                Text('${b['homeSizeMatch']}', style: const TextStyle(fontSize: 11, color: Client.plum, fontWeight: FontWeight.w600)),
+                                              // What the provider says this service includes. A
+                                              // cleaning package already lists its tasks through
+                                              // the checklist, so this is for everything else.
+                                              for (final ben in svc.benefits)
+                                                Padding(
+                                                  padding: const EdgeInsets.only(top: 2),
+                                                  child: Row(
+                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    children: [
+                                                      const Padding(
+                                                        padding: EdgeInsetsDirectional.only(end: 4, top: 2),
+                                                        child: Icon(Icons.check, size: 11, color: Client.plum),
+                                                      ),
+                                                      Expanded(
+                                                        child: Text(ben.of(lang),
+                                                            style: const TextStyle(fontSize: 11, color: Client.muted, height: 1.35)),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              if (svc.needsHairLength) ...[
+                                                const SizedBox(height: 6),
+                                                Text(
+                                                  lang == 'ar' ? 'طول الشعر' : 'Hair length',
+                                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Client.muted),
+                                                ),
+                                                const SizedBox(height: 4),
+                                                Row(
+                                                  children: [
+                                                    ('short', lang == 'ar' ? 'قصير' : 'Short'),
+                                                    ('medium', lang == 'ar' ? 'متوسط' : 'Medium'),
+                                                    ('long', lang == 'ar' ? 'طويل' : 'Long'),
+                                                  ].map((e) {
+                                                    final on = (g.hairLengths[svc.id] ?? 'medium') == e.$1;
+                                                    return Expanded(
+                                                      child: Padding(
+                                                        padding: const EdgeInsets.only(right: 4),
+                                                        child: InkWell(
+                                                          onTap: () => setState(() => g.hairLengths[svc.id] = e.$1),
+                                                          child: Container(
+                                                            alignment: Alignment.center,
+                                                            padding: const EdgeInsets.symmetric(vertical: 8),
+                                                            decoration: BoxDecoration(
+                                                              border: Border.all(color: Client.ink, width: Client.rule),
+                                                              color: on ? Client.plumTint : Client.bg,
+                                                            ),
+                                                            child: Text(e.$2, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600)),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    );
+                                                  }).toList(),
+                                                ),
+                                              ],
+                                            ],
                                           ],
                                         ),
                                       ),
@@ -791,6 +978,36 @@ class _BookScreenState extends ConsumerState<BookScreen> {
                         }(),
                         ClientKicker('${b['notes']}'),
                         const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: _noteChips.map((chip) {
+                            final on = _noteChipIds.contains(chip.$1);
+                            final label = lang == 'ar' ? chip.$3 : chip.$2;
+                            return InkWell(
+                              onTap: () => setState(() {
+                                final current = notes.text.split('. ').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+                                if (on) {
+                                  _noteChipIds.remove(chip.$1);
+                                  current.remove(label);
+                                } else {
+                                  _noteChipIds.add(chip.$1);
+                                  current.add(label);
+                                }
+                                notes.text = current.join('. ').isEmpty ? '' : '${current.join('. ')}.';
+                              }),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: Client.ink, width: Client.rule),
+                                  color: on ? Client.plum : Client.card,
+                                ),
+                                child: Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: on ? Client.bg : Client.ink)),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                        const SizedBox(height: 10),
                         TextField(
                           controller: notes,
                           minLines: 3,
@@ -905,6 +1122,7 @@ class _BookScreenState extends ConsumerState<BookScreen> {
                       'guestNotes': g.notes.text.trim(),
                       'serviceItemId': e.key,
                       'count': e.value,
+                      if (it?.needsHairLength == true) 'hairLength': g.hairLengths[e.key] ?? 'medium',
                     });
                   }
                 }
@@ -912,7 +1130,7 @@ class _BookScreenState extends ConsumerState<BookScreen> {
                   setState(() => formError = '${b['needService']}');
                   return;
                 }
-                final onlyCleaningCatalog = p!.items.every((e) => e.isCleaning);
+                final onlyCleaningCatalog = _visibleItems.every((e) => e.isCleaning);
                 if (selectedCleaning || onlyCleaningCatalog) {
                   final sqm = _parsedHomeSqm;
                   if (sqm == null) {
@@ -949,6 +1167,7 @@ class _BookScreenState extends ConsumerState<BookScreen> {
                         saveInstruction: saveInstr && instructionId == null,
                         guests: guestPayload,
                         couponCode: _couponOk ? _appliedCouponCode : null,
+                        toolsFromProvider: _toolsFromProvider,
                       );
                   await ref.read(sessionProvider.notifier).refreshMe();
                   if (mounted) context.push('/checkout/${created.booking.id}');
@@ -981,6 +1200,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   BookingBundle? data;
   String method = 'card';
   bool _checkoutTracked = false;
+  bool _refundOpen = false;
 
   @override
   void initState() {
@@ -1021,6 +1241,11 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       ['card', Icons.credit_card_outlined, co['card'], co['cardNote']],
       ['instapay', Icons.phone_iphone_outlined, co['instapay'], co['instapayNote']],
     ];
+    // One number, everywhere on this screen and reused verbatim on the
+    // payment frame's own "Amount" line — card/wallet fee schedules are
+    // numerically identical today (see paymobFeeSchedule), so this is exact
+    // regardless of which method ends up selected, not just an estimate.
+    final amountDue = b.total + data!.processingFeeFor(method);
     return Scaffold(
       backgroundColor: Client.bg,
       body: SafeArea(
@@ -1148,52 +1373,42 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                                   ],
                                 ),
                               )),
+                        if (data!.processingFeeFor(method) > 0)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    lang == 'ar' ? 'رسوم معالجة الدفع (داخلة في السعر)' : 'Payment processing fee (included below)',
+                                    style: const TextStyle(fontSize: 12, color: Client.muted),
+                                  ),
+                                ),
+                                Text(money(data!.processingFeeFor(method), lang), style: const TextStyle(fontFamily: T.mono, fontSize: 12, color: Client.muted)),
+                              ],
+                            ),
+                          ),
                         const ClientDivider(),
                         Padding(
                           padding: const EdgeInsets.only(top: 12),
                           child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('${co['total']}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('${co['total']}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+                                  Text(
+                                    lang == 'ar' ? 'كل الرسوم داخلة — مفيش أي حاجة بتتزود بعدين' : 'All fees included — nothing added later',
+                                    style: const TextStyle(fontSize: 11, color: Client.muted),
+                                  ),
+                                ],
+                              ),
                               const Spacer(),
-                              Text(money(b.total, lang), style: const TextStyle(fontFamily: T.mono, fontSize: 20, fontWeight: FontWeight.w800)),
+                              Text(money(amountDue, lang), style: const TextStyle(fontFamily: T.mono, fontSize: 20, fontWeight: FontWeight.w800)),
                             ],
                           ),
                         ),
-                        if (data!.processingFeeFor(method) > 0) ...[
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  lang == 'ar' ? 'رسوم معالجة الدفع' : 'Payment processing fee',
-                                  style: const TextStyle(fontSize: 13, color: Client.body),
-                                ),
-                              ),
-                              Text(money(data!.processingFeeFor(method), lang), style: const TextStyle(fontFamily: T.mono, fontSize: 13)),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Text(
-                                lang == 'ar' ? 'المبلغ المستحق' : 'Amount due',
-                                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
-                              ),
-                              const Spacer(),
-                              Text(
-                                money(b.total + data!.processingFeeFor(method), lang),
-                                style: const TextStyle(fontFamily: T.mono, fontSize: 20, fontWeight: FontWeight.w800, color: Client.plum),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            lang == 'ar'
-                                ? 'رسوم بوابة الدفع بتتحسب فوق سعر الزيارة عشان المبلغ يوصل كامل.'
-                                : 'Gateway fees are added so the visit total arrives in full after Paymob charges.',
-                            style: const TextStyle(fontSize: 11, color: Client.muted, height: 1.35),
-                          ),
-                        ],
                       ],
                     ),
                   ),
@@ -1305,20 +1520,31 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        ClientKicker('${co['policyTitle']}'),
-                        ...(t['policy'] as List).map((row) {
-                          final r = row as Map;
-                          return Container(
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Client.line, width: Client.rule))),
-                            child: Row(
-                              children: [
-                                SizedBox(width: 78, child: Text('${r['when']}', style: const TextStyle(fontFamily: T.mono, fontSize: 11))),
-                                Expanded(child: Text('${r['what']}', style: const TextStyle(fontSize: 13, height: 1.4))),
-                              ],
-                            ),
-                          );
-                        }),
+                        InkWell(
+                          onTap: () => setState(() => _refundOpen = !_refundOpen),
+                          child: Row(
+                            children: [
+                              Expanded(child: ClientKicker('${co['policyTitle']}')),
+                              Icon(_refundOpen ? Icons.remove : Icons.add, size: 18, color: Client.muted),
+                            ],
+                          ),
+                        ),
+                        if (_refundOpen) ...[
+                          const SizedBox(height: 8),
+                          ...(t['policy'] as List).map((row) {
+                            final r = row as Map;
+                            return Container(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Client.line, width: Client.rule))),
+                              child: Row(
+                                children: [
+                                  SizedBox(width: 78, child: Text('${r['when']}', style: const TextStyle(fontFamily: T.mono, fontSize: 11))),
+                                  Expanded(child: Text('${r['what']}', style: const TextStyle(fontSize: 13, height: 1.4))),
+                                ],
+                              ),
+                            );
+                          }),
+                        ],
                         const SizedBox(height: 12),
                         Text('${co['policyNote']}', style: const TextStyle(fontSize: 12, height: 1.5, color: Client.muted)),
                         const SizedBox(height: 10),
@@ -1362,7 +1588,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
               ),
             ClientStickyBar(
               label: '${bar['payNow']}',
-              price: money(b.total, lang),
+              price: money(amountDue, lang),
               cta: lang == 'ar' ? 'ادفعِي بإطار ${_methodShortAr(method)}' : 'Pay with ${_methodShortEn(method)}',
               note: lang == 'ar' ? 'الفلوس واقفة. مش رايحة لحد لسه. بتروح بعد ما تخلص.' : 'Held, not sent. Released after checkout.',
               enabled: online && !needsId,

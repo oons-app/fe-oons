@@ -600,7 +600,7 @@ class AppAnalytics {
     }
   }
 
-  /// GA4 recommended ecommerce step when the client picks card / InstaPay / Fawry.
+  /// GA4 recommended ecommerce step when the client picks card / mobile wallet / Fawry.
   static Future<void> addPaymentInfo({
     required String bookingId,
     required String method,

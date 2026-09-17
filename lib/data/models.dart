@@ -264,6 +264,9 @@ class ServiceItem {
     this.excludedTaskIds = const [],
     this.approvalState = '',
     this.benefits = const [],
+    this.vertical,
+    this.needsHairLength = false,
+    this.hairSurcharge = const {},
   });
   final String id;
   final Loc name;
@@ -284,33 +287,56 @@ class ServiceItem {
   // Server-owned: "" / "approved" = live, "pending" = awaiting staff
   // activation, "rejected" = declined. Never sent back to the server.
   final String approvalState;
+  /// The vertical this item's category actually belongs to (from
+  /// bookBootstrap's itemsWithVertical) — null when fetched through an
+  /// endpoint that doesn't stamp it (e.g. plain /providers/:id), in which
+  /// case callers should fall back to the provider's own primary service.
+  final String? vertical;
+  final bool needsHairLength;
+  final Map<String, int> hairSurcharge;
 
   bool get isCleaning => kind == 'cleaning';
   bool get isPendingApproval => approvalState == 'pending';
 
-  factory ServiceItem.fromJson(Map j) => ServiceItem(
-        id: '${j['id']}',
-        name: Loc.fromJson(j['name']),
-        duration: (j['durationMin'] as num?)?.toInt() ?? 0,
-        price: (j['price'] as num?)?.toInt() ?? 0,
-        categoryId: j['categoryId']?.toString(),
-        catalogItemId: j['catalogItemId']?.toString(),
-        kind: '${j['kind'] ?? 'standard'}',
-        active: j['active'] != false,
-        travelFee: (j['travelFee'] as num?)?.toInt() ?? 0,
-        sizeFromSqm: (j['sizeFromSqm'] as num?)?.toInt() ?? 0,
-        sizeToSqm: (j['sizeToSqm'] as num?)?.toInt(),
-        workerCount: (j['workerCount'] as num?)?.toInt() ?? 0,
-        excludedTaskIds: ((j['excludedTaskIds'] as List?) ?? const [])
-            .map((e) => '$e')
-            .where((e) => e.isNotEmpty)
-            .toList(),
-        approvalState: '${j['approvalState'] ?? ''}',
-        benefits: ((j['benefits'] as List?) ?? const [])
-            .map((e) => Loc.fromJson(e))
-            .where((e) => e.en.isNotEmpty || e.ar.isNotEmpty)
-            .toList(),
-      );
+  factory ServiceItem.fromJson(Map j) {
+    // bookBootstrap wraps each item as {item, vertical} so the booking
+    // screen can group by real vertical; every other provider-fetching
+    // endpoint still returns a flat ServiceItem. Unwrap transparently so
+    // both shapes work through this one factory.
+    if (j['item'] is Map) {
+      final inner = Map<String, dynamic>.from(j['item'] as Map);
+      inner['vertical'] = j['vertical'];
+      return ServiceItem.fromJson(inner);
+    }
+    return ServiceItem(
+      id: '${j['id']}',
+      name: Loc.fromJson(j['name']),
+      duration: (j['durationMin'] as num?)?.toInt() ?? 0,
+      price: (j['price'] as num?)?.toInt() ?? 0,
+      categoryId: j['categoryId']?.toString(),
+      catalogItemId: j['catalogItemId']?.toString(),
+      kind: '${j['kind'] ?? 'standard'}',
+      active: j['active'] != false,
+      travelFee: (j['travelFee'] as num?)?.toInt() ?? 0,
+      sizeFromSqm: (j['sizeFromSqm'] as num?)?.toInt() ?? 0,
+      sizeToSqm: (j['sizeToSqm'] as num?)?.toInt(),
+      workerCount: (j['workerCount'] as num?)?.toInt() ?? 0,
+      excludedTaskIds: ((j['excludedTaskIds'] as List?) ?? const [])
+          .map((e) => '$e')
+          .where((e) => e.isNotEmpty)
+          .toList(),
+      approvalState: '${j['approvalState'] ?? ''}',
+      benefits: ((j['benefits'] as List?) ?? const [])
+          .map((e) => Loc.fromJson(e))
+          .where((e) => e.en.isNotEmpty || e.ar.isNotEmpty)
+          .toList(),
+      vertical: j['vertical']?.toString(),
+      needsHairLength: j['needsHairLength'] == true,
+      hairSurcharge: ((j['hairSurcharge'] as Map?) ?? const {}).map(
+        (k, v) => MapEntry('$k', (v as num?)?.toInt() ?? 0),
+      ),
+    );
+  }
 
   Map<String, dynamic> toPatchJson() => {
         'id': int.tryParse(id) ?? id,

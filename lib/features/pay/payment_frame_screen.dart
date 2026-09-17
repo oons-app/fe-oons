@@ -49,6 +49,13 @@ class _PaymentFrameScreenState extends ConsumerState<PaymentFrameScreen> with Wi
     return 'card';
   }
 
+  // Only card/wallet are live at checkout — swapping always toggles between
+  // those two, regardless of which one failed.
+  String get _otherMethod => method == 'card' ? 'instapay' : 'card';
+
+  String _otherMethodLabel(String lang) =>
+      _otherMethod == 'card' ? (lang == 'ar' ? 'البطاقة' : 'the card') : (lang == 'ar' ? 'محفظة الموبايل' : 'the mobile wallet');
+
   @override
   void initState() {
     super.initState();
@@ -263,7 +270,9 @@ class _PaymentFrameScreenState extends ConsumerState<PaymentFrameScreen> with Wi
                       ),
                       const Spacer(),
                       Text(
-                        money(b.total, lang),
+                        // Same fee-inclusive figure Checkout showed — never a
+                        // second, different-looking number at this stage.
+                        money(b.total + (data?.processingFeeFor(method) ?? 0), lang),
                         style: const TextStyle(fontFamily: T.mono, fontSize: 18, fontWeight: FontWeight.w800),
                       ),
                     ],
@@ -297,6 +306,17 @@ class _PaymentFrameScreenState extends ConsumerState<PaymentFrameScreen> with Wi
                                       : error!,
                                   style: const TextStyle(fontSize: 14, height: 1.45, color: Client.body),
                                 ),
+                                if (data?.booking.status != 'cancelled_client') ...[
+                                  const SizedBox(height: 10),
+                                  Text(
+                                    hold != null
+                                        ? (lang == 'ar'
+                                            ? 'مفيش أي مبلغ اتسحب منك. ميعادك لسه محجوز لحد ${_holdLabel(hold, lang)}.'
+                                            : 'Nothing was charged. Your slot is still held until ${_holdLabel(hold, lang)}.')
+                                        : (lang == 'ar' ? 'مفيش أي مبلغ اتسحب منك.' : 'Nothing was charged.'),
+                                    style: const TextStyle(fontSize: 13, height: 1.4, color: Client.muted, fontWeight: FontWeight.w600),
+                                  ),
+                                ],
                                 const Spacer(),
                                 if (data?.booking.status == 'cancelled_client')
                                   ClientPrimaryButton(
@@ -305,8 +325,18 @@ class _PaymentFrameScreenState extends ConsumerState<PaymentFrameScreen> with Wi
                                   )
                                 else ...[
                                   ClientPrimaryButton(
-                                    label: lang == 'ar' ? 'حاولي تاني' : 'Try again',
+                                    label: lang == 'ar' ? 'حاولي تاني بنفس الطريقة' : 'Try again, same method',
                                     onTap: _start,
+                                  ),
+                                  const SizedBox(height: 10),
+                                  ClientGhostButton(
+                                    label: lang == 'ar' ? 'جرّبي ${_otherMethodLabel(lang)}' : 'Try ${_otherMethodLabel(lang)}',
+                                    onTap: () => context.pushReplacement('/pay/${widget.bookingId}/$_otherMethod'),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  ClientGhostButton(
+                                    label: lang == 'ar' ? 'ارجعي وغيّري طريقة الدفع' : 'Back and change payment method',
+                                    onTap: () => unawaited(_leaveUnpaid()),
                                   ),
                                   const SizedBox(height: 10),
                                   ClientGhostButton(

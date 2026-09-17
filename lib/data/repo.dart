@@ -389,6 +389,7 @@ class Repo {
     bool saveInstruction = false,
     List<Map<String, dynamic>>? guests,
     String? couponCode,
+    bool toolsFromProvider = false,
   }) async {
     final r = await api.post('/bookings', data: {
       'providerId': providerId,
@@ -403,6 +404,7 @@ class Repo {
       },
       if (guests != null && guests.isNotEmpty) 'guests': guests,
       if (couponCode != null && couponCode.trim().isNotEmpty) 'couponCode': couponCode.trim(),
+      if (toolsFromProvider) 'toolsFromProvider': true,
     });
     final bundle = BookingBundle.fromJson(r);
     final addr = bundle.booking.address;
