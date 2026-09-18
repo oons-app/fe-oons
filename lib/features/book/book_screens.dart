@@ -40,7 +40,7 @@ class _BookScreenState extends ConsumerState<BookScreen> {
   String? _activeVertical;
   final homeSqm = TextEditingController();
   int? chipSqm;
-  bool toolsFromProvider = true;
+  bool toolsFromProvider = false;
   int guests = 1;
   String hair = 'medium';
   int day = 0;
@@ -271,7 +271,7 @@ class _BookScreenState extends ConsumerState<BookScreen> {
           ..clear()
           ..addAll(nextQty);
         _activeVertical = vert;
-        toolsFromProvider = draft?.toolsFromProvider ?? true;
+        toolsFromProvider = false;
         guests = draft?.guests ?? 1;
         hair = draft?.hair ?? 'medium';
         day = draft?.day ?? 0;
@@ -814,34 +814,6 @@ class _BookScreenState extends ConsumerState<BookScreen> {
                 style: TextStyle(fontSize: 12.5, height: 1.4, fontWeight: FontWeight.w600, color: match == null ? T.danger : Client.ink),
               ),
             ],
-            const SizedBox(height: 16),
-            Text(copy['tools'] ?? '', style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                BookChip(
-                  expanded: true,
-                  label: copy['toolsHers'] ?? '',
-                  selected: toolsFromProvider,
-                  onTap: () {
-                    _touch(() => toolsFromProvider = true);
-                    unawaited(AppAnalytics.bookFieldChanged(providerId: p!.id, field: 'tools'));
-                  },
-                ),
-                const SizedBox(width: 8),
-                BookChip(
-                  expanded: true,
-                  label: copy['toolsMine'] ?? '',
-                  selected: !toolsFromProvider,
-                  onTap: () {
-                    _touch(() => toolsFromProvider = false);
-                    unawaited(AppAnalytics.bookFieldChanged(providerId: p!.id, field: 'tools'));
-                  },
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(toolsFromProvider ? (copy['toolsHersResult'] ?? '') : (copy['toolsMineResult'] ?? ''), style: const TextStyle(fontSize: 12, color: Client.muted)),
           ],
         ),
       ),
