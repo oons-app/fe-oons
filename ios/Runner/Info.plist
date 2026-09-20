@@ -38,7 +38,7 @@
 		<key>NSLocationAlwaysUsageDescription</key>
 		<string>Oons uses your location during a visit handshake to confirm arrival, while a professional is traveling to a booking, and to fill your address when you add a home.</string>
 		<key>NSPhotoLibraryUsageDescription</key>
-		<string>Oons uses photos you pick for your professional profile and portfolio.</string>
+		<string>Oons uses photos you pick for your profile, national ID, and InstaPay transfer screenshots.</string>
 		<key>NSPhotoLibraryAddUsageDescription</key>
 		<string>Oons may save photos you capture for your profile and visit records.</string>
 		<key>NSCameraUsageDescription</key>
