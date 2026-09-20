@@ -79,6 +79,7 @@ flutter:
     enable-swift-package-manager: false
   assets:
     - assets/images/
+    - assets/images/brand/
     - assets/images/providers/
     - assets/images/work/
   fonts:
