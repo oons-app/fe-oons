@@ -59,6 +59,8 @@ void main() {
     expect(fees.feeFor(80000), 2350);
     expect(fees.charge(80000), 82350);
     expect(fees.charge(80000, 'instapay'), 82350);
+    expect(fees.feeFor(80000, 'manual'), 0);
+    expect(fees.charge(80000, 'instapay_manual'), 80000);
     expect(money(82350, 'en').contains('824'), isTrue);
   });
 

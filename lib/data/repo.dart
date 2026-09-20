@@ -820,6 +820,11 @@ class Repo {
     return BookingBundle.fromJson(r);
   }
 
+  Future<BookingBundle> uploadPayReceipt(String id, List<int> bytes) async {
+    final r = await api.upload('/bookings/$id/pay/receipt', 'receipt', bytes, filename: 'instapay.jpg');
+    return BookingBundle.fromJson(r);
+  }
+
   /// Fires GA `purchase` / `booking_paid` once per booking with the real Paymob method.
   Future<void> ensurePurchaseTracked(BookingBundle bundle, [String? methodHint]) async {
     if (bundle.booking.status != 'paid') return;

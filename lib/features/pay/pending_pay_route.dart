@@ -7,6 +7,9 @@ String pendingPayRoute(String bookingId, {String? paymentMethod, String? fawryCo
   if (m == 'instapay' || m == 'wallet') {
     return '/pay/$bookingId/instapay';
   }
+  if (m == 'manual' || m == 'instapay_manual' || m == 'instapay_transfer') {
+    return '/pay/$bookingId/manual';
+  }
   if (m == 'card') {
     return '/pay/$bookingId/card';
   }

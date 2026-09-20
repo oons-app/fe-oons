@@ -645,6 +645,10 @@ class AppAnalytics {
       case 'instapay':
       case 'wallet':
         return 'instapay';
+      case 'manual':
+      case 'instapay_manual':
+      case 'instapay_transfer':
+        return 'manual';
       case 'fawry':
       case 'kiosk':
         return 'fawry';

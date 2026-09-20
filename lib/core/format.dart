@@ -49,6 +49,10 @@ String paymentMethodLabel(String? method, String lang) {
     case 'instapay':
     case 'wallet':
       return lang == 'ar' ? 'محفظة الموبايل' : 'Mobile Wallet';
+    case 'manual':
+    case 'instapay_manual':
+    case 'instapay_transfer':
+      return lang == 'ar' ? 'إنستاباي' : 'InstaPay';
     case 'fawry':
     case 'kiosk':
       return lang == 'ar' ? 'فوري' : 'Fawry';

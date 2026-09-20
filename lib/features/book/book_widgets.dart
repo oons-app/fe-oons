@@ -132,15 +132,21 @@ class BookStepperControl extends StatelessWidget {
   }
 }
 
+enum BookPayKind { card, wallet, transfer }
+
 class BookPayIcon extends StatelessWidget {
-  const BookPayIcon({super.key, required this.card});
-  final bool card;
+  const BookPayIcon({super.key, required this.kind});
+  final BookPayKind kind;
 
   @override
   Widget build(BuildContext context) {
     return CustomPaint(
       size: const Size(24, 24),
-      painter: card ? _CardIconPainter() : _WalletIconPainter(),
+      painter: kind == BookPayKind.card
+          ? _CardIconPainter()
+          : kind == BookPayKind.transfer
+              ? _TransferIconPainter()
+              : _WalletIconPainter(),
     );
   }
 }
@@ -173,6 +179,24 @@ class _WalletIconPainter extends CustomPainter {
     canvas.drawRect(const Rect.fromLTWH(6, 2, 12, 20), p);
     canvas.drawLine(const Offset(10, 5), const Offset(14, 5), p);
     canvas.drawLine(const Offset(10.5, 18.5), const Offset(13.5, 18.5), p);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _TransferIconPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final p = Paint()
+      ..color = Client.ink
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.6
+      ..strokeCap = StrokeCap.square;
+    canvas.drawRect(const Rect.fromLTWH(4, 3, 16, 18), p);
+    canvas.drawLine(const Offset(8, 8), const Offset(16, 8), p);
+    canvas.drawLine(const Offset(8, 12), const Offset(16, 12), p);
+    canvas.drawLine(const Offset(8, 16), const Offset(13, 16), p);
   }
 
   @override
@@ -621,14 +645,14 @@ class BookPayMethodTile extends StatelessWidget {
   const BookPayMethodTile({
     super.key,
     required this.selected,
-    required this.card,
+    required this.kind,
     required this.title,
     required this.note,
     required this.onTap,
   });
 
   final bool selected;
-  final bool card;
+  final BookPayKind kind;
   final String title;
   final String note;
   final VoidCallback onTap;
@@ -656,7 +680,7 @@ class BookPayMethodTile extends StatelessWidget {
                 height: 38,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(border: Border.all(color: Client.ink, width: Client.rule), color: Client.card),
-                child: BookPayIcon(card: card),
+                child: BookPayIcon(kind: kind),
               ),
               const SizedBox(width: 12),
               Expanded(

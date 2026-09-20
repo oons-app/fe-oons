@@ -93,6 +93,26 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen> {
 
   Future<void> _confirmPayment() async {
     final lang = ref.read(localeCodeProvider);
+    final existing = '${booking?['paymentReceiptUrl'] ?? ''}';
+    if (existing.isNotEmpty) {
+      final ok = await v2Confirm(
+        context,
+        title: lang == 'ar' ? 'تأكيد الدفع' : 'Confirm payment',
+        body: lang == 'ar' ? 'العميلة رفعت صورة التحويل. تأكيد إن المبلغ وصل؟' : 'The client uploaded a transfer screenshot. Confirm the money arrived?',
+        confirmLabel: lang == 'ar' ? 'تأكيد الدفع' : 'Confirm payment',
+      );
+      if (!ok) return;
+      try {
+        await staffClient.post('/admin/bookings/${widget.bookingId}/confirm-payment', data: {});
+        if (mounted) {
+          v2Toast(context, lang == 'ar' ? 'تم تأكيد الدفع' : 'Payment confirmed');
+          _load();
+        }
+      } on ApiException catch (e) {
+        if (mounted) v2Toast(context, e.message, error: true);
+      }
+      return;
+    }
     XFile? receipt;
     final ok = await v2Form(
       context,
@@ -354,9 +374,11 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen> {
       if (canWrite && ('${b['status']}' == 'pending_payment' || receiptUrl.isNotEmpty || lastPaymentError.isNotEmpty))
         V2SectionCard(
           title: lang == 'ar' ? 'الدفع' : 'Payment',
-          subtitle: receiptUrl.isNotEmpty
-              ? (lang == 'ar' ? 'تم تأكيده يدويًا' : 'Confirmed manually')
-              : (lang == 'ar' ? 'بانتظار الدفع' : 'Awaiting payment'),
+          subtitle: '${b['status']}' == 'pending_payment' && receiptUrl.isNotEmpty
+              ? (lang == 'ar' ? 'العميلة رفعت صورة التحويل — أكّدي الدفع' : 'Client uploaded a screenshot — confirm the transfer')
+              : receiptUrl.isNotEmpty
+                  ? (lang == 'ar' ? 'تم تأكيده يدويًا' : 'Confirmed manually')
+                  : (lang == 'ar' ? 'بانتظار الدفع' : 'Awaiting payment'),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

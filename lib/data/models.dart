@@ -374,6 +374,7 @@ class BookingBundle {
     this.clientLocked = false,
     this.settlement,
     this.processingFees = const {},
+    this.instapayManualNumber = '01117198333',
   });
   final Booking booking;
   final ProviderP? provider;
@@ -390,6 +391,7 @@ class BookingBundle {
   final Map<String, dynamic>? settlement;
   /// Paymob surcharge estimates by method key (`card` / `instapay`), piastres.
   final Map<String, int> processingFees;
+  final String instapayManualNumber;
 
   int processingFeeFor(String method) => processingFees[method] ?? 0;
 
@@ -436,6 +438,9 @@ class BookingBundle {
       clientLocked: j['clientLocked'] == true,
       settlement: j['settlement'] is Map ? Map<String, dynamic>.from(j['settlement'] as Map) : null,
       processingFees: fees,
+      instapayManualNumber: '${j['instapayManualNumber'] ?? '01117198333'}'.trim().isEmpty
+          ? '01117198333'
+          : '${j['instapayManualNumber']}'.trim(),
     );
   }
 
@@ -454,6 +459,7 @@ class BookingBundle {
         clientLocked: clientLocked,
         settlement: settlement,
         processingFees: processingFees,
+        instapayManualNumber: instapayManualNumber,
       );
 }
 
@@ -550,6 +556,7 @@ class Booking {
     this.paymentFeeAmount = 0,
     this.providerId,
     this.durationMin = 0,
+    this.paymentReceiptUrl,
   });
   final String id;
   final String ref;
@@ -590,6 +597,7 @@ class Booking {
   final int paymentFeeAmount;
   final String? providerId;
   final int durationMin;
+  final String? paymentReceiptUrl;
 
   int amountDue({int processingFee = 0}) {
     if (chargedAmount > 0) return chargedAmount;
@@ -670,6 +678,7 @@ class Booking {
         paymentFeeAmount: (j['paymentFeeAmount'] as num?)?.toInt() ?? 0,
         providerId: j['providerId'] == null || '${j['providerId']}'.isEmpty ? null : '${j['providerId']}',
         durationMin: (j['durationMin'] as num?)?.toInt() ?? 0,
+        paymentReceiptUrl: j['paymentReceiptUrl'] == null || '${j['paymentReceiptUrl']}'.trim().isEmpty ? null : '${j['paymentReceiptUrl']}',
       );
 
   Booking withLocation(double lat, double lng) => Booking(
@@ -710,6 +719,7 @@ class Booking {
         paymentFeeAmount: paymentFeeAmount,
         providerId: providerId,
         durationMin: durationMin,
+        paymentReceiptUrl: paymentReceiptUrl,
       );
 }
 

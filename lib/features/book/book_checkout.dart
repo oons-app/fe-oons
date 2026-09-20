@@ -85,6 +85,17 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     return b.amountDue(processingFee: _fee());
   }
 
+  String _payCta(Map co) {
+    switch (method) {
+      case 'instapay':
+        return '${co['instapay']}';
+      case 'manual':
+        return '${co['instapayManual']}';
+      default:
+        return '${co['card']}';
+    }
+  }
+
   String _hairMod(String? hair, Map<String, String> bf) {
     switch (hair) {
       case 'short':
@@ -209,17 +220,24 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                           const SizedBox(height: 12),
                           BookPayMethodTile(
                             selected: method == 'card',
-                            card: true,
+                            kind: BookPayKind.card,
                             title: '${co['card']}',
                             note: '${co['cardNote']}',
                             onTap: () => setState(() => method = 'card'),
                           ),
                           BookPayMethodTile(
                             selected: method == 'instapay',
-                            card: false,
+                            kind: BookPayKind.wallet,
                             title: '${co['instapay']}',
                             note: '${co['instapayNote']}',
                             onTap: () => setState(() => method = 'instapay'),
+                          ),
+                          BookPayMethodTile(
+                            selected: method == 'manual',
+                            kind: BookPayKind.transfer,
+                            title: '${co['instapayManual']}',
+                            note: '${co['instapayManualNote']}',
+                            onTap: () => setState(() => method = 'manual'),
                           ),
                         ],
                       ),
@@ -300,7 +318,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                 label: bf['dueNow'] ?? '',
                 sub: bf['barFeesIn'],
                 price: money(due, lang),
-                cta: '${bf['ctaPayNow'] ?? ''} · ${method == 'card' ? co['card'] : co['instapay']}',
+                cta: '${bf['ctaPayNow'] ?? ''} · ${_payCta(co)}',
                 enabled: online && !needsId,
                 onTap: () {
                   if (!online) return;

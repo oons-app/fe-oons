@@ -44,7 +44,8 @@ class ProcessingFeeSchedule {
     if (m == 'instapay' || m == 'wallet') {
       bps = walletBps;
       fixed = walletFixed;
-    } else if (m == 'fawry' || m == 'kiosk') {
+    }
+    if (m == 'manual' || m == 'instapay_manual' || m == 'instapay_transfer' || m == 'fawry' || m == 'kiosk') {
       return 0;
     }
     return (basePiastres * bps) ~/ 10000 + fixed;

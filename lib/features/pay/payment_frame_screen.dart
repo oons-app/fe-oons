@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
@@ -15,6 +16,7 @@ import 'package:oons/data/models.dart';
 import 'package:oons/data/repo.dart';
 import 'package:oons/features/client/client_chrome.dart';
 import 'package:oons/features/pay/pay_checkout_frame.dart';
+import 'package:oons/features/pay/pay_manual_panel.dart';
 import 'package:oons/features/book/book_widgets.dart';
 import 'package:oons/l10n/copy.dart';
 
@@ -44,20 +46,33 @@ class _PaymentFrameScreenState extends ConsumerState<PaymentFrameScreen> with Wi
   bool abandoning = false;
   Timer? poll;
   Timer? tick;
+  Uint8List? _receiptBytes;
+  bool _receiptBusy = false;
 
   String get method {
     final m = widget.method.toLowerCase().trim();
     if (m == 'instapay' || m == 'wallet') return 'instapay';
+    if (m == 'manual' || m == 'instapay_manual' || m == 'instapay_transfer') return 'manual';
     if (m == 'fawry' || m == 'kiosk') return 'fawry';
     return 'card';
   }
 
-  // Only card/wallet are live at checkout — swapping always toggles between
-  // those two, regardless of which one failed.
-  String get _otherMethod => method == 'card' ? 'instapay' : 'card';
+  String get _otherMethod {
+    if (method == 'card') return 'instapay';
+    if (method == 'instapay') return 'manual';
+    return 'card';
+  }
 
-  String _otherMethodLabel(String lang) =>
-      _otherMethod == 'card' ? (lang == 'ar' ? 'البطاقة' : 'the card') : (lang == 'ar' ? 'محفظة الموبايل' : 'the mobile wallet');
+  String _otherMethodLabel(String lang) {
+    switch (_otherMethod) {
+      case 'card':
+        return lang == 'ar' ? 'البطاقة' : 'the card';
+      case 'manual':
+        return lang == 'ar' ? 'إنستاباي' : 'InstaPay';
+      default:
+        return lang == 'ar' ? 'محفظة الموبايل' : 'the mobile wallet';
+    }
+  }
 
   @override
   void initState() {
@@ -80,10 +95,8 @@ class _PaymentFrameScreenState extends ConsumerState<PaymentFrameScreen> with Wi
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Mobile: app backgrounded / killed while Paymob sheet open.
-    if (state == AppLifecycleState.paused || state == AppLifecycleState.detached) {
-      if (!finishedPaid) unawaited(_abandonSilent());
-    }
+    // Paymob stays in-app. Only refresh on resume (3DS / OTP may have finished).
+    // Do not abandon on pause — that used to fire when Chrome opened.
     if (state == AppLifecycleState.resumed && !finishedPaid && !starting) {
       unawaited(_check());
     }
@@ -229,10 +242,39 @@ class _PaymentFrameScreenState extends ConsumerState<PaymentFrameScreen> with Wi
     }
   }
 
+  Future<void> _pickReceipt() async {
+    final f = await pickPayReceipt();
+    if (f == null) return;
+    final bytes = await f.readAsBytes();
+    if (mounted) setState(() => _receiptBytes = Uint8List.fromList(bytes));
+  }
+
+  Future<void> _submitReceipt() async {
+    if (_receiptBytes == null || _receiptBusy) return;
+    setState(() => _receiptBusy = true);
+    try {
+      final b = await ref.read(repoProvider).uploadPayReceipt(widget.bookingId, _receiptBytes!);
+      if (!mounted) return;
+      setState(() {
+        data = b;
+        _receiptBusy = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _receiptBusy = false);
+      final lang = langOf(ref);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(lang == 'ar' ? 'رفع الصورة فشل. جرّبي تاني.' : 'Could not upload the screenshot. Try again.')),
+      );
+    }
+  }
+
   String _title(String lang, Map co) {
     switch (method) {
       case 'instapay':
         return '${co['instapay']}';
+      case 'manual':
+        return '${co['instapayManual'] ?? 'InstaPay'}';
       case 'fawry':
         return '${co['fawry']}';
       default:
@@ -393,6 +435,18 @@ class _PaymentFrameScreenState extends ConsumerState<PaymentFrameScreen> with Wi
                               ],
                             ),
                           )
+                        : method == 'manual'
+                            ? PayManualPanel(
+                                lang: lang,
+                                bf: bf,
+                                amountPiastres: b?.amountDue(processingFee: 0) ?? 0,
+                                number: data?.instapayManualNumber ?? '01117198333',
+                                preview: _receiptBytes,
+                                busy: _receiptBusy,
+                                submitted: (b?.paymentReceiptUrl ?? '').isNotEmpty,
+                                onPick: () => unawaited(_pickReceipt()),
+                                onSubmit: () => unawaited(_submitReceipt()),
+                              )
                         : showIframe
                             ? Column(
                                 children: [
@@ -416,7 +470,7 @@ class _PaymentFrameScreenState extends ConsumerState<PaymentFrameScreen> with Wi
                                   Expanded(
                                     child: Padding(
                                       padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                                      child: PayCheckoutFrame(url: checkoutUrl!, lang: lang),
+                                      child: PayCheckoutFrame(url: checkoutUrl!, lang: lang, onReturned: _check),
                                     ),
                                   ),
                                   Padding(

@@ -1,7 +1,7 @@
 name: oons
 description: Oons — women-first home services for Greater Cairo.
 publish_to: "none"
-version: 1.0.0+9
+version: 1.0.0+10
 
 environment:
   sdk: ">=3.4.0 <4.0.0"
@@ -29,6 +29,8 @@ dependencies:
   qr_flutter: ^4.1.0
   mobile_scanner: ^7.0.0
   url_launcher: ^6.3.1
+  webview_flutter: ^4.10.0
+  webview_flutter_android: ^4.3.0
   flutter_local_notifications: ^18.0.1
   http: ^1.2.2
   web_socket_channel: ^3.0.2
@@ -61,11 +63,14 @@ flutter_launcher_icons:
 
 flutter_native_splash:
   color: "#F7F3EC"
-  image: assets/images/logo.png
+  image: assets/images/brand/mark.png
   android_12:
     color: "#F7F3EC"
-    image: assets/images/logo.png
+    image: assets/images/brand/mark.png
+    icon_background_color: "#F7F3EC"
   web: true
+  android: true
+  ios: true
 
 flutter:
   generate: true
