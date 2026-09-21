@@ -15,6 +15,7 @@ import 'package:oons/data/api.dart';
 import 'package:oons/data/models.dart';
 import 'package:oons/data/repo.dart';
 import 'package:oons/features/client/client_chrome.dart';
+import 'package:oons/features/system/progress.dart';
 import 'package:oons/features/pay/pay_checkout_frame.dart';
 import 'package:oons/features/pay/pay_manual_panel.dart';
 import 'package:oons/features/book/book_widgets.dart';
@@ -353,11 +354,15 @@ class _PaymentFrameScreenState extends ConsumerState<PaymentFrameScreen> with Wi
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              const CircularProgressIndicator(color: Client.plum),
+                              const InlineSpinner(size: 28),
                               const SizedBox(height: 18),
                               Text(bf['payOpening'] ?? '', textAlign: TextAlign.center, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                               const SizedBox(height: 8),
                               Text(bf['payHold'] ?? '', textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, height: 1.45, color: Client.muted)),
+                              if (hold != null && !holdGone) ...[
+                                const SizedBox(height: 16),
+                                HoldCountdown(deadline: hold, label: bf['holdLabel'] ?? '', ar: lang == 'ar'),
+                              ],
                             ],
                           ),
                         ),

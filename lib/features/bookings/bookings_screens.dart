@@ -1,3 +1,4 @@
+import 'package:oons/core/icons/ons_icons.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -12,6 +13,7 @@ import 'package:oons/data/models.dart';
 import 'package:oons/data/repo.dart';
 import 'package:oons/features/client/client_chrome.dart';
 import 'package:oons/features/pay/pending_pay_route.dart';
+import 'package:oons/features/system/empty_states.dart';
 import 'package:oons/l10n/copy.dart';
 import 'package:oons/l10n/errors.dart';
 
@@ -55,7 +57,14 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> {
                     index: tab,
                     onChanged: (i) => setState(() => tab = i),
                   ),
-                  Expanded(child: _BookingList(scope: tab == 0 ? 'upcoming' : 'past', lang: lang, empty: '${b['empty']}')),
+                  Expanded(
+                    child: _BookingList(
+                      scope: tab == 0 ? 'upcoming' : 'past',
+                      lang: lang,
+                      empty: '${b['empty']}',
+                      lastPast: past.isEmpty ? null : (past.toList()..sort((a, c) => c.booking.slotStart.compareTo(a.booking.slotStart))).first,
+                    ),
+                  ),
                 ],
               );
             },
@@ -67,11 +76,12 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> {
 }
 
 class _BookingList extends ConsumerWidget {
-  const _BookingList({required this.scope, required this.lang, required this.empty});
+  const _BookingList({required this.scope, required this.lang, required this.empty, this.lastPast});
 
   final String scope;
   final String lang;
   final String empty;
+  final BookingBundle? lastPast;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -82,14 +92,21 @@ class _BookingList extends ConsumerWidget {
         if (snap.connectionState != ConnectionState.done) {
           return const Padding(padding: EdgeInsets.all(20), child: Skel(width: 200, height: 28));
         }
+        if (list.isEmpty && scope == 'upcoming') {
+          final last = lastPast;
+          final pid = last?.booking.providerId ?? last?.provider?.id;
+          return OnsEmpty.noUpcoming(
+            lang: lang,
+            lastProvider: last?.provider?.name(lang),
+            lastDate: last == null ? null : DateFormat('d MMMM', lang).format(last.booking.slotStart.toLocal()),
+            onRepeat: (last == null || pid == null || pid.isEmpty) ? null : () => context.push('/book/$pid'),
+            onBrowse: () => context.push('/browse/beauty'),
+          );
+        }
         if (list.isEmpty) {
           return ClientEmptyState(
-            title: scope == 'upcoming'
-                ? (lang == 'ar' ? 'مفيش حجوزات جاية' : 'No upcoming bookings')
-                : (lang == 'ar' ? 'مفيش حجوزات سابقة' : 'No past bookings'),
-            body: scope == 'upcoming'
-                ? (lang == 'ar' ? 'احجزي خدمة من الرئيسية ولما تتأكدي هتظهر هنا.' : 'Book a service from Home — confirmed visits show up here.')
-                : empty,
+            title: lang == 'ar' ? 'مفيش حجوزات سابقة' : 'No past bookings',
+            body: empty,
             cta: lang == 'ar' ? 'تصفحي الخدمات' : 'Browse services',
             onCta: () => context.push('/browse/beauty'),
           );
@@ -376,20 +393,20 @@ class _StatusScreenState extends ConsumerState<StatusScreen> {
                     padding: const EdgeInsets.all(20),
                     child: Column(
                       children: [
-                        _kv(Icons.person_outline, lang == 'ar' ? 'المتخصصة' : 'Professional', p?.name(lang) ?? '',
+                        _kv('user', lang == 'ar' ? 'المتخصصة' : 'Professional', p?.name(lang) ?? '',
                             trailing: Face(id: p?.id, ini: p?.initials.of(lang) ?? '', size: 28, photo: p?.photo)),
-                        _kv(Icons.payments_outlined, lang == 'ar' ? 'المبلغ' : 'Amount', money(b.total, lang)),
+                        _kv('wallet', lang == 'ar' ? 'المبلغ' : 'Amount', money(b.total, lang)),
                         if (paymentMethodLabel(b.paymentMethod, lang).isNotEmpty)
                           _kv(
-                            Icons.credit_card_outlined,
+                            'card',
                             lang == 'ar' ? 'طريقة الدفع' : 'Payment method',
                             paymentMethodLabel(b.paymentMethod, lang),
                           ),
-                        _kv(Icons.lock_outline, lang == 'ar' ? 'الحفظ' : 'Escrow', '${escrow[b.escrow] ?? b.escrow}'),
-                        _kv(Icons.verified_user_outlined, lang == 'ar' ? 'الضمان' : 'Guarantee', lang == 'ar' ? 'صندوق أمانة · شغال' : 'Amana fund · active'),
+                        _kv('shield', lang == 'ar' ? 'الحفظ' : 'Escrow', '${escrow[b.escrow] ?? b.escrow}'),
+                        _kv('shieldCheck', lang == 'ar' ? 'الضمان' : 'Guarantee', lang == 'ar' ? 'صندوق أمانة · شغال' : 'Amana fund · active'),
                         if (b.address != null)
                           _kv(
-                            Icons.place_outlined,
+                            'pin',
                             lang == 'ar' ? 'العنوان' : 'Address',
                             [
                               b.address!.line1.of(lang),
@@ -398,7 +415,7 @@ class _StatusScreenState extends ConsumerState<StatusScreen> {
                             ].join('\n'),
                           ),
                         if (b.notes != null && b.notes!.trim().isNotEmpty)
-                          _kv(Icons.notes_outlined, lang == 'ar' ? 'التعليمات' : 'Notes', b.notes!),
+                          _kv('edit', lang == 'ar' ? 'التعليمات' : 'Notes', b.notes!),
                       ],
                     ),
                   ),
@@ -458,13 +475,13 @@ class _StatusScreenState extends ConsumerState<StatusScreen> {
     );
   }
 
-  Widget _kv(IconData icon, String k, String v, {Widget? trailing}) {
+  Widget _kv(String icon, String k, String v, {Widget? trailing}) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 9),
       decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Client.line, width: Client.rule))),
       child: Row(
         children: [
-          Icon(icon, size: 16, color: Client.plum),
+          OnsIcon(icon, size: 16, color: Client.plum),
           const SizedBox(width: 10),
           SizedBox(width: 88, child: ClientKicker(k)),
           Expanded(child: Text(v, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600))),

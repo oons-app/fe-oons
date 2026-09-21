@@ -1,3 +1,4 @@
+import 'package:oons/core/icons/ons_icons.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -14,6 +15,9 @@ import 'package:oons/data/repo.dart';
 import 'package:oons/data/reviews.dart';
 import 'package:oons/data/service_catalog.dart';
 import 'package:oons/features/client/client_chrome.dart';
+import 'package:oons/core/open_external.dart';
+import 'package:oons/features/system/empty_states.dart';
+import 'package:oons/features/system/nearest_match.dart';
 import 'package:oons/features/reviews/reviews_screens.dart';
 import 'package:oons/l10n/copy.dart';
 
@@ -214,22 +218,10 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
                 }
                 if (snap.hasError) {
                   return Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            lang == 'ar' ? 'مقدرناش نحمّل النتائج.' : 'Could not load results.',
-                            style: const TextStyle(color: Client.muted),
-                          ),
-                          const SizedBox(height: 12),
-                          TextButton(
-                            onPressed: () => setState(_refreshList),
-                            child: Text(lang == 'ar' ? 'حاولي تاني' : 'Try again'),
-                          ),
-                        ],
-                      ),
+                    child: OnsEmpty.fetchFailed(
+                      lang: lang,
+                      onRetry: () => setState(_refreshList),
+                      onSupport: () => unawaited(openExternal('https://wa.me/201117198333')),
                     ),
                   );
                 }
@@ -267,11 +259,13 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
                           ],
                         ),
                       ),
-                      if (list.isEmpty)
+                      if (list.isEmpty && query.isNotEmpty)
+                        _noMatch(lang)
+                      else if (list.isEmpty)
                         Padding(
                           padding: const EdgeInsets.all(24),
                           child: Text(
-                            lang == 'ar' ? 'مفيش متخصصات مطابقة للبحث ده.' : 'No professionals match this search.',
+                            lang == 'ar' ? 'لا توجد متخصصات مطابقة للبحث.' : 'No professionals match this search.',
                             style: const TextStyle(color: Client.muted),
                           ),
                         ),
@@ -453,6 +447,27 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
     );
   }
 
+  Widget _noMatch(String lang) {
+    final near = nearestByName<Map<String, dynamic>>(
+      query,
+      categories,
+      (c) => c['name'] is Map ? Loc.fromJson(c['name'] as Map).of(lang) : '${c['name'] ?? c['slug']}',
+    );
+    final nearName = near == null ? null : (near['name'] is Map ? Loc.fromJson(near['name'] as Map).of(lang) : '${near['name'] ?? near['slug']}');
+    return OnsEmpty.noMatch(
+      lang: lang,
+      query: query,
+      nearest: nearName,
+      onNearest: () => setState(() {
+        query = '';
+        _q.clear();
+        categoryId = near == null ? null : '${near['id']}';
+        _refreshList();
+      }),
+      onSuggest: () => unawaited(openExternal('https://wa.me/201117198333?text=${Uri.encodeComponent(lang == 'ar' ? 'أقترح إضافة خدمة: $query' : 'I suggest adding a service: $query')}')),
+    );
+  }
+
   Widget _catChip(String label, String? id, bool on, {bool muted = false}) {
     final fg = on ? Client.bg : (muted ? Client.muted : Client.ink);
     return Padding(
@@ -536,7 +551,7 @@ class _ProviderRow extends StatelessWidget {
                     children: [
                       Flexible(child: Text(p.name(lang), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700))),
                       const SizedBox(width: 8),
-                      const Icon(Icons.check, size: 13, color: Client.olive),
+                      const OnsIcon('check', size: 13, color: Client.olive),
                     ],
                   ),
                   const SizedBox(height: 4),

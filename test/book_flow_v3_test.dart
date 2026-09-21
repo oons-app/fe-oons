@@ -5,6 +5,7 @@ import 'package:oons/data/models.dart';
 import 'package:oons/features/book/book_pricing.dart';
 import 'package:oons/features/book/book_widgets.dart';
 import 'package:oons/features/client/client_chrome.dart';
+import 'package:oons/features/system/empty_states.dart';
 import 'package:oons/l10n/copy.dart';
 
 ServiceItem _item({
@@ -132,7 +133,7 @@ void main() {
         body: StatefulBuilder(
           builder: (context, setState) => ListView(
             children: [
-              BookEmptyCart(title: bf['emptyTitle']!, body: bf['emptyBody']!),
+              OnsEmpty.nothingPicked(lang: 'ar', onBrowse: () {}),
               BookServiceRow(
                 name: 'غسيل شعر',
                 note: '٤٥ د',
@@ -154,7 +155,7 @@ void main() {
         ),
       ),
     ));
-    expect(find.text(bf['emptyTitle']!), findsOneWidget);
+    expect(find.text('لم تختاري أي خدمة بعد'), findsOneWidget);
     expect(find.text(bf['detailsOpen']!), findsOneWidget);
     await tester.tap(find.text(bf['detailsOpen']!));
     await tester.pump();
@@ -195,7 +196,7 @@ void main() {
       ),
     ));
     expect(find.text(bf['errRetry']!), findsOneWidget);
-    expect(find.textContaining(bf['errOther']!), findsOneWidget);
+    expect(find.text('${bf['errOther']} البطاقة'), findsOneWidget); // errRetry also starts with the same verb in MSA copy
     expect(find.text(bf['errSupport']!), findsOneWidget);
     expect(find.text(bf['errBack']!), findsNothing);
   });

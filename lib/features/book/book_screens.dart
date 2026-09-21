@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:oons/core/analytics.dart';
 import 'package:oons/core/format.dart';
 import 'package:oons/core/locale.dart';
+import 'package:oons/core/open_external.dart';
 import 'package:oons/core/pro_format.dart';
 import 'package:oons/core/tokens.dart';
 import 'package:oons/core/widgets.dart';
@@ -17,6 +18,8 @@ import 'package:oons/features/book/book_pricing.dart';
 import 'package:oons/features/book/book_widgets.dart';
 import 'package:oons/features/client/client_chrome.dart';
 import 'package:oons/features/me/me_screens.dart';
+import 'package:oons/features/system/empty_states.dart';
+import 'package:oons/features/system/progress.dart';
 import 'package:oons/l10n/copy.dart';
 import 'package:oons/l10n/errors.dart';
 
@@ -566,30 +569,69 @@ class _BookScreenState extends ConsumerState<BookScreen> {
     }
   }
 
+  Future<void> _addAddress() async {
+    final saved = await Navigator.of(context).push<Address?>(
+      MaterialPageRoute(fullscreenDialog: true, builder: (_) => const AddressFormScreen(returnResult: true)),
+    );
+    if (!mounted) return;
+    final addrsNow = ref.read(sessionProvider).user?.addresses ?? [];
+    final pick = saved ?? (addrsNow.isNotEmpty ? addrsNow.last : null);
+    if (pick == null) return;
+    _clearFieldError(BookField.address);
+    _touch(() => addressId = pick.id);
+    await ref.read(sessionProvider.notifier).patchMe(defaultAddressId: pick.id);
+    unawaited(AppAnalytics.bookingAddressSelected(providerId: p!.id, area: pick.area));
+    await _refreshAvailability(force: true);
+  }
+
+  void _browseServices() {
+    final verts = verticals;
+    final target = verts.contains('cleaning') ? 'cleaning' : (verts.isEmpty ? null : verts.first);
+    if (target != null && target != activeVertical) {
+      _touch(() => _activeVertical = target);
+      unawaited(AppAnalytics.bookCategorySwitched(providerId: p!.id, vertical: target));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final lang = langOf(ref);
     final copy = bf;
     if (p == null && loadError != null) {
+      final online = ref.watch(sessionProvider).online;
       return Scaffold(
         backgroundColor: Client.bg,
         body: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(friendlyError(loadError!, lang), textAlign: TextAlign.center, style: const TextStyle(fontSize: 14, height: 1.45, color: Client.body)),
-                const SizedBox(height: 16),
-                ClientPrimaryButton(label: copy['retry'] ?? '', onTap: _load),
-              ],
-            ),
+          child: Column(
+            children: [
+              ClientFlowHeader(title: copy['title1'] ?? '', onBack: () => context.pop()),
+              Expanded(
+                child: online
+                    ? OnsEmpty.fetchFailed(lang: lang, onRetry: _load, onSupport: () => unawaited(openExternal('https://wa.me/201117198333')))
+                    : OnsEmpty.offline(lang: lang, onRetry: _load),
+              ),
+            ],
           ),
         ),
       );
     }
     if (p == null) {
-      return const Scaffold(backgroundColor: Client.bg, body: Center(child: CircularProgressIndicator(color: Client.plum)));
+      final ec = Copy.of(lang)['empty'] as Map;
+      return Scaffold(
+        backgroundColor: Client.bg,
+        body: SafeArea(
+          child: Column(
+            children: [
+              ClientFlowHeader(title: copy['title1'] ?? '', onBack: () => context.pop()),
+              Expanded(
+                child: SingleChildScrollView(
+                  child: ServiceListSkeleton(heading: copy['title1'] ?? '', caption: '${ec['skeletonCaption']}'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
     }
     final steps = [copy['step1'] ?? '', copy['step2'] ?? '', copy['step3'] ?? ''];
     final empty = !cartReady;
@@ -739,7 +781,7 @@ class _BookScreenState extends ConsumerState<BookScreen> {
                 detailsClose: copy['detailsClose'] ?? '',
               );
             }),
-            if (!cartReady) BookEmptyCart(title: copy['emptyTitle'] ?? '', body: copy['emptyBody'] ?? ''),
+            if (!cartReady) OnsEmpty.nothingPicked(lang: lang, cleaning: verticals.contains('cleaning'), onBrowse: _browseServices),
           ],
         ),
       ),
@@ -894,6 +936,27 @@ class _BookScreenState extends ConsumerState<BookScreen> {
     final addrs = ref.watch(sessionProvider).user?.addresses ?? const <Address>[];
     final addr = _selectedAddress();
     final travel = bookTravel(lines);
+    final ec = Copy.of(lang)['empty'] as Map;
+    final daySlots = days.isEmpty ? const [] : ((days[day]['slots'] as List?) ?? const []);
+    final dayTaken = days.isEmpty || daySlots.every((s) => (s as Map)['available'] == false);
+    int? nextIdx;
+    int? nextFree;
+    if (days.isNotEmpty) {
+      for (var k = day + 1; k < days.length; k++) {
+        final n = ((days[k]['slots'] as List?) ?? const []).where((s) => (s as Map)['available'] != false).length;
+        if (n > 0) {
+          nextIdx = k;
+          nextFree = n;
+          break;
+        }
+      }
+    }
+    String dayWord(int k) {
+      final d = DateTime.tryParse('${days[k]['date']}') ?? DateTime.now();
+      final now = DateTime.now();
+      if (d.year == now.year && d.month == now.month && d.day == now.day) return '${ec['today']}';
+      return '${weekdayLabel(d, lang)} ${digits(d.day, ar: lang == 'ar')}';
+    }
     return [
       BookFieldFrame(
         key: slotKey,
@@ -943,16 +1006,23 @@ class _BookScreenState extends ConsumerState<BookScreen> {
               ),
             ),
             const SizedBox(height: 10),
-            if (days.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                child: Column(
-                  children: [
-                    Text(copy['noSlotsTitle'] ?? '', style: const TextStyle(fontWeight: FontWeight.w700)),
-                    const SizedBox(height: 4),
-                    Text(copy['noSlotsBody'] ?? '', textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, color: Client.muted, height: 1.4)),
-                  ],
-                ),
+            if (dayTaken)
+              OnsEmpty.noAvailability(
+                lang: lang,
+                area: areaName(_selectedAddress()?.area ?? (p!.areas.isNotEmpty ? p!.areas.first : ''), lang),
+                day: days.isEmpty ? '' : dayWord(day),
+                nextDayLabel: nextIdx == null ? null : dayWord(nextIdx),
+                nextCount: nextFree,
+                onNext: () {
+                  final idx = nextIdx;
+                  if (idx == null) {
+                    unawaited(_refreshAvailability(force: true));
+                    return;
+                  }
+                  _clearFieldError(BookField.slot);
+                  _touch(() => day = idx);
+                  unawaited(AppAnalytics.bookingSlotSelected(providerId: p!.id, slotStart: slotTime().toIso8601String()));
+                },
               )
             else
               GridView.count(
@@ -1023,18 +1093,7 @@ class _BookScreenState extends ConsumerState<BookScreen> {
           children: [
             BookMonoKicker(copy['where'] ?? ''),
             const SizedBox(height: 10),
-            if (addrs.isEmpty)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(copy['noAddressTitle'] ?? '', style: const TextStyle(fontWeight: FontWeight.w700)),
-                    const SizedBox(height: 4),
-                    Text(copy['noAddressBody'] ?? '', style: const TextStyle(fontSize: 13, height: 1.4, color: Client.muted)),
-                  ],
-                ),
-              ),
+            if (addrs.isEmpty) OnsEmpty.noAddress(lang: lang, onAdd: _addAddress),
             ...addrs.map((a) {
               final on = addr?.id == a.id;
               final covered = p!.areas.isEmpty || p!.areas.contains(a.area);
@@ -1080,20 +1139,7 @@ class _BookScreenState extends ConsumerState<BookScreen> {
             Semantics(
               button: true,
               child: InkWell(
-                onTap: () async {
-                  final saved = await Navigator.of(context).push<Address?>(
-                    MaterialPageRoute(fullscreenDialog: true, builder: (_) => const AddressFormScreen(returnResult: true)),
-                  );
-                  if (!mounted) return;
-                  final addrsNow = ref.read(sessionProvider).user?.addresses ?? [];
-                  final pick = saved ?? (addrsNow.isNotEmpty ? addrsNow.last : null);
-                  if (pick == null) return;
-                  _clearFieldError(BookField.address);
-                  _touch(() => addressId = pick.id);
-                  await ref.read(sessionProvider.notifier).patchMe(defaultAddressId: pick.id);
-                  unawaited(AppAnalytics.bookingAddressSelected(providerId: p!.id, area: pick.area));
-                  await _refreshAvailability(force: true);
-                },
+                onTap: _addAddress,
                 child: Container(
                   width: double.infinity,
                   constraints: const BoxConstraints(minHeight: 44),

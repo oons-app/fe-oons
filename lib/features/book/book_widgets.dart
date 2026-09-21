@@ -1,3 +1,4 @@
+import 'package:oons/core/icons/ons_icons.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -45,7 +46,7 @@ class BookChip extends StatelessWidget {
         onTap: onTap,
         child: Container(
           alignment: Alignment.center,
-          constraints: const BoxConstraints(minHeight: 38),
+          constraints: const BoxConstraints(minHeight: 44, minWidth: 44),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
           decoration: BoxDecoration(
             border: Border.all(color: Client.ink, width: Client.rule),
@@ -89,7 +90,8 @@ class BookStepperControl extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           _cell(
-            label: '−',
+            icon: 'minus',
+            ar: ar,
             onTap: canDec ? onDec : null,
             fg: canDec ? Client.ink : const Color(0xFFC9C1BA),
             border: Border(left: BorderSide(color: Client.line, width: Client.rule)),
@@ -103,7 +105,8 @@ class BookStepperControl extends StatelessWidget {
             ),
           ),
           _cell(
-            label: '+',
+            icon: 'plus',
+            ar: ar,
             onTap: qty < max ? onInc : null,
             fg: Client.ink,
             bg: Client.sand2,
@@ -114,18 +117,23 @@ class BookStepperControl extends StatelessWidget {
     );
   }
 
-  Widget _cell({required String label, required Color fg, VoidCallback? onTap, Color? bg, required Border border}) {
+  // Stepper −/+ is one of the eight permitted icon-only cases: the quantity
+  // between them is the visible label, each control keeps an accessible name.
+  // 44px so the tap target meets the accessibility minimum.
+  Widget _cell({required String icon, required bool ar, required Color fg, VoidCallback? onTap, Color? bg, required Border border}) {
     return Semantics(
       button: true,
-      label: label,
+      enabled: onTap != null,
+      label: onsIconLabel(icon, ar: ar),
+      excludeSemantics: true,
       child: InkWell(
         onTap: onTap,
         child: Container(
-          width: 38,
-          height: 38,
+          width: 44,
+          height: 44,
           alignment: Alignment.center,
           decoration: BoxDecoration(color: bg, border: border),
-          child: Text(label, style: TextStyle(fontFamily: T.mono, fontSize: 18, fontWeight: FontWeight.w500, color: fg)),
+          child: OnsIcon(icon, size: 18, color: fg),
         ),
       ),
     );
@@ -473,26 +481,6 @@ class BookServiceRow extends StatelessWidget {
                 ],
               ),
             ),
-        ],
-      ),
-    );
-  }
-}
-
-class BookEmptyCart extends StatelessWidget {
-  const BookEmptyCart({super.key, required this.title, required this.body});
-  final String title;
-  final String body;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 28, 20, 12),
-      child: Column(
-        children: [
-          Text(title, textAlign: TextAlign.center, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 6),
-          Text(body, textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, height: 1.45, color: Client.muted)),
         ],
       ),
     );

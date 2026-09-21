@@ -1,3 +1,4 @@
+import 'package:oons/core/icons/ons_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -387,7 +388,7 @@ class SavedScreen extends ConsumerWidget {
                                   ],
                                 ),
                               ),
-                              Icon(Icons.arrow_forward, size: 16, color: Client.muted, textDirection: Directionality.of(context)),
+                              const OnsIcon('advance', size: 16, color: Client.muted),
                             ],
                           ),
                         ),

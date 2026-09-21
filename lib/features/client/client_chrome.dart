@@ -1,3 +1,4 @@
+import 'package:oons/core/icons/ons_icons.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -131,7 +132,7 @@ class ClientAddressChip extends StatelessWidget {
         decoration: BoxDecoration(color: Client.card, border: Border.all(color: Client.ink, width: Client.rule)),
         child: Row(
           children: [
-            const Icon(Icons.place_outlined, size: 14, color: Client.ink),
+            const OnsIcon('pin', size: 14, color: Client.ink),
             const SizedBox(width: 8),
             Expanded(
               child: Text(

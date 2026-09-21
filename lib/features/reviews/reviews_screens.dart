@@ -6,6 +6,8 @@ import 'package:oons/core/locale.dart';
 import 'package:oons/core/tokens.dart';
 import 'package:oons/core/widgets.dart';
 import 'package:oons/features/client/client_chrome.dart';
+import 'package:oons/features/system/empty_states.dart';
+import 'package:oons/features/system/progress.dart';
 import 'package:oons/data/repo.dart';
 import 'package:oons/data/reviews.dart';
 import 'package:oons/l10n/copy.dart';
@@ -30,7 +32,13 @@ class ReviewsScreen extends ConsumerWidget {
                 builder: (context, snap) {
                   final list = snap.data ?? const <Review>[];
                   if (snap.connectionState != ConnectionState.done) {
-                    return const Center(child: CircularProgressIndicator(color: Client.plum));
+                    final ec = Copy.of(lang)['empty'] as Map;
+                    return SingleChildScrollView(
+                      child: ServiceListSkeleton(heading: providerId == null ? '${t['all']}' : '${t['for']}', caption: '${ec['skeletonReviews']}', rows: 3),
+                    );
+                  }
+                  if (list.isEmpty && providerId == null) {
+                    return OnsEmpty.noRatings(lang: lang, onPast: () => context.go('/bookings'));
                   }
                   if (list.isEmpty) {
                     return Center(child: Text('${t['empty']}', style: const TextStyle(color: Client.muted)));
