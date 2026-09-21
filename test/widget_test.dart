@@ -46,12 +46,12 @@ void main() {
     expect(secure, startsWith('wss://app.oons.example/api/v1/bookings/abc/track'));
   });
 
-  test('weekdayLabel uses weekday-1 so Monday is اتنين', () {
+  test('weekdayLabel uses weekday-1 so Monday is الاثنين', () {
     final monday = DateTime(2026, 3, 2);
     expect(monday.weekday, DateTime.monday);
-    expect(weekdayLabel(monday, 'ar'), 'اتنين');
+    expect(weekdayLabel(monday, 'ar'), 'الاثنين');
     expect(weekdayLabel(monday, 'en'), 'MON');
-    expect(weekdayLabel(DateTime(2026, 3, 3), 'ar'), 'تلات');
+    expect(weekdayLabel(DateTime(2026, 3, 3), 'ar'), 'الثلاثاء');
   });
 
   test('money formats piastres without floats in the UI string', () {
@@ -62,7 +62,7 @@ void main() {
   test('timeline and escrow copy is bilingual', () {
     expect(Copy.of('ar')['timeline'], containsPair('on_the_way', 'في الطريق'));
     expect(Copy.of('ar')['timeline'], containsPair('checked_in', 'وصلت'));
-    expect(Copy.of('ar')['escrow'], containsPair('held', 'واقفة'));
+    expect(Copy.of('ar')['escrow'], containsPair('held', 'محتجز'));
     expect(Copy.of('en')['escrow'], containsPair('held', 'Held in escrow'));
     expect((Copy.of('ar')['reviews'] as Map)['all'], 'كل التقييمات');
     expect(AppShell.clientPaths, contains('/profile'));

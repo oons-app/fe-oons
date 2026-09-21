@@ -340,7 +340,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
   String code = '';
   bool busy = false;
   String? err;
-  int cooldown = 60;
+  int cooldown = 20;
   Timer? tick;
 
   @override
@@ -357,7 +357,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
 
   void _startCooldown() {
     tick?.cancel();
-    setState(() => cooldown = 60);
+    setState(() => cooldown = 20);
     tick = Timer.periodic(const Duration(seconds: 1), (t) {
       if (!mounted) return;
       if (cooldown <= 1) {

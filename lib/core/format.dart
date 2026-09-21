@@ -213,7 +213,7 @@ String localizeAreaSlugs(String text, String lang) {
   return out;
 }
 
-const weekdayAr = ['اتنين', 'تلات', 'أربع', 'خميس', 'جمعة', 'سبت', 'حد'];
+const weekdayAr = ['الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت', 'الأحد'];
 const weekdayEn = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
 
 String weekdayLabel(DateTime date, String lang) {

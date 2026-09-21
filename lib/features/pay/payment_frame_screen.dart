@@ -70,7 +70,7 @@ class _PaymentFrameScreenState extends ConsumerState<PaymentFrameScreen> with Wi
       case 'manual':
         return lang == 'ar' ? 'إنستاباي' : 'InstaPay';
       default:
-        return lang == 'ar' ? 'محفظة الموبايل' : 'the mobile wallet';
+        return lang == 'ar' ? 'محفظة الهاتف' : 'the mobile wallet';
     }
   }
 
@@ -121,8 +121,8 @@ class _PaymentFrameScreenState extends ConsumerState<PaymentFrameScreen> with Wi
     final lang = langOf(ref);
     final msg = lang == 'ar'
         ? (hold != null
-            ? 'الدفع ما اكتملش. الميعاد محجوز لحد ${_holdLabel(hold, lang)} — تقدري تكمّلي من الحجوزات.'
-            : 'الدفع ما اكتملش. الميعاد لسه محجوز — كمّلي من الحجوزات.')
+            ? 'لم يكتمل الدفع. الموعد محجوز حتى ${_holdLabel(hold, lang)} — يمكنكِ الإكمال من الحجوزات.'
+            : 'لم يكتمل الدفع. الموعد ما زال محجوزًا — أكملي من الحجوزات.')
         : (hold != null
             ? 'Payment not finished. Slot held until ${_holdLabel(hold, lang)} — resume from Bookings.'
             : 'Payment not finished. Slot still held — resume from Bookings.');
@@ -264,7 +264,7 @@ class _PaymentFrameScreenState extends ConsumerState<PaymentFrameScreen> with Wi
       setState(() => _receiptBusy = false);
       final lang = langOf(ref);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(lang == 'ar' ? 'رفع الصورة فشل. جرّبي تاني.' : 'Could not upload the screenshot. Try again.')),
+        SnackBar(content: Text(lang == 'ar' ? 'فشل رفع الصورة. حاولِي مرة أخرى.' : 'Could not upload the screenshot. Try again.')),
       );
     }
   }
@@ -317,10 +317,10 @@ class _PaymentFrameScreenState extends ConsumerState<PaymentFrameScreen> with Wi
                   child: Text(
                     hold != null
                         ? (lang == 'ar'
-                            ? 'لو قفلتِ النافذة، الحجز يفضل مستني الدفع لحد ${_holdLabel(hold, lang)}.'
+                            ? 'إن أغلقتِ النافذة، يبقى الحجز بانتظار الدفع حتى ${_holdLabel(hold, lang)}.'
                             : 'If you close this window, the booking stays unpaid until ${_holdLabel(hold, lang)}.')
                         : (lang == 'ar'
-                            ? 'لو قفلتِ النافذة، تقدري ترجعي تكمّلي من الحجوزات.'
+                            ? 'إن أغلقتِ النافذة، يمكنكِ العودة والإكمال من الحجوزات.'
                             : 'If you close this window, resume anytime from Bookings.'),
                     style: const TextStyle(fontSize: 12.5, height: 1.4, color: Client.ink),
                   ),
@@ -455,14 +455,14 @@ class _PaymentFrameScreenState extends ConsumerState<PaymentFrameScreen> with Wi
                                     child: Text(
                                       method == 'instapay'
                                           ? (lang == 'ar'
-                                              ? 'كمّلي دفع محفظة الموبايل في الإطار تحت. لو قفلتِ، الحجز يفضل مستني الدفع.'
+                                              ? 'أكملي دفع محفظة الهاتف في الإطار أدناه. إن أغلقتِ، يبقى الحجز بانتظار الدفع.'
                                               : 'Complete mobile wallet payment below. Closing keeps the booking pending.')
                                           : method == 'fawry'
                                               ? (lang == 'ar'
-                                                  ? 'اتبعِي خطوات فوري في الإطار، أو ادفعِي بالكود لو ظهر.'
+                                                  ? 'اتبعي خطوات فوري في الإطار، أو ادفعِي بالرمز إن ظهر.'
                                                   : 'Follow Fawry below, or pay with the code if shown.')
                                               : (lang == 'ar'
-                                                  ? 'أدخلي بيانات البطاقة في الإطار الآمن. قفل النافذة مش بيلغي الحجز فوراً.'
+                                                  ? 'أدخلي بيانات البطاقة في الإطار الآمن. إغلاق النافذة لا يلغي الحجز فورًا.'
                                                   : 'Enter card details in the secure frame. Closing does not cancel immediately.'),
                                       style: const TextStyle(fontSize: 13, height: 1.45, color: Client.body),
                                     ),
@@ -476,7 +476,7 @@ class _PaymentFrameScreenState extends ConsumerState<PaymentFrameScreen> with Wi
                                   Padding(
                                     padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
                                     child: ClientGhostButton(
-                                      label: lang == 'ar' ? 'حدّث حالة الدفع' : 'Refresh payment status',
+                                      label: lang == 'ar' ? 'حدّثي حالة الدفع' : 'Refresh payment status',
                                       onTap: _check,
                                     ),
                                   ),
@@ -486,7 +486,7 @@ class _PaymentFrameScreenState extends ConsumerState<PaymentFrameScreen> with Wi
                                       child: TextButton(
                                         onPressed: () => unawaited(_leaveUnpaid()),
                                         child: Text(
-                                          lang == 'ar' ? 'قفلتِ الدفع — رجّعيني للحجز' : 'I closed payment — back to booking',
+                                          lang == 'ar' ? 'أغلقتُ الدفع — أرجعيني إلى الحجز' : 'I closed payment — back to booking',
                                           style: const TextStyle(color: Client.muted, fontSize: 13),
                                         ),
                                       ),
@@ -507,25 +507,25 @@ class _PaymentFrameScreenState extends ConsumerState<PaymentFrameScreen> with Wi
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          lang == 'ar' ? 'بنتأكد من الدفع' : 'Confirming payment',
+                                          lang == 'ar' ? 'نتحقق من الدفع' : 'Confirming payment',
                                           style: Theme.of(context).textTheme.headlineMedium,
                                         ),
                                         const SizedBox(height: 10),
                                         Text(
                                           lang == 'ar'
-                                              ? 'بنحدّث الحالة تلقائي. لو قفلتِ صفحة بايموب، ارجعي هنا أو من الحجوزات.'
+                                              ? 'نحدّث الحالة تلقائيًا. إن أغلقتِ صفحة بايموب، ارجعي إلى هنا أو من الحجوزات.'
                                               : 'We refresh automatically. If you closed Paymob, return here or resume from Bookings.',
                                           style: const TextStyle(fontSize: 14, height: 1.45, color: Client.body),
                                         ),
                                         const Spacer(),
                                         ClientGhostButton(
-                                          label: lang == 'ar' ? 'حدّث الآن' : 'Refresh now',
+                                          label: lang == 'ar' ? 'حدّثي الآن' : 'Refresh now',
                                           onTap: _check,
                                         ),
                                         TextButton(
                                           onPressed: () => unawaited(_leaveUnpaid()),
                                           child: Text(
-                                            lang == 'ar' ? 'كمّلي بعدين' : 'Finish later',
+                                            lang == 'ar' ? 'أكملي لاحقًا' : 'Finish later',
                                             style: const TextStyle(color: Client.muted),
                                           ),
                                         ),
