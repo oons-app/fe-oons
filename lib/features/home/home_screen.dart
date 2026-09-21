@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:oons/core/format.dart';
+import 'package:oons/core/icons/ons_icons.dart';
 import 'package:oons/core/locale.dart';
 import 'package:oons/core/tokens.dart';
 import 'package:oons/core/widgets.dart';
@@ -115,24 +116,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(greet(DateTime.now(), lang, name), style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700, height: 1.2, color: Client.ink)),
-                                const SizedBox(height: 6),
-                                ClientAddressChip(
-                                  line: addrLine,
-                                  changeLabel: lang == 'ar' ? 'تغيير' : 'Change',
-                                  onTap: () => context.push('/me/addresses'),
-                                ),
-                              ],
-                            ),
+                            child: Text(greet(DateTime.now(), lang, name), style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700, height: 1.2, color: Client.ink)),
                           ),
                           const SizedBox(width: 8),
-                          ClientSquareBtn(label: lang == 'ar' ? 'EN' : 'ع', onTap: () => ref.read(localeProvider.notifier).toggle()),
+                          ClientSquareBtn(
+                            label: lang == 'ar' ? 'العنوان: $addrLine' : 'Address: $addrLine',
+                            icon: const OnsIcon('pin', size: 18, color: Client.ink),
+                            onTap: () => context.push('/me/addresses'),
+                          ),
                           const SizedBox(width: 8),
                           ClientSquareBtn(
                             label: (user?.initials.of(lang).isNotEmpty == true ? user!.initials.of(lang).characters.first : 'ن'),
@@ -314,10 +308,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       return '${h['notInArea']}';
                     }
                     final tileDefs = <({String id, Color bg, Color fg, String icon, bool locked})>[
-                      (id: 'beauty', bg: const Color(0xFFB5654B), fg: Client.bg, icon: '✂', locked: lockedVertical('beauty')),
-                      (id: 'cleaning', bg: Client.card, fg: Client.ink, icon: '✳', locked: lockedVertical('cleaning')),
-                      (id: 'chef', bg: Client.card, fg: Client.ink, icon: '♨', locked: lockedVertical('chef')),
-                      (id: 'childcare', bg: Client.sand2, fg: Client.ink, icon: '☺', locked: lockedVertical('childcare')),
+                      (id: 'beauty', bg: const Color(0xFFB5654B), fg: Client.bg, icon: 'beauty', locked: lockedVertical('beauty')),
+                      (id: 'cleaning', bg: Client.card, fg: Client.ink, icon: 'clean', locked: lockedVertical('cleaning')),
+                      (id: 'chef', bg: Client.card, fg: Client.ink, icon: 'home', locked: lockedVertical('chef')),
+                      (id: 'childcare', bg: Client.sand2, fg: Client.ink, icon: 'user', locked: lockedVertical('childcare')),
                     ];
                     tileDefs.sort((a, b) {
                       final aa = availableVertical(a.id);
@@ -564,7 +558,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(icon, style: TextStyle(fontFamily: T.mono, fontSize: 18, color: fg)),
+                  OnsIcon(icon, size: 18, color: fg),
                   const Spacer(),
                   if (!locked)
                     Container(

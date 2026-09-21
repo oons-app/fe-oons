@@ -71,43 +71,51 @@ class ClientSectionLabel extends StatelessWidget {
 }
 
 class ClientSquareBtn extends StatelessWidget {
-  const ClientSquareBtn({super.key, required this.label, this.onTap, this.filled = false, this.badge});
+  const ClientSquareBtn({super.key, required this.label, this.onTap, this.filled = false, this.badge, this.icon});
 
   final String label;
   final VoidCallback? onTap;
   final bool filled;
   final String? badge;
+  final Widget? icon;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        width: 40,
-        height: 40,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: filled ? Client.sand : Client.card,
-          border: Border.all(color: Client.ink, width: Client.rule),
-        ),
-        child: Stack(
-          clipBehavior: Clip.none,
+    return Semantics(
+      button: true,
+      label: label,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          width: 40,
+          height: 40,
           alignment: Alignment.center,
-          children: [
-            Text(label, style: const TextStyle(fontFamily: T.mono, fontSize: 12, fontWeight: FontWeight.w600, color: Client.ink)),
-            if (badge != null)
-              Positioned(
-                top: -4,
-                left: -4,
-                child: Container(
-                  width: 14,
-                  height: 14,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(color: Client.terracotta, border: Border.all(color: Client.ink, width: Client.rule)),
-                  child: Text(badge!, style: const TextStyle(fontFamily: T.mono, fontSize: 8, fontWeight: FontWeight.w600, color: Client.bg)),
-                ),
+          decoration: BoxDecoration(
+            color: filled ? Client.sand : Client.card,
+            border: Border.all(color: Client.ink, width: Client.rule),
+          ),
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.center,
+            children: [
+              ExcludeSemantics(
+                child: icon ??
+                    Text(label, style: const TextStyle(fontFamily: T.mono, fontSize: 12, fontWeight: FontWeight.w600, color: Client.ink)),
               ),
-          ],
+              if (badge != null)
+                Positioned(
+                  top: -4,
+                  left: -4,
+                  child: Container(
+                    width: 14,
+                    height: 14,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(color: Client.terracotta, border: Border.all(color: Client.ink, width: Client.rule)),
+                    child: Text(badge!, style: const TextStyle(fontFamily: T.mono, fontSize: 8, fontWeight: FontWeight.w600, color: Client.bg)),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -180,7 +188,7 @@ class ClientSearchField extends StatelessWidget {
         decoration: BoxDecoration(color: Client.card, border: Border.all(color: Client.ink, width: Client.rule)),
         child: Row(
           children: [
-            const Text('⌕', style: TextStyle(fontFamily: T.mono, fontSize: 14, color: Client.muted2)),
+            const OnsIcon('search', size: 16, color: Client.muted2),
             const SizedBox(width: 10),
             if (controller != null)
               Expanded(

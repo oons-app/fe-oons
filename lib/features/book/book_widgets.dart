@@ -239,7 +239,7 @@ String bookVerticalLabel(String v, Map<String, String> bf) {
   }
 }
 
-String bookVerticalGlyph(String v) => v == 'beauty' ? '✂' : '⌂';
+String bookVerticalIcon(String v) => v == 'beauty' ? 'beauty' : (v == 'cleaning' ? 'clean' : 'list');
 
 String heldSlotLine({
   required DateTime slot,
@@ -332,7 +332,7 @@ class BookCategoryTabs extends StatelessWidget {
                             Row(
                               children: [
                                 OnsIcon(
-                                  v == 'beauty' ? 'beauty' : (v == 'cleaning' ? 'clean' : 'list'),
+                                  bookVerticalIcon(v),
                                   size: 14,
                                   color: on ? Client.bg : Client.ink,
                                 ),
