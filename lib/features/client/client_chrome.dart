@@ -1,8 +1,7 @@
-import 'package:oons/core/icons/ons_icons.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:oons/core/glyphs.dart';
+import 'package:oons/core/icons/ons_icons.dart';
 import 'package:oons/core/pro_format.dart';
 import 'package:oons/core/tokens.dart';
 import 'package:oons/core/widgets.dart';
@@ -330,7 +329,7 @@ class ClientPrimaryButton extends StatelessWidget {
                   child: Text(label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Client.bg)),
                 ),
                 if (trailing)
-                  const Text('←', style: TextStyle(fontFamily: T.mono, fontSize: 16, color: Client.bg)),
+                  const OnsIcon('advance', size: 16, color: Client.bg),
               ],
             ),
           ),
@@ -509,11 +508,11 @@ class ClientFlowHeader extends StatelessWidget {
             label: rtl ? 'رجوع' : 'Back',
             child: InkWell(
               onTap: onBack ?? () => Navigator.maybePop(context),
-              child: const SizedBox(
+              child: SizedBox(
                 width: 34,
                 height: 34,
                 child: Center(
-                  child: Text('›', style: TextStyle(fontFamily: T.mono, fontSize: 16, fontWeight: FontWeight.w500, color: Client.ink)),
+                  child: OnsIconOnly('back', semanticLabel: rtl ? 'رجوع' : 'Back', size: 18, color: Client.ink),
                 ),
               ),
             ),
@@ -555,10 +554,11 @@ class ClientBackHeader extends StatelessWidget {
           if (onBack != null || Navigator.of(context).canPop())
             IconButton(
               onPressed: onBack ?? () => Navigator.maybePop(context),
-              icon: Transform(
-                alignment: Alignment.center,
-                transform: Matrix4.diagonal3Values(Directionality.of(context) == TextDirection.rtl ? -1.0 : 1.0, 1, 1),
-                child: const Glyph(GlyphKind.back, size: 20, color: Client.ink),
+              icon: OnsIconOnly(
+                'back',
+                semanticLabel: Directionality.of(context) == TextDirection.rtl ? 'رجوع' : 'Back',
+                size: 20,
+                color: Client.ink,
               ),
             )
           else
@@ -745,6 +745,8 @@ class ClientStickyBar extends StatelessWidget {
     this.sub,
     this.note,
     this.enabled = true,
+    this.busy = false,
+    this.busyLabel,
   });
 
   final String label;
@@ -754,6 +756,8 @@ class ClientStickyBar extends StatelessWidget {
   final String? note;
   final VoidCallback onTap;
   final bool enabled;
+  final bool busy;
+  final String? busyLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -783,22 +787,30 @@ class ClientStickyBar extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Material(
-            color: enabled ? Client.plum : Client.line,
+            color: (enabled || busy) ? Client.plum : Client.line,
             child: InkWell(
-              onTap: enabled ? onTap : null,
-              mouseCursor: enabled ? SystemMouseCursors.click : SystemMouseCursors.forbidden,
+              onTap: (enabled && !busy) ? onTap : null,
+              mouseCursor: (enabled && !busy) ? SystemMouseCursors.click : SystemMouseCursors.forbidden,
               child: Container(
                 height: 54,
                 padding: const EdgeInsets.symmetric(horizontal: 18),
                 child: Row(
                   children: [
+                    if (busy) ...[
+                      const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 1.8, color: Client.bg),
+                      ),
+                      const SizedBox(width: 10),
+                    ],
                     Expanded(
                       child: Text(
-                        cta,
-                        style: TextStyle(fontSize: 16.5, fontWeight: FontWeight.w700, color: enabled ? Client.bg : Client.muted2),
+                        busy ? (busyLabel ?? cta) : cta,
+                        style: TextStyle(fontSize: 16.5, fontWeight: FontWeight.w700, color: (enabled || busy) ? Client.bg : Client.muted2),
                       ),
                     ),
-                    Text('←', style: TextStyle(fontFamily: T.mono, fontSize: 16, color: enabled ? Client.bg : Client.muted2)),
+                    if (!busy) OnsIcon('advance', size: 16, color: (enabled || busy) ? Client.bg : Client.muted2),
                   ],
                 ),
               ),

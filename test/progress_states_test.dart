@@ -9,6 +9,12 @@ Widget _app(Widget child) => MaterialApp(
     );
 
 void main() {
+  testWidgets('OnsBusyPage names what is loading instead of a bare spinner', (t) async {
+    await t.pumpWidget(const MaterialApp(home: OnsBusyPage(caption: 'نحمل ملخص حجزكِ…')));
+    expect(find.text('نحمل ملخص حجزكِ…'), findsOneWidget);
+    expect(find.byType(InlineSpinner), findsOneWidget);
+  });
+
   test('duration policy picks the documented treatment', () {
     expect(progressTreatmentFor(const Duration(milliseconds: 400)), ProgressTreatment.none);
     expect(progressTreatmentFor(const Duration(seconds: 2)), ProgressTreatment.inlineSpinner);
@@ -75,9 +81,9 @@ void main() {
   });
 
   testWidgets('determinate bar shows a number; indeterminate bar never does', (t) async {
-    await t.pumpWidget(_app(const OnsProgressBar.determinate(value: 0.5, numberLabel: '٣ / ٦')));
+    await t.pumpWidget(_app(const DeterminateBar(value: 0.5, numberLabel: '٣ / ٦')));
     expect(find.text('٣ / ٦'), findsOneWidget);
-    await t.pumpWidget(_app(const OnsProgressBar.indeterminate()));
+    await t.pumpWidget(_app(const IndeterminateBar()));
     await t.pump(const Duration(milliseconds: 300));
     expect(find.textContaining('%'), findsNothing);
     expect(find.byType(Text), findsNothing);

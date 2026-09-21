@@ -14,6 +14,7 @@ import 'package:oons/data/repo.dart';
 import 'package:oons/features/client/client_chrome.dart';
 import 'package:oons/features/pay/pending_pay_route.dart';
 import 'package:oons/features/system/empty_states.dart';
+import 'package:oons/features/system/progress.dart';
 import 'package:oons/l10n/copy.dart';
 import 'package:oons/l10n/errors.dart';
 
@@ -52,8 +53,8 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> {
               return Column(
                 children: [
                   ClientSegmentTabs(
-                    left: lang == 'ar' ? 'الجاية · ${upcoming.length}' : 'Upcoming · ${upcoming.length}',
-                    right: lang == 'ar' ? 'اللي فات · ${past.length}' : 'Past · ${past.length}',
+                    left: '${b['upcoming']} · ${upcoming.length}',
+                    right: '${b['past']} · ${past.length}',
                     index: tab,
                     onChanged: (i) => setState(() => tab = i),
                   ),
@@ -61,7 +62,6 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> {
                     child: _BookingList(
                       scope: tab == 0 ? 'upcoming' : 'past',
                       lang: lang,
-                      empty: '${b['empty']}',
                       lastPast: past.isEmpty ? null : (past.toList()..sort((a, c) => c.booking.slotStart.compareTo(a.booking.slotStart))).first,
                     ),
                   ),
@@ -76,11 +76,10 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> {
 }
 
 class _BookingList extends ConsumerWidget {
-  const _BookingList({required this.scope, required this.lang, required this.empty, this.lastPast});
+  const _BookingList({required this.scope, required this.lang, this.lastPast});
 
   final String scope;
   final String lang;
-  final String empty;
   final BookingBundle? lastPast;
 
   @override
@@ -104,12 +103,7 @@ class _BookingList extends ConsumerWidget {
           );
         }
         if (list.isEmpty) {
-          return ClientEmptyState(
-            title: lang == 'ar' ? 'مفيش حجوزات سابقة' : 'No past bookings',
-            body: empty,
-            cta: lang == 'ar' ? 'تصفحي الخدمات' : 'Browse services',
-            onCta: () => context.push('/browse/beauty'),
-          );
+          return OnsEmpty.noPast(lang: lang, onBrowse: () => context.push('/browse/beauty'));
         }
         return ListView(
           children: [
@@ -254,7 +248,8 @@ class _StatusScreenState extends ConsumerState<StatusScreen> {
     final b = data?.booking;
     final p = data?.provider;
     if (b == null) {
-      return const Scaffold(backgroundColor: Client.bg, body: Center(child: CircularProgressIndicator(color: Client.plum)));
+      final ec = Copy.of(lang)['empty'] as Map;
+      return OnsBusyPage(caption: '${ec['loadingBooking']}');
     }
     final st = (states[b.status] as Map?) ?? {'code': b.status, 'cta': ''};
     final rateCopy = Copy.of(lang)['rate'] as Map;
@@ -310,7 +305,7 @@ class _StatusScreenState extends ConsumerState<StatusScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(children: [
-                                Icon(glyphStatus(b.status), size: 16, color: chip),
+                                OnsIcon(_statusIcon(b.status), size: 16, color: chip),
                                 const SizedBox(width: 8),
                                 ClientKicker('${st['code']}', color: fg),
                               ]),
@@ -343,28 +338,36 @@ class _StatusScreenState extends ConsumerState<StatusScreen> {
                     if (b.paymentHoldUntil != null || b.fawryExpiresAt != null)
                       Padding(
                         padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
-                        child: Text(
-                          () {
-                            final hold = (b.paymentHoldUntil ?? b.fawryExpiresAt)!.toLocal();
-                            final h = hold.hour.toString().padLeft(2, '0');
-                            final m = hold.minute.toString().padLeft(2, '0');
-                            return lang == 'ar' ? 'ينتهي الحجز غير المدفوع حوالي $h:$m' : 'Unpaid hold ends around $h:$m';
-                          }(),
-                          style: const TextStyle(fontSize: 12, color: Client.muted),
+                        child: HoldCountdown(
+                          deadline: (b.paymentHoldUntil ?? b.fawryExpiresAt)!,
+                          label: Copy.bookFlow(lang)['holdLabel'] ?? '',
+                          ar: lang == 'ar',
                         ),
                       ),
                   ],
                   Padding(
                     padding: const EdgeInsets.all(20),
                     child: Column(
-                      children: b.timeline.map((tl) {
+                      children: [
+                        JourneyStages(
+                          stages: [
+                            '${timeline['booked']}',
+                            '${timeline['confirmed']}',
+                            '${timeline['on_the_way']}',
+                            '${timeline['checked_in']}',
+                            '${timeline['checked_out']}',
+                          ],
+                          current: _journeyCurrent(b.status),
+                        ),
+                        const SizedBox(height: 16),
+                        ...b.timeline.map((tl) {
                         final label = '${timeline[tl.key] ?? tl.key.replaceAll('_', ' ')}';
                         return Padding(
                           padding: const EdgeInsets.symmetric(vertical: 7),
                           child: Row(
                             children: [
-                              Icon(
-                                glyphTimeline(tl.key),
+                              OnsIcon(
+                                _timelineIcon(tl.key),
                                 size: 18,
                                 color: tl.done ? Client.olive : const Color(0xFFA79FA5),
                               ),
@@ -386,7 +389,8 @@ class _StatusScreenState extends ConsumerState<StatusScreen> {
                             ],
                           ),
                         );
-                      }).toList(),
+                      }),
+                      ],
                     ),
                   ),
                   Padding(
@@ -489,5 +493,65 @@ class _StatusScreenState extends ConsumerState<StatusScreen> {
         ],
       ),
     );
+  }
+}
+
+int _journeyCurrent(String status) {
+  switch (status) {
+    case 'paid':
+      return 1;
+    case 'on_the_way':
+      return 2;
+    case 'in_progress':
+    case 'at_door':
+      return 3;
+    case 'completed':
+    case 'refunded':
+    case 'released':
+      return 4;
+    default:
+      return 0;
+  }
+}
+
+String _statusIcon(String status) {
+  switch (status) {
+    case 'pending_payment':
+      return 'clock';
+    case 'paid':
+      return 'shieldCheck';
+    case 'on_the_way':
+      return 'advance';
+    case 'in_progress':
+    case 'at_door':
+      return 'pin';
+    case 'completed':
+      return 'check';
+    case 'disputed':
+      return 'alert';
+    case 'refunded':
+      return 'retry';
+    case 'cancelled_client':
+    case 'cancelled_provider':
+      return 'close';
+    default:
+      return 'info';
+  }
+}
+
+String _timelineIcon(String key) {
+  switch (key) {
+    case 'booked':
+      return 'calendar';
+    case 'confirmed':
+      return 'check';
+    case 'on_the_way':
+      return 'advance';
+    case 'checked_in':
+      return 'pin';
+    case 'checked_out':
+      return 'check';
+    default:
+      return 'clock';
   }
 }

@@ -9,7 +9,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:oons/core/format.dart';
 import 'package:oons/core/geo.dart';
-import 'package:oons/core/glyphs.dart';
+import 'package:oons/core/icons/ons_icons.dart';
 import 'package:oons/core/locale.dart';
 import 'package:oons/core/tokens.dart';
 import 'package:oons/core/widgets.dart';
@@ -979,7 +979,7 @@ class ProviderCancelScreen extends ConsumerWidget {
                     decoration: BoxDecoration(border: Border.all(color: Client.ink, width: Client.rule), color: Client.oliveTint),
                     child: Row(
                       children: [
-                        const Glyph(GlyphKind.shield, size: 16, color: Client.olive),
+                        const OnsIcon('shield', size: 16, color: Client.olive),
                         const SizedBox(width: 10),
                         Expanded(child: Text('${pc['comp']}', style: const TextStyle(fontSize: 13, height: 1.45))),
                       ],

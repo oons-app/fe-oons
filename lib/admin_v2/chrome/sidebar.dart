@@ -41,7 +41,7 @@ class V2Sidebar extends ConsumerWidget {
                     color: Ops.creamTile,
                     borderRadius: BorderRadius.circular(11),
                   ),
-                  child: Image.asset('assets/images/brand/mark.png', height: 30, fit: BoxFit.contain),
+                  child: Image.asset('assets/images/logo.png', height: 30, fit: BoxFit.contain),
                 ),
                 const SizedBox(height: 10),
                 Row(

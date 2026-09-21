@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:oons/core/glyphs.dart';
+import 'package:oons/core/icons/ons_icons.dart';
 import 'package:oons/core/tokens.dart';
 import 'package:oons/data/api.dart';
 
@@ -19,7 +19,7 @@ class BrandMark extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Image.asset(
-      'assets/images/brand/mark.png',
+      'assets/images/logo.png',
       width: size,
       height: size,
       fit: BoxFit.contain,
@@ -95,7 +95,7 @@ class InkButton extends StatelessWidget {
                       : Text(label, textAlign: TextAlign.start, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: fg)),
                 ),
                 if (trailing && filled && !busy)
-                  Icon(Icons.arrow_forward, size: 18, color: fg, textDirection: Directionality.of(context)),
+                  OnsIcon('advance', size: 16, color: fg),
               ],
             ),
           ),
@@ -380,14 +380,11 @@ class ScreenHead extends StatelessWidget {
           if (onBack != null || Navigator.of(context).canPop())
             IconButton(
               onPressed: onBack ?? () => Navigator.maybePop(context),
-              icon: Transform(
-                alignment: Alignment.center,
-                transform: Matrix4.diagonal3Values(
-                  Directionality.of(context) == TextDirection.rtl ? -1.0 : 1.0,
-                  1,
-                  1,
-                ),
-                child: const Glyph(GlyphKind.back, size: 20, color: T.ink),
+              icon: OnsIconOnly(
+                'back',
+                semanticLabel: Directionality.of(context) == TextDirection.rtl ? 'رجوع' : 'Back',
+                size: 20,
+                color: T.ink,
               ),
             )
           else
@@ -419,7 +416,7 @@ class OfflineBanner extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(
         children: [
-          const Icon(Icons.wifi_off_rounded, size: 16, color: Color(0xFF8E4B36)),
+          const OnsIcon('offline', size: 16, color: Color(0xFF8E4B36)),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -532,7 +529,7 @@ class OonsTabBar extends StatelessWidget {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Glyph(tabGlyph(i, provider: false), size: 20, color: on ? active : idle, fill: on),
+                          OnsIcon(const ['home', 'list', 'user'][i], size: 20, color: on ? active : idle),
                           const SizedBox(height: 5),
                           Text(
                             labels[i],
@@ -594,11 +591,10 @@ class OonsTabBar extends StatelessWidget {
                               borderRadius: BorderRadius.circular(999),
                             ),
                             alignment: Alignment.center,
-                            child: Glyph(
-                              tabGlyph(i, provider: true),
+                            child: OnsIcon(
+                              const ['calendar', 'list', 'wallet', 'user'][i],
                               size: 18,
                               color: on ? plum : const Color(0xFFA99DA4),
-                              fill: on,
                             ),
                           ),
                           const SizedBox(height: 5),

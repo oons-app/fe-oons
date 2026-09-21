@@ -100,6 +100,11 @@ List<BookLine> bookLines({
 
 int bookSubtotal(List<BookLine> lines) => lines.fold(0, (a, l) => a + l.amount);
 
+/// Matches the API: `ServiceItem.travelFee` is optional per-item travel in
+/// piastres, multiplied by the line count (`bookings.go` does the same).
+/// Area-level platform travel is a separate admin default and is not applied
+/// here. Do not collapse this to one trip-per-address — the receipt would
+/// disagree with the charge.
 int bookTravel(List<BookLine> lines) {
   var t = 0;
   for (final l in lines) {

@@ -344,6 +344,15 @@ class _BookScreenState extends ConsumerState<BookScreen> {
           value: it.price / 100,
           serviceName: it.name.en.isNotEmpty ? it.name.en : it.name.ar,
         ));
+        if (mounted) {
+          final name = it.name.of(langOf(ref));
+          showUndoSnack(
+            context,
+            message: (bf['added'] ?? '').replaceAll('{name}', name),
+            undoLabel: bf['undo'] ?? '',
+            onUndo: () => unawaited(_setQty(it, 0)),
+          );
+        }
       }
     }
   }
@@ -392,8 +401,8 @@ class _BookScreenState extends ConsumerState<BookScreen> {
         appliedCoupon = ok ? code : null;
         couponDiscount = ok ? ((r['discount'] as num?)?.toInt() ?? 0) : 0;
         couponMessage = ok
-            ? (label is Map ? '${label[lang] ?? label['en'] ?? ''}' : (lang == 'ar' ? 'تم تطبيق الكوبون' : 'Coupon applied'))
-            : '${r['message'] ?? (lang == 'ar' ? 'الكوبون مش شغال' : 'This coupon isn\'t valid')}';
+            ? (label is Map ? '${label[lang] ?? label['en'] ?? ''}' : (bf['couponApplied'] ?? ''))
+            : '${r['message'] ?? (bf['couponInvalid'] ?? '')}';
       });
     } catch (e) {
       if (!mounted) return;
@@ -703,6 +712,8 @@ class _BookScreenState extends ConsumerState<BookScreen> {
               sub: empty ? copy['barEmptySub'] : copy['barFeesIn'],
               price: empty ? '—' : money(inclusive, lang),
               cta: screen == 1 ? (copy['ctaSlot'] ?? '') : (copy['ctaPay'] ?? ''),
+              busy: busy,
+              busyLabel: copy['confirming'] ?? '',
               enabled: !busy && !empty && ref.watch(sessionProvider).online,
               onTap: () {
                 if (screen == 1) {
@@ -1216,9 +1227,13 @@ class _BookScreenState extends ConsumerState<BookScreen> {
                   Expanded(
                     child: TextField(
                       controller: coupon,
+                      enabled: !couponBusy,
                       textCapitalization: TextCapitalization.characters,
                       decoration: InputDecoration(
                         hintText: copy['couponPh'],
+                        prefixIcon: couponBusy
+                            ? const Padding(padding: EdgeInsets.all(12), child: InlineSpinner())
+                            : null,
                         filled: true,
                         fillColor: Client.card,
                         enabledBorder: const OutlineInputBorder(borderRadius: BorderRadius.zero, borderSide: BorderSide(color: Client.ink, width: Client.rule)),
@@ -1230,7 +1245,7 @@ class _BookScreenState extends ConsumerState<BookScreen> {
                   SizedBox(
                     width: 104,
                     height: 48,
-                    child: ClientGhostButton(label: couponBusy ? '…' : (copy['couponApply'] ?? ''), onTap: couponBusy ? () {} : _applyCoupon),
+                    child: ClientGhostButton(label: copy['couponApply'] ?? '', onTap: couponBusy ? null : _applyCoupon),
                   ),
                 ],
               ),

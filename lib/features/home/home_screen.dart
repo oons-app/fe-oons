@@ -495,7 +495,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(color: Client.sand, border: Border.all(color: Client.ink, width: Client.rule)),
                           child: Text(
-                            lang == 'ar' ? 'حجوزاتك وحسابك من التبويبات تحت.' : 'Bookings and account live in the tabs below.',
+                            lang == 'ar' ? 'حجوزاتكِ وحسابكِ من القائمة.' : 'Bookings and account live in the menu.',
                             style: const TextStyle(fontSize: 12.5, color: Client.body),
                           ),
                         ),

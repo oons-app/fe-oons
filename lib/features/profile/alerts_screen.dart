@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:oons/core/glyphs.dart';
 import 'package:oons/core/locale.dart';
 import 'package:oons/core/tokens.dart';
 import 'package:oons/features/client/client_chrome.dart';
@@ -30,7 +29,7 @@ class AlertsScreen extends ConsumerWidget {
                   ? ListView(
                       padding: const EdgeInsets.all(20),
                       children: [
-                        const Glyph(GlyphKind.bell, size: 28, color: Client.plum),
+                        const OnsIcon('bell', size: 28, color: Client.plum),
                         const SizedBox(height: 16),
                         Text('${p['notifBody']}', style: Theme.of(context).textTheme.bodyLarge),
                         const SizedBox(height: 12),
@@ -52,7 +51,7 @@ class AlertsScreen extends ConsumerWidget {
                               children: [
                                 const Padding(
                                   padding: EdgeInsets.only(top: 2),
-                                  child: Glyph(GlyphKind.bell, size: 18, color: Client.plum),
+                                  child: OnsIcon('bell', size: 18, color: Client.plum),
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(

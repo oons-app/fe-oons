@@ -329,15 +329,27 @@ class BookCategoryTabs extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              '${bookVerticalGlyph(v)}  ${bookVerticalLabel(v, bf)}',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 13.5,
-                                fontWeight: FontWeight.w700,
-                                color: on ? Client.bg : Client.ink,
-                              ),
+                            Row(
+                              children: [
+                                OnsIcon(
+                                  v == 'beauty' ? 'beauty' : (v == 'cleaning' ? 'clean' : 'list'),
+                                  size: 14,
+                                  color: on ? Client.bg : Client.ink,
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    bookVerticalLabel(v, bf),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 13.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: on ? Client.bg : Client.ink,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                             const SizedBox(height: 2),
                             Text(

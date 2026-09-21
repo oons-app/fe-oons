@@ -1,7 +1,7 @@
+import 'package:oons/core/icons/ons_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:oons/core/glyphs.dart';
 import 'package:oons/core/locale.dart';
 import 'package:oons/core/tokens.dart';
 import 'package:oons/core/widgets.dart';
@@ -100,7 +100,7 @@ class ReviewCard extends StatelessWidget {
                     5,
                     (i) => Padding(
                       padding: const EdgeInsetsDirectional.only(start: 2),
-                      child: Glyph(GlyphKind.star, size: 12, color: i < review.stars ? Client.plum : Client.line, fill: i < review.stars),
+                      child: OnsIcon('star', size: 12, color: i < review.stars ? Client.plum : Client.line),
                     ),
                   ),
                 ),

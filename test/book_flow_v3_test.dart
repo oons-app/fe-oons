@@ -55,6 +55,23 @@ void main() {
     expect(inclusive, fees.charge(exclusive));
   });
 
+  test('travel fee is per-item × line count, matching the API charge', () {
+    final once = bookLines(
+      items: [_item(id: 'c1', price: 10000, kind: 'cleaning', travel: 4000, vertical: 'cleaning')],
+      qty: {'c1': 1},
+      guests: 1,
+      hair: 'medium',
+    );
+    expect(bookTravel(once), 4000);
+    final twice = bookLines(
+      items: [_item(id: 'c1', price: 10000, kind: 'cleaning', travel: 4000, vertical: 'cleaning')],
+      qty: {'c1': 2},
+      guests: 1,
+      hair: 'medium',
+    );
+    expect(bookTravel(twice), 8000);
+  });
+
   test('800 EGP exclusive becomes 823.50 under current card/wallet schedule', () {
     const fees = ProcessingFeeSchedule();
     expect(fees.feeFor(80000), 2350);

@@ -6,12 +6,14 @@ import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:oons/core/icons/ons_icons.dart';
 import 'package:oons/core/format.dart';
 import 'package:oons/core/locale.dart';
 import 'package:oons/core/open_external.dart';
 import 'package:oons/core/tokens.dart';
 import 'package:oons/core/widgets.dart';
 import 'package:oons/features/client/client_chrome.dart';
+import 'package:oons/features/system/progress.dart';
 import 'package:oons/data/geocode.dart';
 import 'package:oons/data/models.dart';
 import 'package:oons/data/repo.dart';
@@ -410,7 +412,7 @@ class _InstructionsScreenState extends ConsumerState<InstructionsScreen> {
                   if (list.isEmpty)
                     Padding(
                       padding: const EdgeInsets.all(20),
-                      child: Text(lang == 'ar' ? 'لسه مفيش تعليمات محفوظة.' : 'No saved instructions yet.', style: const TextStyle(color: Client.muted)),
+                      child: Text(lang == 'ar' ? 'لا تعليمات محفوظة بعد.' : 'No saved instructions yet.', style: const TextStyle(color: Client.muted)),
                     ),
                   ...list.map((i) => Container(
                         decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Client.ink, width: Client.rule))),
@@ -422,14 +424,14 @@ class _InstructionsScreenState extends ConsumerState<InstructionsScreen> {
                             if (mounted) await ref.read(sessionProvider.notifier).refreshMe();
                           },
                           trailing: IconButton(
-                            icon: const Icon(Icons.delete_outline, color: T.danger),
+                            icon: OnsIconOnly('close', semanticLabel: lang == 'ar' ? 'احذفي' : 'Delete', size: 20, color: T.danger),
                             onPressed: () async {
                               try {
                                 final u = await ref.read(repoProvider).deleteInstruction(i.id);
                                 ref.read(sessionProvider.notifier).setUser(u);
                                 if (!mounted) return;
                                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(
-                                  lang == 'ar' ? 'اتشالت.' : 'Deleted.',
+                                  lang == 'ar' ? 'حُذفت.' : 'Deleted.',
                                 )));
                               } catch (e) {
                                 if (!mounted) return;
@@ -768,7 +770,7 @@ class _ClientIdentityScreenState extends ConsumerState<ClientIdentityScreen> {
                   if (busy)
                     const Padding(
                       padding: EdgeInsets.only(top: 20),
-                      child: Center(child: CircularProgressIndicator(color: Client.plum)),
+                      child: Center(child: InlineSpinner(size: 22)),
                     ),
                 ],
               ),

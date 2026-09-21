@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:oons/core/icons/ons_icons.dart';
 import 'package:oons/core/pro_format.dart';
 import 'package:oons/core/tokens.dart';
 import 'package:oons/features/client/client_chrome.dart';
@@ -39,6 +40,35 @@ class SkeletonBlock extends StatelessWidget {
         height: height,
         decoration: BoxDecoration(color: Client.sand2, border: Border.all(color: Client.line, width: Client.rule)),
       );
+}
+
+/// Content-shaped skeleton (design-system name). Same as [ServiceListSkeleton].
+typedef OnsSkeleton = ServiceListSkeleton;
+
+/// Full-page wait for a 1–3s fetch. Names what is loading; never a bare spinner.
+class OnsBusyPage extends StatelessWidget {
+  const OnsBusyPage({super.key, required this.caption});
+  final String caption;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Client.bg,
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const InlineSpinner(size: 22),
+              const SizedBox(height: 14),
+              Text(caption, textAlign: TextAlign.center, style: const TextStyle(fontSize: 13.5, height: 1.45, color: Client.muted)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// Takes the shape and count of the real content (not random rectangles). The
@@ -177,7 +207,7 @@ class BusyLock extends StatelessWidget {
   }
 }
 
-/// States what is actually happening ("بنأكّد الميعاد…") and only returns to its
+/// States what is actually happening ("نؤكّد الموعد…") and only returns to its
 /// idle label when the action finishes. Must sit inside a [BusyGroup].
 class BusyButton extends StatelessWidget {
   const BusyButton({super.key, required this.label, required this.busyLabel, required this.onPressed, this.enabled = true});
@@ -292,15 +322,19 @@ class _HoldCountdownState extends State<HoldCountdown> {
       liveRegion: false,
       label: '${widget.label} $txt',
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(color: Client.oliveTint, border: Border.all(color: Client.olive, width: Client.rule)),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(color: Client.card, border: Border.all(color: Client.ink, width: Client.rule)),
         child: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Expanded(child: Text(widget.label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Client.oliveInk))),
             Directionality(
               textDirection: TextDirection.ltr,
-              child: Text(txt, style: const TextStyle(fontFamily: T.mono, fontSize: 19, fontWeight: FontWeight.w600, color: Client.ink)),
+              child: Text(txt, style: const TextStyle(fontFamily: T.mono, fontSize: 16, fontWeight: FontWeight.w600, color: Client.ink)),
             ),
+            const SizedBox(width: 8),
+            const OnsIcon('clock', size: 16, color: Client.ink),
+            const SizedBox(width: 8),
+            Flexible(child: Text(widget.label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Client.ink))),
           ],
         ),
       ),
@@ -382,6 +416,16 @@ class _OnsProgressBarState extends State<OnsProgressBar> with SingleTickerProvid
       ),
     );
   }
+}
+
+/// Design-system names. Determinate always shows a number; indeterminate never
+/// invents one.
+class DeterminateBar extends OnsProgressBar {
+  const DeterminateBar({super.key, required super.value, super.numberLabel}) : super.determinate();
+}
+
+class IndeterminateBar extends OnsProgressBar {
+  const IndeterminateBar({super.key}) : super.indeterminate();
 }
 
 // ── 5. Journey ────────────────────────────────────────────────────────────

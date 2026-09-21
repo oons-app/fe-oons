@@ -18,7 +18,6 @@ import 'package:oons/features/client/client_chrome.dart';
 import 'package:oons/features/system/progress.dart';
 import 'package:oons/features/pay/pay_checkout_frame.dart';
 import 'package:oons/features/pay/pay_manual_panel.dart';
-import 'package:oons/features/book/book_widgets.dart';
 import 'package:oons/l10n/copy.dart';
 
 /// Dedicated frame per payment method: card / mobile wallet / Fawry (legacy).
@@ -168,6 +167,7 @@ class _PaymentFrameScreenState extends ConsumerState<PaymentFrameScreen> with Wi
         starting = false;
       });
       _beginPoll();
+      _beginTick();
     } on ApiException catch (e) {
       if (!mounted) return;
       if (e.isPayFail) {
@@ -225,12 +225,18 @@ class _PaymentFrameScreenState extends ConsumerState<PaymentFrameScreen> with Wi
   void _beginTick() {
     tick?.cancel();
     tick = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!mounted) return;
+      if (!mounted || finishedPaid || abandoning) return;
+      final hold = data?.booking.paymentHoldUntil ?? data?.booking.fawryExpiresAt;
+      if (hold != null && hold.isBefore(DateTime.now()) && data != null) {
+        _dropExpired(data!);
+        return;
+      }
       setState(() {});
     });
   }
 
   void _dropExpired(BookingBundle bundle) {
+    if (abandoning || finishedPaid) return;
     abandoning = true;
     finishedPaid = false;
     unawaited(AppAnalytics.paymentFailed(bookingId: widget.bookingId, reasonCode: 'hold_expired', method: method));
@@ -361,7 +367,12 @@ class _PaymentFrameScreenState extends ConsumerState<PaymentFrameScreen> with Wi
                               Text(bf['payHold'] ?? '', textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, height: 1.45, color: Client.muted)),
                               if (hold != null && !holdGone) ...[
                                 const SizedBox(height: 16),
-                                HoldCountdown(deadline: hold, label: bf['holdLabel'] ?? '', ar: lang == 'ar'),
+                                HoldCountdown(
+                                  deadline: hold,
+                                  label: bf['holdLabel'] ?? '',
+                                  ar: lang == 'ar',
+                                  onExpired: data == null ? null : () => _dropExpired(data!),
+                                ),
                               ],
                             ],
                           ),
@@ -383,10 +394,18 @@ class _PaymentFrameScreenState extends ConsumerState<PaymentFrameScreen> with Wi
                                 Text(bf['errNoneTaken'] ?? '', style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700)),
                                 if (hold != null && b != null) ...[
                                   const SizedBox(height: 8),
-                                  Text(
-                                    holdGone ? (bf['holdExpired'] ?? '') : heldSlotLine(slot: b.slotStart, hold: hold, lang: lang, bf: bf),
-                                    style: const TextStyle(fontSize: 13, height: 1.4, color: Client.muted, fontWeight: FontWeight.w600),
-                                  ),
+                                  if (holdGone)
+                                    Text(
+                                      bf['holdExpired'] ?? '',
+                                      style: const TextStyle(fontSize: 13, height: 1.4, color: Client.muted, fontWeight: FontWeight.w600),
+                                    )
+                                  else
+                                    HoldCountdown(
+                                      deadline: hold,
+                                      label: bf['holdLabel'] ?? '',
+                                      ar: lang == 'ar',
+                                      onExpired: data == null ? null : () => _dropExpired(data!),
+                                    ),
                                 ],
                                 const SizedBox(height: 8),
                                 Text(bf['errHint'] ?? '', style: const TextStyle(fontSize: 12.5, height: 1.4, color: Client.muted)),

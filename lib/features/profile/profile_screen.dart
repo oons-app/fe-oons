@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:oons/core/format.dart';
-import 'package:oons/core/glyphs.dart';
 import 'package:oons/core/locale.dart';
 import 'package:oons/core/open_external.dart';
 import 'package:oons/core/tokens.dart';
@@ -290,7 +289,7 @@ class AddressesScreen extends ConsumerWidget {
                     decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Client.ink, width: Client.rule))),
                     child: Row(
                       children: [
-                        Glyph(a.isDefault ? GlyphKind.home : GlyphKind.pin, color: Client.plum),
+                        OnsIcon(a.isDefault ? 'home' : 'pin', color: Client.plum),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Column(
@@ -328,7 +327,7 @@ class AddressesScreen extends ConsumerWidget {
                                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendlyError(e, lang))));
                               }
                             },
-                            icon: const Icon(Icons.delete_outline, color: T.danger),
+                            icon: OnsIconOnly('close', semanticLabel: lang == 'ar' ? 'احذفي' : 'Delete', size: 20, color: T.danger),
                           ),
                       ],
                     ),
@@ -424,7 +423,7 @@ class ProfileCopyScreen extends ConsumerWidget {
               child: ListView(
                 padding: const EdgeInsets.all(20),
                 children: [
-                  const Glyph(GlyphKind.shield, size: 28, color: Client.plum),
+                  const OnsIcon('shield', size: 28, color: Client.plum),
                   const SizedBox(height: 16),
                   Text('${p[bodyKey]}', style: Theme.of(context).textTheme.bodyLarge),
                 ],

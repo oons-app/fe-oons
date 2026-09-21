@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:oons/core/analytics.dart';
-import 'package:oons/core/glyphs.dart';
 import 'package:oons/core/format.dart';
 import 'package:oons/core/locale.dart';
 import 'package:oons/core/tokens.dart';
@@ -18,6 +17,7 @@ import 'package:oons/features/client/client_chrome.dart';
 import 'package:oons/core/open_external.dart';
 import 'package:oons/features/system/empty_states.dart';
 import 'package:oons/features/system/nearest_match.dart';
+import 'package:oons/features/system/progress.dart';
 import 'package:oons/features/reviews/reviews_screens.dart';
 import 'package:oons/l10n/copy.dart';
 
@@ -153,10 +153,11 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
                 children: [
                   IconButton(
                     onPressed: () => context.go('/home'),
-                    icon: Transform(
-                      alignment: Alignment.center,
-                      transform: Matrix4.diagonal3Values(Directionality.of(context) == TextDirection.rtl ? -1.0 : 1.0, 1, 1),
-                      child: const Glyph(GlyphKind.back, size: 20, color: Client.ink),
+                    icon: OnsIconOnly(
+                      'back',
+                      semanticLabel: Directionality.of(context) == TextDirection.rtl ? 'رجوع' : 'Back',
+                      size: 20,
+                      color: Client.ink,
                     ),
                   ),
                   Expanded(
@@ -538,57 +539,62 @@ class _ProviderRow extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
         decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Client.ink, width: Client.rule))),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Face(id: p.id, ini: p.initials.of(lang), photo: p.photo),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Face(id: p.id, ini: p.initials.of(lang), photo: p.photo),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Flexible(child: Text(p.name(lang), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700))),
-                      const SizedBox(width: 8),
-                      const OnsIcon('check', size: 13, color: Client.olive),
+                      Row(
+                        children: [
+                          Flexible(child: Text(p.name(lang), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700))),
+                          const SizedBox(width: 8),
+                          const OnsIcon('check', size: 13, color: Client.olive),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${p.specialty.of(lang)} · ${area.isEmpty ? '' : '${areaName(area, lang)} · '}${p.years} ${lang == 'ar' ? 'سنين' : 'yrs'}',
+                        style: const TextStyle(fontSize: 12, color: Client.muted),
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Text('${p.rating} ★ (${p.reviewCount})', style: const TextStyle(fontFamily: T.mono, fontSize: 11)),
+                          Container(width: 2, height: 12, color: Client.line, margin: const EdgeInsets.symmetric(horizontal: 8)),
+                          Text('$fromLabel ${money(p.priceFrom, lang)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                        ],
+                      ),
                     ],
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${p.specialty.of(lang)} · ${area.isEmpty ? '' : '${areaName(area, lang)} · '}${p.years} ${lang == 'ar' ? 'سنين' : 'yrs'}',
-                    style: const TextStyle(fontSize: 12, color: Client.muted),
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      Text('${p.rating} ★ (${p.reviewCount})', style: const TextStyle(fontFamily: T.mono, fontSize: 11)),
-                      Container(width: 2, height: 12, color: Client.line, margin: const EdgeInsets.symmetric(horizontal: 8)),
-                      Text('$fromLabel ${money(p.priceFrom, lang)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  InkWell(
-                    onTap: () {
-                      AppAnalytics.markBookingEntry('search');
-                      unawaited(AppAnalytics.selectProvider(providerId: p.id, service: service, providerName: p.name('en')));
-                      unawaited(AppAnalytics.beginCheckout(
-                        providerId: p.id,
-                        entryPoint: 'search',
-                        providerName: p.name('en'),
-                        serviceName: service,
-                      ));
-                      context.push('/book/${p.id}');
-                    },
-                    child: Container(
-                      width: double.infinity,
-                      alignment: Alignment.center,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(color: Client.plum, border: Border.all(color: Client.ink, width: Client.rule)),
-                      child: Text(bookLabel, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Client.bg)),
-                    ),
-                  ),
-                ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            InkWell(
+              onTap: () {
+                AppAnalytics.markBookingEntry('search');
+                unawaited(AppAnalytics.selectProvider(providerId: p.id, service: service, providerName: p.name('en')));
+                unawaited(AppAnalytics.beginCheckout(
+                  providerId: p.id,
+                  entryPoint: 'search',
+                  providerName: p.name('en'),
+                  serviceName: service,
+                ));
+                context.push('/book/${p.id}');
+              },
+              child: Container(
+                width: double.infinity,
+                alignment: Alignment.center,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(color: Client.plum, border: Border.all(color: Client.ink, width: Client.rule)),
+                child: Text(bookLabel, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Client.bg)),
               ),
             ),
           ],
@@ -629,7 +635,8 @@ class ProviderScreen extends ConsumerWidget {
       future: ref.read(repoProvider).provider(id),
       builder: (context, snap) {
         if (!snap.hasData) {
-          return const Scaffold(backgroundColor: Client.bg, body: Center(child: CircularProgressIndicator(color: Client.plum)));
+          final ec = Copy.of(lang)['empty'] as Map;
+          return OnsBusyPage(caption: '${ec['loadingProvider']}');
         }
         final p = snap.data!;
         return Scaffold(

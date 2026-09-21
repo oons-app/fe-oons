@@ -145,6 +145,18 @@ class OnsEmpty {
     return OnsEmptyState(icon: 'pin', title: '${c['noAddressTitle']}', body: '${c['noAddressBody']}', cta: '${c['noAddressCta']}', onCta: onAdd);
   }
 
+  /// Past bookings, nothing yet.
+  static Widget noPast({required String lang, required VoidCallback onBrowse}) {
+    final c = _c(lang);
+    return OnsEmptyState(
+      icon: 'calendar',
+      title: '${c['noPastTitle']}',
+      body: '${c['noPastBody']}',
+      cta: '${c['noPastCta']}',
+      onCta: onBrowse,
+    );
+  }
+
   /// EMPTY-04 · bookings, nothing upcoming. Pass the real last visit (provider
   /// name + formatted date) to offer a repeat; otherwise only browse is offered.
   static Widget noUpcoming({

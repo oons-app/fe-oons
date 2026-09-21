@@ -1,7 +1,7 @@
+import 'package:oons/core/icons/ons_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:oons/core/glyphs.dart';
 import 'package:oons/core/locale.dart';
 import 'package:oons/core/tokens.dart';
 import 'package:oons/features/client/client_chrome.dart';
@@ -58,14 +58,10 @@ class _LegalScreenState extends ConsumerState<LegalScreen> {
               child: Row(
                 children: [
                   IconButton(
-                    icon: Transform(
-                      alignment: Alignment.center,
-                      transform: Matrix4.diagonal3Values(
-                        Directionality.of(context) == TextDirection.rtl ? 1.0 : -1.0,
-                        1,
-                        1,
-                      ),
-                      child: const Glyph(GlyphKind.back, size: 20),
+                    icon: OnsIconOnly(
+                      'back',
+                      semanticLabel: Directionality.of(context) == TextDirection.rtl ? 'رجوع' : 'Back',
+                      size: 20,
                     ),
                     onPressed: () => context.pop(),
                   ),

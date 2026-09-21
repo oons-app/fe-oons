@@ -16,6 +16,7 @@ import 'package:oons/features/book/book_draft.dart';
 import 'package:oons/features/book/book_widgets.dart';
 import 'package:oons/features/client/client_chrome.dart';
 import 'package:oons/features/legal/legal_widgets.dart';
+import 'package:oons/features/system/progress.dart';
 import 'package:oons/l10n/copy.dart';
 
 class CheckoutScreen extends ConsumerStatefulWidget {
@@ -120,7 +121,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     final needsId = user?.needsIdentityCompletion ?? false;
     final steps = [bf['step1'] ?? '', bf['step2'] ?? '', bf['step3'] ?? ''];
     if (data == null) {
-      return const Scaffold(backgroundColor: Client.bg, body: Center(child: CircularProgressIndicator(color: Client.plum)));
+      final ec = Copy.of(lang)['empty'] as Map;
+      return OnsBusyPage(caption: '${ec['loadingCheckout']}');
     }
     final b = data!.booking;
     final due = _due();

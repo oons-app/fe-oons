@@ -8,7 +8,7 @@ import 'package:oons/core/format.dart';
 import 'package:oons/app/router.dart';
 import 'package:oons/app/shell.dart';
 import 'package:oons/app/web_host.dart';
-import 'package:oons/core/glyphs.dart';
+import 'package:oons/core/icons/ons_icons.dart';
 import 'package:oons/core/tokens.dart';
 import 'package:oons/core/widgets.dart';
 import 'package:oons/features/auth/auth_screens.dart';
@@ -320,8 +320,8 @@ void main() {
     final bar = tester.getRect(find.byType(OonsTabBar));
     expect(bar.height, lessThan(100));
     expect(bar.bottom, closeTo(800, 1));
-    expect(find.byType(Glyph), findsWidgets);
-    expect(find.byType(Glyph), findsNWidgets(3));
+    expect(find.byType(OnsIcon), findsWidgets);
+    expect(find.byType(OnsIcon), findsNWidgets(3));
   });
 
   testWidgets('phone canvas frames a wide window to 390px', (tester) async {
@@ -357,7 +357,7 @@ void main() {
         ),
       ),
     );
-    expect(find.byType(Glyph), findsOneWidget);
+    expect(find.byType(OnsIcon), findsOneWidget);
     expect(find.byIcon(Icons.arrow_back), findsNothing);
     expect(find.byIcon(Icons.chevron_left), findsNothing);
   });

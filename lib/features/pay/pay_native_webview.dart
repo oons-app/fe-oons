@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:oons/features/client/client_chrome.dart';
+import 'package:oons/features/system/progress.dart';
 import 'package:oons/features/pay/pay_return.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
@@ -87,7 +88,7 @@ class _PayNativeWebViewState extends State<_PayNativeWebView> {
           if (!_ready)
             const ColoredBox(
               color: Client.bg,
-              child: Center(child: CircularProgressIndicator(color: Client.plum)),
+              child: Center(child: InlineSpinner(size: 22)),
             ),
         ],
       ),

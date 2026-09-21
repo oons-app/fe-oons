@@ -53,6 +53,12 @@ void main() {
     expect(find.text('إضافة عنوان'), findsOneWidget);
   });
 
+  testWidgets('past bookings empty uses the four-part pattern', (t) async {
+    await t.pumpWidget(_app(OnsEmpty.noPast(lang: 'ar', onBrowse: () {})));
+    _expectFourParts(t);
+    expect(find.text('لا زيارات سابقة بعد'), findsOneWidget);
+  });
+
   testWidgets('EMPTY-04 bookings: repeat offer uses the real last visit; none → browse only', (t) async {
     await t.pumpWidget(_app(OnsEmpty.noUpcoming(lang: 'ar', lastProvider: 'دعاء مصطفى', lastDate: '١ سبتمبر', onRepeat: () {}, onBrowse: () {})));
     _expectFourParts(t, alt: true);
