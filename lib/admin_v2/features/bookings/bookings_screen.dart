@@ -53,6 +53,7 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> with WidgetsBin
   String statusFilter = '';
   String queryFilter = '';
   bool unpaidOps = false;
+  bool receiptPending = false;
   Set<String> selected = {};
   bool bulkMode = false;
   Timer? _refreshTimer;
@@ -63,12 +64,26 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> with WidgetsBin
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    statusFilter = widget.queryParams['status'] ?? '';
-    queryFilter = widget.queryParams['q'] ?? '';
-    unpaidOps = widget.queryParams['unpaidOps'] == '1';
+    _applyQuery(widget.queryParams);
     WidgetsBinding.instance.addPostFrameCallback((_) => _publishHeader());
     _load();
     if (widget.live) _startAutoRefresh();
+  }
+
+  @override
+  void didUpdateWidget(covariant BookingsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.queryParams.toString() != widget.queryParams.toString()) {
+      _applyQuery(widget.queryParams);
+      _load();
+    }
+  }
+
+  void _applyQuery(Map<String, String> q) {
+    statusFilter = q['status'] ?? '';
+    queryFilter = q['q'] ?? '';
+    unpaidOps = q['unpaidOps'] == '1';
+    receiptPending = q['receiptPending'] == '1';
   }
 
   @override
@@ -132,6 +147,7 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> with WidgetsBin
         if (!widget.live && statusFilter.isNotEmpty) 'status': statusFilter,
         if (queryFilter.isNotEmpty) 'q': queryFilter,
         if (unpaidOps) 'unpaidOps': '1',
+        if (receiptPending) 'receiptPending': '1',
       };
       final data = await staffClient.get('/admin/bookings', query: query);
       final rows = asMapList(data['bookings']);
@@ -202,6 +218,7 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> with WidgetsBin
         if (statusFilter.isNotEmpty) 'status': statusFilter,
         if (queryFilter.isNotEmpty) 'q': queryFilter,
         if (unpaidOps) 'unpaidOps': '1',
+        if (receiptPending) 'receiptPending': '1',
       });
       download.downloadBytes(bytes, 'oons-bookings.csv');
       if (mounted) v2Toast(context, t(V2Copy.exportCsv, lang));
@@ -474,6 +491,9 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> with WidgetsBin
 
   void _toggle(String id) => setState(() => selected.contains(id) ? selected.remove(id) : selected.add(id));
 
+  bool _hasClientReceipt(Map b) =>
+      b['hasReceipt'] == true || '${b['paymentReceiptUrl'] ?? ''}'.trim().isNotEmpty;
+
   Future<void> _raiseClaim(Map b) async {
     final lang = ref.read(localeCodeProvider);
     var kind = 'damage';
@@ -580,6 +600,16 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> with WidgetsBin
                         _load();
                       },
                     ),
+                  if (!widget.live)
+                    V2FilterChip(
+                      label: lang == 'ar' ? 'إيصالات بانتظار التأكيد' : 'Receipts to confirm',
+                      count: statusCounts['receipt_pending'] ?? 0,
+                      selected: receiptPending,
+                      onTap: () {
+                        setState(() => receiptPending = !receiptPending);
+                        _load();
+                      },
+                    ),
                 ],
               ),
               const SizedBox(height: 12),
@@ -603,6 +633,17 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> with WidgetsBin
                       kind: bulkMode ? V2BtnKind.primary : V2BtnKind.ghost,
                       size: V2BtnSize.sm,
                     ),
+                    if (bulkMode && selected.isNotEmpty) ...[
+                      const SizedBox(width: 8),
+                      V2Btn(
+                        label: lang == 'ar'
+                            ? 'تسوية ${selected.length} زيارة'
+                            : 'Settle ${selected.length} visits',
+                        onPressed: _bulkSettle,
+                        kind: V2BtnKind.primary,
+                        size: V2BtnSize.sm,
+                      ),
+                    ],
                     const SizedBox(width: 8),
                   ],
                   V2Btn.ghost(t(V2Copy.exportCsv, lang), onPressed: _exportCsv, size: V2BtnSize.sm, icon: Icons.download),
@@ -634,7 +675,7 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> with WidgetsBin
                   rows: [
                     for (final b in bookings)
                       V2GridRow(
-                        onTap: () => context.go(V2Paths.booking(idOf(b))),
+                        onTap: () => bulkMode ? _toggle(idOf(b)) : context.go(V2Paths.booking(idOf(b))),
                         selectable: true,
                         selected: selected.contains(idOf(b)),
                         onToggleSelect: () => _toggle(idOf(b)),
@@ -648,8 +689,20 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> with WidgetsBin
                           _stacked(_dateLine(b), _timeLine(b), mono: true, strong: false),
                           Align(
                             alignment: AlignmentDirectional.centerStart,
-                            child: V2StatusPill(
-                                label: statusLabel('${b['status']}', lang), tone: statusTone('${b['status']}')),
+                            child: Wrap(
+                              spacing: 6,
+                              runSpacing: 4,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                V2StatusPill(
+                                    label: statusLabel('${b['status']}', lang), tone: statusTone('${b['status']}')),
+                                if (_hasClientReceipt(b))
+                                  V2StatusPill(
+                                    label: lang == 'ar' ? 'إيصال' : 'Receipt',
+                                    tone: '${b['status']}' == 'pending_payment' ? V2Tone.warn : V2Tone.info,
+                                  ),
+                              ],
+                            ),
                           ),
                           Text(money(asInt(b['total']), lang),
                               style: const TextStyle(fontSize: 13, fontFamily: Ops.mono, fontWeight: FontWeight.w600)),
@@ -687,14 +740,14 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> with WidgetsBin
             ],
           ),
         ),
-        if (bulkMode && selected.isNotEmpty)
+        if (bulkMode)
           V2BulkPayBar(
             count: selected.length,
             providerGrossPiastres: _gross(),
             trustFeeExcludedPiastres: _clientTotal() - _gross(),
             lang: lang,
-            onClear: () => setState(() => selected.clear()),
-            onSettle: _bulkSettle,
+            onClear: selected.isEmpty ? () {} : () => setState(() => selected.clear()),
+            onSettle: selected.isEmpty ? () {} : _bulkSettle,
           ),
       ],
     );

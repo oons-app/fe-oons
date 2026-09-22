@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -40,6 +41,7 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen> {
   Map<String, dynamic>? booking;
   bool loading = true;
   String? error;
+  Future<dynamic>? _receiptFuture;
 
   @override
   void initState() {
@@ -54,9 +56,12 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen> {
         error = null;
       });
       final data = await staffClient.get('/admin/bookings/${widget.bookingId}');
+      final row = unwrapEntity(data, const ['booking']);
+      final receipt = '${row['paymentReceiptUrl'] ?? ''}'.trim();
       setState(() {
-        booking = unwrapEntity(data, const ['booking']);
+        booking = row;
         loading = false;
+        _receiptFuture = receipt.isEmpty ? null : staffClient.uploadBytes(receipt);
       });
     } on ApiException catch (e) {
       setState(() {
@@ -371,7 +376,7 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen> {
     final receiptUrl = '${b['paymentReceiptUrl'] ?? ''}';
     final lastPaymentError = '${b['lastPaymentError'] ?? ''}';
     final right = <Widget>[
-      if (canWrite && ('${b['status']}' == 'pending_payment' || receiptUrl.isNotEmpty || lastPaymentError.isNotEmpty))
+      if ('${b['status']}' == 'pending_payment' || receiptUrl.isNotEmpty || lastPaymentError.isNotEmpty)
         V2SectionCard(
           title: lang == 'ar' ? 'الدفع' : 'Payment',
           subtitle: '${b['status']}' == 'pending_payment' && receiptUrl.isNotEmpty
@@ -382,6 +387,10 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (method.isNotEmpty) ...[
+                Text(method, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 10),
+              ],
               if (lastPaymentError.isNotEmpty) ...[
                 Container(
                   width: double.infinity,
@@ -405,7 +414,7 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen> {
                   ),
                 ),
               ],
-              if ('${b['status']}' == 'pending_payment')
+              if (canWrite && '${b['status']}' == 'pending_payment')
                 V2Btn(
                   label: lang == 'ar' ? 'تأكيد الدفع' : 'Confirm payment',
                   kind: V2BtnKind.primary,
@@ -413,27 +422,55 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen> {
                   onPressed: _confirmPayment,
                 ),
               if (receiptUrl.isNotEmpty) ...[
-                if ('${b['status']}' == 'pending_payment') const SizedBox(height: 7),
-                V2Btn(
-                  label: lang == 'ar' ? 'عرض إيصال المعاملة' : 'View transaction screenshot',
-                  kind: V2BtnKind.ghost,
-                  expand: true,
-                  onPressed: () async {
-                    final bytes = await staffClient.uploadBytes(receiptUrl);
-                    if (bytes == null || !context.mounted) {
-                      if (context.mounted) {
-                        v2Toast(context, lang == 'ar' ? 'تعذر عرض الإيصال' : 'Could not load the screenshot', error: true);
-                      }
-                      return;
+                if (canWrite && '${b['status']}' == 'pending_payment') const SizedBox(height: 7),
+                FutureBuilder(
+                  future: _receiptFuture ?? staffClient.uploadBytes(receiptUrl),
+                  builder: (ctx, snap) {
+                    if (snap.connectionState != ConnectionState.done) {
+                      return const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                        child: Center(child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2))),
+                      );
                     }
-                    showDialog<void>(
-                      context: context,
-                      builder: (_) => Dialog(
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 640, maxHeight: 820),
-                          child: InteractiveViewer(child: Image.memory(bytes, fit: BoxFit.contain)),
+                    final bytes = snap.data is Uint8List ? snap.data as Uint8List : null;
+                    if (bytes == null || bytes.isEmpty) {
+                      return Text(lang == 'ar' ? 'تعذر عرض الإيصال' : 'Could not load the screenshot',
+                          style: const TextStyle(fontSize: 12.5, color: Ops.muted));
+                    }
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        GestureDetector(
+                          onTap: () => showDialog<void>(
+                            context: context,
+                            builder: (_) => Dialog(
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(maxWidth: 640, maxHeight: 820),
+                                child: InteractiveViewer(child: Image.memory(bytes, fit: BoxFit.contain)),
+                              ),
+                            ),
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: Image.memory(bytes, height: 220, fit: BoxFit.cover),
+                          ),
                         ),
-                      ),
+                        const SizedBox(height: 7),
+                        V2Btn(
+                          label: lang == 'ar' ? 'عرض إيصال المعاملة' : 'View transaction screenshot',
+                          kind: V2BtnKind.ghost,
+                          expand: true,
+                          onPressed: () => showDialog<void>(
+                            context: context,
+                            builder: (_) => Dialog(
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(maxWidth: 640, maxHeight: 820),
+                                child: InteractiveViewer(child: Image.memory(bytes, fit: BoxFit.contain)),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     );
                   },
                 ),

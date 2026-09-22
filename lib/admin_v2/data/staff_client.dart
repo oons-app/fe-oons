@@ -1,5 +1,5 @@
+import 'dart:typed_data';
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:http/http.dart' as http;
 import 'package:oons/data/api.dart';
@@ -178,11 +178,16 @@ class StaffClient {
 
   Uri _uploadUri(String path) {
     if (path.startsWith('http://') || path.startsWith('https://')) return Uri.parse(path);
+    final clean = path.startsWith('/') ? path.split('?').first : '/${path.split('?').first}';
     final q = {'v': '${DateTime.now().millisecondsSinceEpoch}'};
-    if (kIsWeb) return Uri.base.replace(path: path.split('?').first, queryParameters: q);
+    // Production Flutter web uses a same-origin `/api` proxy (apiHost is
+    // empty). Receipts live at `/uploads` on the API host, which that proxy
+    // does not cover — always fetch them from the API so the Bearer token
+    // reaches serveUpload.
     final host = apiHost().isNotEmpty ? apiHost() : 'https://api.oons.app';
-    return Uri.parse('$host$path').replace(queryParameters: {
-      ...Uri.parse('$host$path').queryParameters,
+    final base = Uri.parse('$host$clean');
+    return base.replace(queryParameters: {
+      ...base.queryParameters,
       ...q,
     });
   }

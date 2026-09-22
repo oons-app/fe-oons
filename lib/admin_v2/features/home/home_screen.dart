@@ -165,6 +165,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
           lang == 'ar' ? 'ملف' : 'profiles', lang == 'ar' ? 'افتح طابور المراجعة' : 'Open the review queue', '${V2Paths.providers}?status=pending'),
       ('payouts', lang == 'ar' ? 'سحوبات بانتظار الموافقة' : 'Withdrawals awaiting approval', asInt(home['pendingPayouts']),
           lang == 'ar' ? 'طلب' : 'requests', lang == 'ar' ? 'راجع السحوبات' : 'Review withdrawals', V2Paths.payouts),
+      ('receipts', lang == 'ar' ? 'إيصالات إنستاباي بانتظار التأكيد' : 'InstaPay receipts to confirm', asInt(home['pendingReceipts']),
+          lang == 'ar' ? 'إيصال' : 'receipts', lang == 'ar' ? 'راجعي صورة التحويل' : 'Review the transfer screenshot', '${V2Paths.bookings}?receiptPending=1'),
       ('bookings', lang == 'ar' ? 'حجوزات تحتاج متابعة' : 'Bookings needing follow-up', _followUp,
           lang == 'ar' ? 'حجز' : 'bookings', lang == 'ar' ? 'راجع الحجوزات' : 'Check bookings', '${V2Paths.bookings}?status=pending'),
       ('claims', lang == 'ar' ? 'نزاعات مفتوحة' : 'Open disputes', asInt(home['openDisputes']),

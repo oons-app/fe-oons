@@ -261,16 +261,22 @@ class _Check extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
-      child: Container(
-        width: 17,
-        height: 17,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(5),
-          color: selected ? Ops.plum : Ops.cardAlt,
-          border: Border.all(color: selected ? Ops.plum : const Color(0xFFC9BBA9)),
+      child: SizedBox(
+        width: 28,
+        height: 28,
+        child: Center(
+          child: Container(
+            width: 22,
+            height: 22,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(6),
+              color: selected ? Ops.plum : Ops.cardAlt,
+              border: Border.all(color: selected ? Ops.plum : const Color(0xFFC9BBA9)),
+            ),
+            child: selected ? const Icon(Icons.check, size: 14, color: Color(0xFFF6F0EF)) : null,
+          ),
         ),
-        child: selected ? const Icon(Icons.check, size: 11, color: Color(0xFFF6F0EF)) : null,
       ),
     );
   }

@@ -101,17 +101,17 @@ bool canSeeScreen(String role, String screenId) {
     'home', 'live', 'bookings', 'booking', 'claims', 'customers', 'customer',
     'providers', 'provider', 'categoryRequests', 'serviceRequests', 'batches', 'heatmap', 'vetting', 'workerVetting', 'audit',
     'coupons', 'categories', 'areas', 'impersonate',
-    'refunds', 'analytics', 'liveMap',
+    'refunds', 'clientPayments', 'analytics', 'liveMap',
   };
   const finance = {
     'home', 'payouts', 'ledger', 'coupons', 'batches', 'payments', 'audit', 'bookings', 'booking',
-    'refunds',
+    'refunds', 'clientPayments',
   };
   const vendor = {
     'home', 'providers', 'provider', 'categoryRequests', 'serviceRequests', 'vetting', 'workerVetting', 'heatmap',
   };
   const am = {
-    'home', 'bookings', 'booking', 'customers', 'customer', 'providers', 'provider',
+    'home', 'bookings', 'booking', 'customers', 'customer', 'providers', 'provider', 'clientPayments',
   };
   switch (role) {
     case roleOps:

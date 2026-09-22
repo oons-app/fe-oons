@@ -19,6 +19,7 @@ abstract final class V2Paths {
   static const staff = '/staff';
   static const matrix = '/matrix';
   static const payments = '/payments';
+  static const clientPayments = '/client-payments';
   static const corporate = '/corporate';
   static const audit = '/audit';
   static const heatmap = '/heatmap';
@@ -71,6 +72,7 @@ const v2Nav = [
     NavItem('ledger', V2Paths.ledger, 'Ledger', 'الأرصدة'),
     NavItem('coupons', V2Paths.coupons, 'Coupons', 'الكوبونات'),
     NavItem('batches', V2Paths.batches, 'Batch history', 'سجل الدفعات'),
+    NavItem('clientPayments', V2Paths.clientPayments, 'Client payments', 'مدفوعات العميلات'),
     NavItem('refunds', V2Paths.refunds, 'Refunds', 'المرتجعات'),
   ]),
   NavGroup('Admin', 'الإدارة', [

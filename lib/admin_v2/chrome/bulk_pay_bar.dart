@@ -60,7 +60,7 @@ class V2BulkPayBar extends StatelessWidget {
               const SizedBox(width: 8),
               V2Btn(
                 label: ar ? 'تسوية وإرسال الإيصال' : 'Settle & send receipt',
-                onPressed: onSettle,
+                onPressed: count == 0 ? null : onSettle,
                 kind: V2BtnKind.light,
                 size: V2BtnSize.sm,
               ),

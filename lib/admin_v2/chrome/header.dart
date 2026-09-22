@@ -169,6 +169,7 @@ String headerSubFor(String path, String lang) {
   if (path == V2Paths.payouts) return ar ? 'السحوبات بانتظار الموافقة.' : 'Withdrawals awaiting approval.';
   if (path == V2Paths.ledger) return ar ? 'أرصدة المهنيات: المتاح والمحجوز.' : 'Provider balances: available and held.';
   if (path == V2Paths.batches) return ar ? 'الدفعات المسواة، الإيصالات و Excel.' : 'Settled bulk payouts, receipts and Excel.';
+  if (path == V2Paths.clientPayments) return ar ? 'كل دفعات العميلات: إنستاباي، البطاقة، الإيصالات والسجل.' : 'Every client payment: InstaPay, card, receipts, and the log.';
   if (path == V2Paths.categories) return ar ? 'إنشاء، تعديل، إعادة ترتيب، قفل الفئات.' : 'Create, edit, reorder, lock verticals.';
   if (path == V2Paths.areas) return ar ? 'المدن، رسوم الانتقال، القفل.' : 'Cities, travel fees, lock/unlock.';
   if (path == V2Paths.payments) return ar ? 'وضع البوابة، إعفاء الرسوم، المعاملات.' : 'Gateway mode, fee waiver, transactions.';

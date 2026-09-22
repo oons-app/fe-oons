@@ -26,6 +26,7 @@ import 'package:oons/admin_v2/features/ledger/ledger_screen.dart';
 import 'package:oons/admin_v2/features/live/live_screen.dart';
 import 'package:oons/admin_v2/features/live_map/live_map_screen.dart';
 import 'package:oons/admin_v2/features/login/login_screen.dart';
+import 'package:oons/admin_v2/features/payments/client_payments_screen.dart';
 import 'package:oons/admin_v2/features/payments/payments_screen.dart';
 import 'package:oons/admin_v2/features/payouts/payouts_screen.dart';
 import 'package:oons/admin_v2/features/providers/provider_detail_screen.dart';
@@ -121,6 +122,7 @@ final v2RouterProvider = Provider<GoRouter>((ref) {
           GoRoute(path: V2Paths.staff, builder: (_, __) => const StaffScreen()),
           GoRoute(path: V2Paths.matrix, builder: (_, __) => const MatrixScreen()),
           GoRoute(path: V2Paths.payments, builder: (_, __) => const PaymentsScreen()),
+          GoRoute(path: V2Paths.clientPayments, builder: (_, __) => const ClientPaymentsScreen()),
           GoRoute(path: V2Paths.corporate, builder: (_, __) => const CorporateScreen()),
           GoRoute(path: V2Paths.audit, builder: (_, __) => const AuditScreen()),
           GoRoute(path: V2Paths.heatmap, builder: (_, __) => const HeatmapScreen()),
