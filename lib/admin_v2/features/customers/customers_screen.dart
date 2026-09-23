@@ -48,25 +48,7 @@ int compareCustomerRows(Map<String, dynamic> a, Map<String, dynamic> b, String k
       va = parseTime(a['createdAt']);
       vb = parseTime(b['createdAt']);
   }
-  final ae = _sortEmpty(va);
-  final be = _sortEmpty(vb);
-  if (ae && be) return 0;
-  if (ae) return 1;
-  if (be) return -1;
-  final cmp = _sortCompare(va, vb);
-  return asc ? cmp : -cmp;
-}
-
-bool _sortEmpty(Object? v) {
-  if (v == null) return true;
-  if (v is String) return v.trim().isEmpty;
-  return false;
-}
-
-int _sortCompare(Object? a, Object? b) {
-  if (a is DateTime && b is DateTime) return a.compareTo(b);
-  if (a is num && b is num) return a.compareTo(b);
-  return '$a'.toLowerCase().compareTo('$b'.toLowerCase());
+  return compareSortValues(va, vb, asc: asc);
 }
 
 class CustomersScreen extends ConsumerStatefulWidget {

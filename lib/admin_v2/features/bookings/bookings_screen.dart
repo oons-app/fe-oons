@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -32,6 +33,39 @@ const _statusChips = <(String key, String en, String ar)>[
   ('cancelled', 'Cancelled by client', 'ملغاة'),
 ];
 
+/// Newest visit slot first. Empty values always sink to the bottom.
+@visibleForTesting
+int compareBookingRows(Map<String, dynamic> a, Map<String, dynamic> b, String key, bool asc, String lang) {
+  Object? va;
+  Object? vb;
+  switch (key) {
+    case 'ref':
+      va = bookingRef(a).toLowerCase();
+      vb = bookingRef(b).toLowerCase();
+      break;
+    case 'customer':
+      va = clientNameOf(a, lang).toLowerCase();
+      vb = clientNameOf(b, lang).toLowerCase();
+      break;
+    case 'professional':
+      va = providerNameOf(a, lang).toLowerCase();
+      vb = providerNameOf(b, lang).toLowerCase();
+      break;
+    case 'status':
+      va = statusLabel('${a['status']}', lang).toLowerCase();
+      vb = statusLabel('${b['status']}', lang).toLowerCase();
+      break;
+    case 'total':
+      va = asInt(a['total']);
+      vb = asInt(b['total']);
+      break;
+    default:
+      va = parseTime(a['slotStart']) ?? parseTime(a['createdAt']);
+      vb = parseTime(b['slotStart']) ?? parseTime(b['createdAt']);
+  }
+  return compareSortValues(va, vb, asc: asc);
+}
+
 class BookingsScreen extends ConsumerStatefulWidget {
   const BookingsScreen({super.key, this.queryParams = const {}, this.live = false});
   final Map<String, String> queryParams;
@@ -59,6 +93,8 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> with WidgetsBin
   Timer? _refreshTimer;
   Timer? _debounce;
   bool _appInBackground = false;
+  String sortKey = 'slotStart';
+  bool sortAsc = false;
 
   @override
   void initState() {
@@ -166,6 +202,7 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> with WidgetsBin
       if (!mounted) return;
       setState(() {
         bookings = append ? [...bookings, ...rows] : rows;
+        _applySort();
         // Counts only reflect the full scope on a fresh (skip 0) load.
         if (!append || statusCounts.isEmpty) statusCounts = counts;
         total = asInt(data['total']);
@@ -182,6 +219,23 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> with WidgetsBin
         loadingMore = false;
       });
     }
+  }
+
+  void _applySort({String? lang}) {
+    final code = lang ?? ref.read(localeCodeProvider) ?? 'ar';
+    bookings.sort((a, b) => compareBookingRows(a, b, sortKey, sortAsc, code));
+  }
+
+  void _onSort(String key) {
+    setState(() {
+      if (sortKey == key) {
+        sortAsc = !sortAsc;
+      } else {
+        sortKey = key;
+        sortAsc = key == 'ref' || key == 'customer' || key == 'professional' || key == 'status';
+      }
+      _applySort();
+    });
   }
 
   /// `total` is the server count for the *active* query (drives paging + the
@@ -661,16 +715,19 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> with WidgetsBin
                   loading: loading,
                   bulkMode: bulkMode,
                   actionsWidth: widget.live ? 150 : 96,
+                  sortKey: sortKey,
+                  sortAsc: sortAsc,
+                  onSort: _onSort,
                   emptyText: lang == 'ar'
                       ? 'لا شيء هنا بعد — امسح الفلتر أو البحث'
                       : 'Nothing here yet — clear the filter or search, or create a new record',
                   columns: [
-                    V2Col(lang == 'ar' ? 'المرجع' : 'Ref', fixed: 150),
-                    V2Col(lang == 'ar' ? 'العميلة' : 'Customer', flex: 1.05),
-                    V2Col(lang == 'ar' ? 'المهنية' : 'Professional', flex: 0.95),
-                    V2Col(lang == 'ar' ? 'التاريخ' : 'Date', fixed: 110),
-                    V2Col(lang == 'ar' ? 'الحالة' : 'Status', fixed: 132),
-                    V2Col(lang == 'ar' ? 'الإجمالي' : 'Total', fixed: 100),
+                    V2Col(lang == 'ar' ? 'المرجع' : 'Ref', fixed: 150, sortKey: 'ref'),
+                    V2Col(lang == 'ar' ? 'العميلة' : 'Customer', flex: 1.05, sortKey: 'customer'),
+                    V2Col(lang == 'ar' ? 'المهنية' : 'Professional', flex: 0.95, sortKey: 'professional'),
+                    V2Col(lang == 'ar' ? 'التاريخ' : 'Date', fixed: 110, sortKey: 'slotStart'),
+                    V2Col(lang == 'ar' ? 'الحالة' : 'Status', fixed: 132, sortKey: 'status'),
+                    V2Col(lang == 'ar' ? 'الإجمالي' : 'Total', fixed: 100, sortKey: 'total'),
                   ],
                   rows: [
                     for (final b in bookings)

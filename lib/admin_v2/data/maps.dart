@@ -222,6 +222,30 @@ String timelineLabel(dynamic key, String lang) {
   return m[s] ?? s.replaceAll('_', ' ');
 }
 
+/// Empty values always sink to the bottom, regardless of [asc].
+int compareSortValues(Object? a, Object? b, {required bool asc}) {
+  bool empty(Object? v) {
+    if (v == null) return true;
+    if (v is String) return v.trim().isEmpty;
+    return false;
+  }
+
+  final ae = empty(a);
+  final be = empty(b);
+  if (ae && be) return 0;
+  if (ae) return 1;
+  if (be) return -1;
+  final int cmp;
+  if (a is DateTime && b is DateTime) {
+    cmp = a.compareTo(b);
+  } else if (a is num && b is num) {
+    cmp = a.compareTo(b);
+  } else {
+    cmp = '$a'.toLowerCase().compareTo('$b'.toLowerCase());
+  }
+  return asc ? cmp : -cmp;
+}
+
 DateTime? parseTime(dynamic v) {
   if (v == null) return null;
   if (v is DateTime) return v;

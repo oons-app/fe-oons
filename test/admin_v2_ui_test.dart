@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:oons/admin_v2/features/bookings/bookings_screen.dart';
 import 'package:oons/admin_v2/features/customers/customers_screen.dart';
 import 'package:oons/admin_v2/theme/theme.dart';
 import 'package:oons/admin_v2/ui/atoms.dart';
@@ -170,5 +171,22 @@ void main() {
     final b = {'firstName': 'Amina', 'bookingCount': 4};
     expect(compareCustomerRows(a, b, 'bookingCount', false, 'en') > 0, isTrue);
     expect(compareCustomerRows(a, b, 'name', true, 'en') > 0, isTrue);
+  });
+
+  test('compareBookingRows defaults to newest slot first', () {
+    final older = {'ref': 'ONS-1', 'slotStart': '2026-09-20T10:00:00Z', 'total': 500};
+    final newer = {'ref': 'ONS-2', 'slotStart': '2026-09-23T10:00:00Z', 'total': 100};
+    final empty = {'ref': 'ONS-3'};
+    final rows = [older, empty, newer]..sort((a, b) => compareBookingRows(a, b, 'slotStart', false, 'en'));
+    expect(rows[0]['ref'], 'ONS-2');
+    expect(rows[1]['ref'], 'ONS-1');
+    expect(rows[2]['ref'], 'ONS-3');
+  });
+
+  test('compareBookingRows sorts total and ref', () {
+    final a = {'ref': 'ONS-9', 'total': 100};
+    final b = {'ref': 'ONS-1', 'total': 900};
+    expect(compareBookingRows(a, b, 'total', false, 'en') > 0, isTrue);
+    expect(compareBookingRows(a, b, 'ref', true, 'en') > 0, isTrue);
   });
 }
