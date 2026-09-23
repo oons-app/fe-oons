@@ -1,5 +1,7 @@
 /**
- * Consent Mode v2 (Advanced) — must run before gtag config.
+ * Consent Mode v2 — ads cookies wait for the banner.
+ * GA4 visit measurement is always on. Facebook/Instagram in-app browsers
+ * almost never tap the banner, so gating analytics_storage hid every ad click.
  * https://developers.google.com/tag-platform/security/guides/consent?consentmode=advanced
  */
 window.dataLayer = window.dataLayer || [];
@@ -24,31 +26,25 @@ window.gtag = gtag;
     } catch (_) {}
   }
 
-  var denied = {
-    ad_storage: 'denied',
-    ad_user_data: 'denied',
-    ad_personalization: 'denied',
-    analytics_storage: 'denied',
-    wait_for_update: 500
-  };
+  function withAnalytics(partial) {
+    return {
+      ad_storage: (partial && partial.ad_storage) || 'denied',
+      ad_user_data: (partial && partial.ad_user_data) || 'denied',
+      ad_personalization: (partial && partial.ad_personalization) || 'denied',
+      analytics_storage: 'granted'
+    };
+  }
 
-  // Default: denied (Advanced mode still sends cookieless pings).
-  // EEA/UK/CH explicitly denied; other regions same until banner choice.
-  gtag('consent', 'default', Object.assign({}, denied, { region: ['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH'] }));
-  gtag('consent', 'default', denied);
+  var defaults = Object.assign(withAnalytics({}), { wait_for_update: 500 });
 
+  gtag('consent', 'default', defaults);
   gtag('set', 'ads_data_redaction', true);
   gtag('set', 'url_passthrough', true);
 
   window.__oonsConsent = {
     key: KEY,
     apply: function (partial) {
-      var next = {
-        ad_storage: partial.ad_storage || 'denied',
-        ad_user_data: partial.ad_user_data || 'denied',
-        ad_personalization: partial.ad_personalization || 'denied',
-        analytics_storage: partial.analytics_storage || 'denied'
-      };
+      var next = withAnalytics(partial);
       gtag('consent', 'update', next);
       writeStored(next);
       window.dispatchEvent(new CustomEvent('oons-consent', { detail: next }));
@@ -58,31 +54,25 @@ window.gtag = gtag;
       return window.__oonsConsent.apply({
         ad_storage: 'granted',
         ad_user_data: 'granted',
-        ad_personalization: 'granted',
-        analytics_storage: 'granted'
+        ad_personalization: 'granted'
       });
     },
     acceptAnalytics: function () {
       return window.__oonsConsent.apply({
         ad_storage: 'denied',
         ad_user_data: 'denied',
-        ad_personalization: 'denied',
-        analytics_storage: 'granted'
+        ad_personalization: 'denied'
       });
     },
     rejectAll: function () {
-      return window.__oonsConsent.apply({
-        ad_storage: 'denied',
-        ad_user_data: 'denied',
-        ad_personalization: 'denied',
-        analytics_storage: 'denied'
-      });
+      // Reject advertising cookies only — visits stay counted.
+      return window.__oonsConsent.acceptAnalytics();
     },
     stored: readStored
   };
 
   var stored = readStored();
   if (stored) {
-    gtag('consent', 'update', stored);
+    gtag('consent', 'update', withAnalytics(stored));
   }
 })();

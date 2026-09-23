@@ -16,17 +16,17 @@
   var copy = {
     ar: {
       title: 'ملفات تعريف الارتباط',
-      body: 'نستخدم ملفات تعريف الارتباط لقياس استخدام الموقع وتحسينه. يمكنك قبول التحليلات فقط، أو الكل، أو الرفض.',
+      body: 'نحسب كل زيارة تلقائياً. ملفات الإعلانات اختيارية — قبولي الكل، أو ارفضي الإعلانات.',
       all: 'قبول الكل',
-      analytics: 'التحليلات فقط',
-      reject: 'رفض'
+      analytics: 'بدون إعلانات',
+      reject: 'رفض الإعلانات'
     },
     en: {
       title: 'Cookies',
-      body: 'We use cookies to measure and improve the site. Accept analytics only, all cookies, or reject.',
+      body: 'We count every visit automatically. Advertising cookies are optional — accept all, or reject ads.',
       all: 'Accept all',
-      analytics: 'Analytics only',
-      reject: 'Reject'
+      analytics: 'No ads cookies',
+      reject: 'Reject ads'
     }
   };
   var t = copy[lang] || copy.ar;
