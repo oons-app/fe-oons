@@ -60,7 +60,7 @@
 
   <title>Home | Oons</title>
   <link rel="manifest" href="manifest.json">
-  <script src="a2hs.js?v=5" defer=""></script>
+  <script src="a2hs.js?v=6" defer=""></script>
   
   <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport">
   
@@ -150,9 +150,40 @@
     For more details:
     * https://docs.flutter.dev/platform-integration/web/initialization
   -->
+  <style id="oons-flutter-viewport">
+    flt-glass-pane, flutter-view {
+      top: 0 !important;
+      left: 0 !important;
+      right: 0 !important;
+      bottom: 0 !important;
+      width: 100% !important;
+      height: 100% !important;
+    }
+  </style>
   <script>
     // Break stuck Flutter SW reload loops from older deploys (once per session).
     (function () {
+      var ua = navigator.userAgent || '';
+      var iab = /FBAN|FBAV|FB_IAB|FBIOS|FB4A|Instagram|WhatsApp|TikTok|Bytedance/i.test(ua);
+
+      function pinFlutterViewport() {
+        var css = document.getElementById('oons-flutter-viewport');
+        if (css && css.parentNode) css.parentNode.appendChild(css);
+        var injected = document.getElementById('oons-ios-store-style');
+        if (injected && injected.textContent && /flt-glass-pane|flutter-view/.test(injected.textContent)) {
+          injected.textContent = injected.textContent
+            .replace(/html\.oons-has-ios-store[^{]*\{[^}]*\}/g, '')
+            .replace(/html\.oons-has-ios-store flt-glass-pane[^}]*\}/g, '');
+        }
+        try { document.documentElement.classList.remove('oons-has-ios-store'); } catch (_) {}
+      }
+      pinFlutterViewport();
+      var n = 0;
+      var t = setInterval(function () {
+        pinFlutterViewport();
+        if (++n > 20) clearInterval(t);
+      }, 250);
+
       if (!('serviceWorker' in navigator)) return;
       var KEY = 'oons_sw_cleared_v2';
       navigator.serviceWorker.getRegistrations().then(function (regs) {
@@ -164,10 +195,15 @@
           });
         }
       }).then(function () {
-        if (navigator.serviceWorker.controller && !sessionStorage.getItem(KEY)) {
-          sessionStorage.setItem(KEY, '1');
-          location.reload();
-        }
+        // Facebook IAB can wipe sessionStorage on reload — a reload loop
+        // freezes the splash and burns paid traffic. Clear the SW, don't reload.
+        if (iab) return;
+        try {
+          if (navigator.serviceWorker.controller && !sessionStorage.getItem(KEY)) {
+            sessionStorage.setItem(KEY, '1');
+            location.reload();
+          }
+        } catch (_) {}
       }).catch(function () {});
     })();
   </script>

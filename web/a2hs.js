@@ -369,7 +369,7 @@
   function remountStoreBanner(force) {
     var el = document.getElementById('oons-ios-store');
     var L = lang();
-    var shouldShow = isIOS() && !isStandalone();
+    var shouldShow = isIOS() && !isStandalone() && !inAppInfo() && !document.getElementById('splash');
     if (!shouldShow) {
       if (el) el.remove();
       var st = document.getElementById('oons-ios-store-style');
@@ -387,7 +387,8 @@
 
   function mountStoreBanner() {
     if (document.getElementById('oons-ios-store')) return;
-    if (!isIOS() || isStandalone()) return;
+    if (!isIOS() || isStandalone() || inAppInfo()) return;
+    if (document.getElementById('splash')) return;
     if (!document.body) return;
 
     var L = lang();
@@ -395,11 +396,7 @@
     var style = document.createElement('style');
     style.id = 'oons-ios-store-style';
     style.textContent = [
-      'html.oons-has-ios-store{--oons-ios-store-h:calc(46px + env(safe-area-inset-top,0px))}',
-      'html.oons-has-ios-store body{padding-top:var(--oons-ios-store-h)}',
-      'html.oons-has-ios-store flt-glass-pane,html.oons-has-ios-store flutter-view{',
-      'top:var(--oons-ios-store-h)!important;height:calc(100% - var(--oons-ios-store-h))!important}',
-      '#oons-ios-store{position:fixed;inset-inline:0;top:0;z-index:2147482800;',
+      '#oons-ios-store{position:fixed;inset-inline:0;top:0;z-index:40;',
       'display:flex;align-items:center;justify-content:center;gap:10px;',
       'min-height:46px;padding:8px 12px;padding-top:max(8px,env(safe-area-inset-top,0px));',
       'background:#3A2431;color:#F4EBE1;box-shadow:0 4px 16px rgba(0,0,0,.18);',
