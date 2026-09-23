@@ -14,6 +14,7 @@ import 'package:oons/admin_v2/theme/tokens.dart';
 import 'package:oons/admin_v2/ui/atoms.dart';
 import 'package:oons/admin_v2/ui/buttons.dart';
 import 'package:oons/core/format.dart';
+import 'package:oons/core/pro_format.dart';
 import 'package:oons/data/api.dart';
 
 const _tabs = ['Overview', 'Documents', 'Team', 'Services', 'Coverage', 'Portfolio', 'Money'];
@@ -885,7 +886,7 @@ class _ProviderDetailScreenState extends ConsumerState<ProviderDetailScreen> {
               ),
               Expanded(
                 flex: 2,
-                child: Text('${asInt(s['durationMin'])} ${ar ? 'د' : 'min'}',
+                child: Text(formatServiceDuration(asInt(s['durationMin']), ar: ar),
                     style: const TextStyle(fontSize: 13, color: Ops.inkSoft)),
               ),
               if (canWrite) ...[
@@ -982,7 +983,7 @@ class _ProviderDetailScreenState extends ConsumerState<ProviderDetailScreen> {
 
     final nameEn = TextEditingController(text: '${(existing?['name'] as Map?)?['en'] ?? ''}');
     final nameAr = TextEditingController(text: '${(existing?['name'] as Map?)?['ar'] ?? ''}');
-    final duration = TextEditingController(text: '${asInt(existing?['durationMin'] ?? 60)}');
+    final duration = TextEditingController(text: hoursInputFromMinutes(asInt(existing?['durationMin'] ?? 60)));
     final price = TextEditingController(text: '${(asInt(existing?['price']) / 100).round()}');
     final travel = TextEditingController(text: '${(asInt(existing?['travelFee']) / 100).round()}');
     final note = TextEditingController(text: '${existing?['approvalNote'] ?? ''}');
@@ -1074,7 +1075,7 @@ class _ProviderDetailScreenState extends ConsumerState<ProviderDetailScreen> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: V2FormField(
-                    label: ar ? 'المدة (د)' : 'Duration (min)',
+                    label: ar ? 'المدة (ساعات)' : 'Duration (hours)',
                     child: TextField(controller: duration, keyboardType: TextInputType.number),
                   ),
                 ),
@@ -1182,9 +1183,9 @@ class _ProviderDetailScreenState extends ConsumerState<ProviderDetailScreen> {
           }
           // Matches the server's own bounds, so a bad value is caught here
           // rather than coming back as a 400 after the dialog has closed.
-          final d = int.tryParse(duration.text.trim()) ?? 0;
+          final d = minutesFromHoursInput(duration.text);
           if (d < 15 || d > 480) {
-            v2Toast(context, ar ? 'المدة بين ١٥ و٤٨٠ دقيقة' : 'Duration must be 15–480 minutes', error: true);
+            v2Toast(context, ar ? 'المدة بين ٠٫٢٥ و٨ ساعات' : 'Duration must be 0.25–8 hours', error: true);
             return false;
           }
           if ((state == 'rejected' || state == 'changes_requested') && note.text.trim().isEmpty) {
@@ -1201,7 +1202,10 @@ class _ProviderDetailScreenState extends ConsumerState<ProviderDetailScreen> {
         'name': {'en': nameEn.text.trim(), 'ar': nameAr.text.trim()},
         'categoryId': categoryId,
         'kind': kind,
-        'durationMin': int.tryParse(duration.text.trim()) ?? 60,
+        'durationMin': () {
+          final mins = minutesFromHoursInput(duration.text);
+          return mins == 0 ? 60 : mins;
+        }(),
         'price': ((int.tryParse(price.text.trim()) ?? 0) * 100),
         'travelFee': ((int.tryParse(travel.text.trim()) ?? 0) * 100),
         'active': active,

@@ -876,14 +876,11 @@ class _ProServicesScreenState extends ConsumerState<ProServicesScreen> {
     final meta = d.isCleaning
         ? cleaningSizeMeta(fromSqm: d.sizeFromSqm, toSqm: d.sizeToSqm, workers: d.workerCount, ar: ar)
         : [
-            if (d.duration > 0) '${digits(d.duration, ar: ar)}${ar ? ' د' : ' min'}',
+            if (d.duration > 0) formatServiceDuration(d.duration, ar: ar),
             if (price > 0) '${digits(price, ar: ar)} ${ar ? 'ج.م' : 'EGP'}',
             if (net != null) '· ${m['net']} ${digits(net, ar: ar)}',
           ].join(' · ');
-    final hours = d.duration >= 60 ? (d.duration / 60) : d.duration;
-    final durLabel = d.duration >= 60
-        ? (ar ? '${toArabicDigits(hours % 1 == 0 ? hours.toInt() : hours)} س' : '${hours % 1 == 0 ? hours.toInt() : hours} h')
-        : (ar ? '${toArabicDigits(d.duration)} د' : '${d.duration} min');
+    final durLabel = formatServiceDuration(d.duration, ar: ar);
     final packageLine = d.isCleaning
         ? (ar ? 'الباقة شاملة ${pluralTasks(included, ar: true)} · $durLabel' : 'Package includes ${pluralTasks(included, ar: false)} · $durLabel')
         : null;
@@ -2061,7 +2058,7 @@ class _CategoryServicesSheetState extends State<_CategoryServicesSheet> {
                 final label = name.isEmpty ? _catLabel : name;
                 final meta = d.isCleaning
                     ? cleaningSizeMeta(fromSqm: d.sizeFromSqm, toSqm: d.sizeToSqm, workers: d.workerCount, ar: ar)
-                    : '${digits(d.duration, ar: ar)}${ar ? ' د' : ' min'} · ${digits(d.priceEgp, ar: ar)} ${ar ? 'ج.م' : 'EGP'}';
+                    : '${formatServiceDuration(d.duration, ar: ar)} · ${digits(d.priceEgp, ar: ar)} ${ar ? 'ج.م' : 'EGP'}';
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: InkWell(

@@ -19,7 +19,7 @@ const _fallbackCities = <ServiceCity>[
 
 List<ServiceCity> serviceCities = List<ServiceCity>.from(_fallbackCities);
 
-const serviceDurations = [30, 45, 60, 90, 120, 150, 180, 240, 300];
+const serviceDurations = [30, 45, 60, 90, 120, 150, 180, 240, 300, 360, 480];
 
 Set<String> allCatalogAreaIds() {
   final out = <String>{};

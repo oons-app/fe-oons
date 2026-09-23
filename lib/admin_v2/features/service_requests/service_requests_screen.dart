@@ -14,6 +14,7 @@ import 'package:oons/admin_v2/theme/tokens.dart';
 import 'package:oons/admin_v2/ui/atoms.dart';
 import 'package:oons/admin_v2/ui/buttons.dart';
 import 'package:oons/core/format.dart';
+import 'package:oons/core/pro_format.dart';
 import 'package:oons/data/api.dart';
 
 /// Queue of specialty requests bundled with their real configured service(s)
@@ -168,11 +169,8 @@ class _ServiceRequestsScreenState extends ConsumerState<ServiceRequestsScreen> {
     final price = money(asInt(r['price']), lang);
     final isCleaning = '${r['kind']}' == 'cleaning';
     if (!isCleaning) {
-      final mins = asInt(r['durationMin']);
-      final dur = mins >= 60
-          ? (lang == 'ar' ? '${(mins / 60).toStringAsFixed(mins % 60 == 0 ? 0 : 1)} س' : '${(mins / 60).toStringAsFixed(mins % 60 == 0 ? 0 : 1)}h')
-          : (lang == 'ar' ? '$mins د' : '${mins}m');
-      return '$price · $dur';
+      final dur = formatServiceDuration(asInt(r['durationMin']), ar: lang == 'ar');
+      return dur.isEmpty ? price : '$price · $dur';
     }
     final from = asInt(r['sizeFromSqm']);
     final to = r['sizeToSqm'];

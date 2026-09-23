@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:oons/core/analytics.dart';
 import 'package:oons/core/format.dart';
+import 'package:oons/core/pro_format.dart';
 import 'package:oons/core/locale.dart';
 import 'package:oons/core/tokens.dart';
 import 'package:oons/data/api.dart';
@@ -160,7 +161,7 @@ class _PublicBookScreenState extends ConsumerState<PublicBookScreen> {
                             child: Row(
                               children: [
                                 Expanded(child: Text(it.name.of(lang), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Client.ink))),
-                                Text('${it.duration} ${lang == 'ar' ? 'د' : 'min'} · ${money(it.price, lang)}', style: const TextStyle(fontFamily: T.mono, fontSize: 12, color: Client.body)),
+                                Text('${formatServiceDuration(it.duration, ar: lang == 'ar')} · ${money(it.price, lang)}', style: const TextStyle(fontFamily: T.mono, fontSize: 12, color: Client.body)),
                               ],
                             ),
                           ),

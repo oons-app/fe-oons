@@ -758,7 +758,7 @@ class _BookScreenState extends ConsumerState<BookScreen> {
               final q = qty[it.id] ?? 0;
               final note = it.isCleaning
                   ? cleaningSizeMeta(fromSqm: it.sizeFromSqm, toSqm: it.sizeToSqm, workers: it.workerCount, ar: lang == 'ar')
-                  : (lang == 'ar' ? '${digits(it.duration, ar: true)} د' : '${it.duration} min');
+                  : formatServiceDuration(it.duration, ar: lang == 'ar');
               final includes = it.isCleaning
                   ? cleaningIncludeIds(it).map((id) => cleaningTaskNames[id]?.of(lang) ?? id).where((e) => e.isNotEmpty).toList()
                   : it.benefits.map((b) => b.of(lang)).where((e) => e.isNotEmpty).toList();

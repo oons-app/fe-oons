@@ -15,6 +15,7 @@ import 'package:oons/admin/shell.dart';
 import 'package:oons/admin/widgets.dart';
 import 'package:oons/core/format.dart';
 import 'package:oons/core/locale.dart';
+import 'package:oons/core/pro_format.dart';
 import 'package:oons/admin/theme.dart';
 import 'package:oons/core/analytics.dart';
 import 'package:oons/core/widgets.dart';
@@ -1088,7 +1089,7 @@ class _AdminProviderDetailScreenState extends ConsumerState<AdminProviderDetailS
     final c = _copy(ref);
     final nameEnController = TextEditingController();
     final nameArController = TextEditingController();
-    final durationController = TextEditingController(text: '60');
+    final durationController = TextEditingController(text: '1');
     final priceController = TextEditingController();
     
     final ok = await showOpsPanel(
@@ -1150,7 +1151,9 @@ class _AdminProviderDetailScreenState extends ConsumerState<AdminProviderDetailS
           'en': nameEnController.text.trim(),
           'ar': nameArController.text.trim(),
         },
-        'durationMin': int.tryParse(durationController.text.trim()) ?? 60,
+        'durationMin': minutesFromHoursInput(durationController.text) == 0
+            ? 60
+            : minutesFromHoursInput(durationController.text),
         'price': pricePiastres,
       });
       
@@ -1170,7 +1173,8 @@ class _AdminProviderDetailScreenState extends ConsumerState<AdminProviderDetailS
     
     final nameEnController = TextEditingController(text: nameEn);
     final nameArController = TextEditingController(text: nameAr);
-    final durationController = TextEditingController(text: '${service['durationMin'] ?? 60}');
+    final durationController = TextEditingController(
+        text: hoursInputFromMinutes(_n(service['durationMin'] != null ? service['durationMin'] : 60)));
     final priceEgp = (_n(service['price']) / 100).toStringAsFixed(2);
     final priceController = TextEditingController(text: priceEgp);
     
@@ -1238,7 +1242,9 @@ class _AdminProviderDetailScreenState extends ConsumerState<AdminProviderDetailS
             'en': nameEnController.text.trim(),
             'ar': nameArController.text.trim(),
           },
-          'durationMin': int.tryParse(durationController.text.trim()) ?? 60,
+          'durationMin': minutesFromHoursInput(durationController.text) == 0
+              ? 60
+              : minutesFromHoursInput(durationController.text),
           'price': pricePiastres,
         };
         
@@ -1602,7 +1608,7 @@ class _AdminProviderDetailScreenState extends ConsumerState<AdminProviderDetailS
                       child: Row(
                         children: [
                           Expanded(
-                            child: Text('${locName(item['name'], lang)} · ${item['durationMin'] ?? ''} ${c['minutes']} · ${money(_n(item['price']), lang)}'),
+                            child: Text('${locName(item['name'], lang)} · ${formatServiceDuration(_n(item['durationMin']), ar: lang == 'ar')} · ${money(_n(item['price']), lang)}'),
                           ),
                           if (staffCan(role, 'providers.write'))
                             TextButton(
@@ -2261,7 +2267,7 @@ class _AdminBookingDetailScreenState extends ConsumerState<AdminBookingDetailScr
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 AdminInfoRow(label: '${c['slot']}', value: _slot(b!['slotStart'], lang)),
-                AdminInfoRow(label: '${c['duration']}', value: '${b!['durationMin'] ?? ''} ${c['minutes']}'),
+                AdminInfoRow(label: '${c['duration']}', value: formatServiceDuration(_n(b!['durationMin']), ar: lang == 'ar')),
                 if (_n(b!['refundAmount']) > 0) AdminInfoRow(label: '${c['refundAmount']}', value: money(_n(b!['refundAmount']), lang)),
                 if (b!['notes'] != null && '${b!['notes']}'.isNotEmpty) AdminInfoRow(label: '${c['bookingNotes']}', value: '${b!['notes']}'),
               ],

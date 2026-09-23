@@ -686,7 +686,7 @@ class _ProServiceEditorSheetState extends State<_ProServiceEditorSheet> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(color: on ? Pro.plum : Pro.chip, borderRadius: BorderRadius.circular(10)),
-                      child: Text('$min', style: TextStyle(fontFamily: T.mono, fontSize: 12, fontWeight: FontWeight.w600, color: on ? Colors.white : Pro.muted)),
+                      child: Text(formatServiceDuration(min, ar: ar), style: TextStyle(fontFamily: T.mono, fontSize: 12, fontWeight: FontWeight.w600, color: on ? Colors.white : Pro.muted)),
                     ),
                   );
                 }).toList(),
@@ -740,7 +740,7 @@ class _ProServiceEditorSheetState extends State<_ProServiceEditorSheet> {
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Text(
-                    '${m['suggestedDur'] ?? (ar ? 'مقترح' : 'Suggested')}: ${digits(suggested, ar: ar)} ${ar ? 'د' : 'min'}',
+                    '${m['suggestedDur'] ?? (ar ? 'مقترح' : 'Suggested')}: ${formatServiceDuration(suggested, ar: ar)}',
                     style: const TextStyle(fontSize: 12, color: Pro.muted),
                   ),
                 ),
@@ -754,7 +754,7 @@ class _ProServiceEditorSheetState extends State<_ProServiceEditorSheet> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(color: on ? Pro.plum : Pro.chip, borderRadius: BorderRadius.circular(10)),
-                      child: Text('$min', style: TextStyle(fontFamily: T.mono, fontSize: 12, fontWeight: FontWeight.w600, color: on ? Colors.white : Pro.muted)),
+                      child: Text(formatServiceDuration(min, ar: ar), style: TextStyle(fontFamily: T.mono, fontSize: 12, fontWeight: FontWeight.w600, color: on ? Colors.white : Pro.muted)),
                     ),
                   );
                 }).toList(),

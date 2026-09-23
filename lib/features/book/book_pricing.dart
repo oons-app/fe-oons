@@ -156,16 +156,9 @@ int bookInclusiveTotal({
 
 String crewLine({required int workers, required int durationMin, required bool ar}) {
   final w = pluralWorkers(workers < 1 ? 1 : workers, ar: ar);
-  if (durationMin >= 480) {
-    return ar ? '$w · يوم كامل' : '$w · full day';
-  }
-  final hours = (durationMin / 60).round().clamp(1, 12);
-  if (ar) {
-    if (hours == 1) return '$w · حوالي ساعة';
-    if (hours == 2) return '$w · حوالي ساعتين';
-    return '$w · حوالي ${toArabicDigits(hours)} ساعات';
-  }
-  return '$w · about $hours h';
+  final dur = formatServiceDuration(durationMin < 1 ? 60 : durationMin, ar: ar);
+  if (dur.isEmpty) return w;
+  return '$w · $dur';
 }
 
 const cleaningTaskNames = <String, Loc>{

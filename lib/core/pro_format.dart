@@ -41,6 +41,45 @@ String normalizeMoneyInput(String raw) {
   return '$n';
 }
 
+/// Client-facing duration. Stored as minutes; shown as hours when ≥ 60.
+String formatServiceDuration(int minutes, {required bool ar}) {
+  if (minutes <= 0) return '';
+  if (minutes < 60) {
+    return ar ? '${digits(minutes, ar: true)} د' : '$minutes min';
+  }
+  final h = minutes ~/ 60;
+  final rem = minutes % 60;
+  final hoursLabel = _pluralHours(h, ar: ar);
+  if (rem == 0) return hoursLabel;
+  final minsLabel = ar ? '${digits(rem, ar: true)} د' : '$rem min';
+  return ar ? '$hoursLabel و$minsLabel' : '$hoursLabel $minsLabel';
+}
+
+String _pluralHours(int n, {required bool ar}) {
+  if (!ar) return n == 1 ? '1 hour' : '$n hours';
+  if (n == 1) return 'ساعة';
+  if (n == 2) return 'ساعتان';
+  if (n >= 3 && n <= 10) return '${toArabicDigits(n)} ساعات';
+  return '${toArabicDigits(n)} ساعة';
+}
+
+/// Hours field text for admin/pro editors (6, 1.5, 0.75).
+String hoursInputFromMinutes(int minutes) {
+  if (minutes <= 0) return '';
+  if (minutes % 60 == 0) return '${minutes ~/ 60}';
+  var s = (minutes / 60).toStringAsFixed(2);
+  s = s.replaceFirst(RegExp(r'0+$'), '');
+  return s.replaceFirst(RegExp(r'\.$'), '');
+}
+
+int minutesFromHoursInput(String raw) {
+  final w = toWesternDigits(raw.trim()).replaceAll(',', '.');
+  if (w.isEmpty) return 0;
+  final h = double.tryParse(w);
+  if (h == null) return 0;
+  return (h * 60).round();
+}
+
 /// Egyptian feminine plural for خدمة / خدمات.
 String pluralService(int n, {required bool ar}) {
   if (!ar) return n == 1 ? '1 service' : '$n services';

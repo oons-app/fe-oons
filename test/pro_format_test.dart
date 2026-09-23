@@ -17,6 +17,31 @@ void main() {
     expect(pluralService(11, ar: true), '١١ خدمة');
   });
 
+  test('formatServiceDuration uses hours when ≥ 60', () {
+    expect(formatServiceDuration(45, ar: false), '45 min');
+    expect(formatServiceDuration(45, ar: true), '٤٥ د');
+    expect(formatServiceDuration(60, ar: false), '1 hour');
+    expect(formatServiceDuration(60, ar: true), 'ساعة');
+    expect(formatServiceDuration(120, ar: false), '2 hours');
+    expect(formatServiceDuration(120, ar: true), 'ساعتان');
+    expect(formatServiceDuration(360, ar: false), '6 hours');
+    expect(formatServiceDuration(360, ar: true), '٦ ساعات');
+    expect(formatServiceDuration(480, ar: false), '8 hours');
+    expect(formatServiceDuration(480, ar: true), '٨ ساعات');
+    expect(formatServiceDuration(90, ar: false), '1 hour 30 min');
+    expect(formatServiceDuration(90, ar: true), 'ساعة و٣٠ د');
+  });
+
+  test('hours input round-trip', () {
+    expect(hoursInputFromMinutes(360), '6');
+    expect(hoursInputFromMinutes(90), '1.5');
+    expect(hoursInputFromMinutes(45), '0.75');
+    expect(minutesFromHoursInput('6'), 360);
+    expect(minutesFromHoursInput('٨'), 480);
+    expect(minutesFromHoursInput('1.5'), 90);
+    expect(minutesFromHoursInput('0.75'), 45);
+  });
+
   test('plural workers ar', () {
     expect(pluralWorkers(1, ar: true), 'مُساعدة واحدة');
     expect(pluralWorkers(2, ar: true), 'مُساعدتين');
