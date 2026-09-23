@@ -9,6 +9,7 @@
   var STORAGE_KEY = 'oons_a2hs_dismissed_v1';
   var LOCALE_KEY = 'oons_locale';
   var DISMISS_DAYS = 21;
+  var IOS_STORE = 'https://apps.apple.com/eg/app/oons-app/id6811881656';
   var deferredPrompt = null;
   var mountedLang = null;
   var mountedMode = null;
@@ -197,6 +198,19 @@
       install: en ? 'Add to Home Screen' : 'أضيفي للشاشة الرئيسية'
     };
 
+    if (mode === 'inapp' && isIOS()) {
+      return Object.assign(base, {
+        title: en ? 'Download Oons on the App Store' : 'حمّلي أُنس من آب ستور',
+        body: en
+          ? 'Oons is on the App Store in Egypt. Tap to install the iPhone app.'
+          : 'أُنس على آب ستور في مصر. اضغطي لتثبيت التطبيق على الآيفون.',
+        steps: en
+          ? 'If the store doesn’t open, tap Open in Safari, then Download on the App Store.'
+          : 'لو آب ستور ما فتحش، افتحي في سفاري بعدين حمّلي من آب ستور.',
+        install: en ? 'Download on the App Store' : 'حمّلي من آب ستور'
+      });
+    }
+
     if (mode === 'inapp') {
       return Object.assign(base, {
         title: en ? 'Open in Safari to install' : 'افتحي في سفاري عشان تثبّتي',
@@ -210,6 +224,18 @@
     }
 
     if (kind === 'landing') {
+      if (isIOS()) {
+        return Object.assign(base, {
+          title: en ? 'Download Oons on the App Store' : 'حمّلي أُنس من آب ستور',
+          body: en
+            ? 'Oons is on the App Store in Egypt. Tap to download the iPhone app.'
+            : 'أُنس على آب ستور في مصر. اضغطي للتحميل على الآيفون.',
+          steps: en
+            ? '1) Tap Download on the App Store\n2) Install Oons\n3) Open the app and sign in with your phone'
+            : '١) اضغطي تحميل من آب ستور\n٢) ثبّتي أُنس\n٣) افتحي التطبيق وسجّلي برقمك',
+          install: en ? 'Download on the App Store' : 'حمّلي من آب ستور'
+        });
+      }
       return Object.assign(base, {
         title: en ? 'Add the app from lady.oons.app' : 'ثبّتي التطبيق من lady.oons.app',
         body: en
@@ -223,25 +249,27 @@
 
     if (mode === 'safari') {
       return Object.assign(base, {
-        title: en ? 'Add Oons to Home Screen' : 'ثبّتي أنس على الشاشة الرئيسية',
+        title: en ? 'Download Oons on the App Store' : 'حمّلي أُنس من آب ستور',
         body: en
-          ? 'Do this on lady.oons.app in Safari: Share → Add to Home Screen. It opens full-screen like an app with the Oons logo.'
-          : 'اعملي ده على lady.oons.app في سفاري: مشاركة ← إضافة إلى الشاشة الرئيسية. هتفتح زي التطبيق بلوغو أنس.',
+          ? 'The iPhone app is on the App Store in Egypt. Tap to download.'
+          : 'تطبيق الآيفون على آب ستور في مصر. اضغطي للتحميل.',
         steps: en
-          ? '1) Tap Share (□↑) at the bottom\n2) Scroll → Add to Home Screen\n3) Tap Add'
-          : '١) اضغطي مشاركة (□↑) من تحت\n٢) انزلي ← إضافة إلى الشاشة الرئيسية\n٣) إضافة'
+          ? '1) Tap Download on the App Store\n2) Install, then open Oons'
+          : '١) اضغطي تحميل من آب ستور\n٢) ثبّتي، بعدين افتحي أُنس',
+        install: en ? 'Download on the App Store' : 'حمّلي من آب ستور'
       });
     }
 
     if (mode === 'chromeios') {
       return Object.assign(base, {
-        title: en ? 'Use Safari to add the icon' : 'استخدمي سفاري عشان الأيقونة',
+        title: en ? 'Download Oons on the App Store' : 'حمّلي أُنس من آب ستور',
         body: en
-          ? 'Chrome on iPhone can’t add to Home Screen. Tap Open in Safari (lady.oons.app), then Share → Add to Home Screen.'
-          : 'كروم على الآيفون مش بيضيف للشاشة الرئيسية. افتحي في سفاري على lady.oons.app، بعدين مشاركة ← إضافة إلى الشاشة الرئيسية.',
+          ? 'Tap to open the App Store. Chrome on iPhone cannot install the app itself.'
+          : 'اضغطي لفتح آب ستور. كروم على الآيفون مش يثبّت التطبيق بنفسه.',
         steps: en
-          ? '1) Tap Open in Safari\n2) Share → Add to Home Screen → Add'
-          : '١) افتحي في سفاري\n٢) مشاركة ← إضافة إلى الشاشة الرئيسية ← إضافة',
+          ? '1) Tap Download on the App Store\n2) Or Open in Safari, then download'
+          : '١) اضغطي تحميل من آب ستور\n٢) أو افتحي في سفاري بعدين حمّلي',
+        install: en ? 'Download on the App Store' : 'حمّلي من آب ستور',
         openSafari: en ? 'Open in Safari' : 'افتحي في سفاري'
       });
     }
@@ -321,13 +349,88 @@
     var el = document.getElementById('oons-a2hs');
     var L = lang();
     var mode = browserMode();
-    if (el && !force && mountedLang === L && mountedMode === mode) return;
+    if (el && !force && mountedLang === L && mountedMode === mode) {
+      remountStoreBanner(false);
+      return;
+    }
     if (el) el.remove();
     var st = document.getElementById('oons-a2hs-style');
     if (st) st.remove();
     mountedLang = null;
     mountedMode = null;
     mount();
+    remountStoreBanner(!!force);
+  }
+
+  function storeLabel(L) {
+    return L === 'en' ? 'Download on the App Store' : 'حمّلي من آب ستور';
+  }
+
+  function remountStoreBanner(force) {
+    var el = document.getElementById('oons-ios-store');
+    var L = lang();
+    var shouldShow = isIOS() && !isStandalone();
+    if (!shouldShow) {
+      if (el) el.remove();
+      var st = document.getElementById('oons-ios-store-style');
+      if (st) st.remove();
+      try { document.documentElement.classList.remove('oons-has-ios-store'); } catch (_) {}
+      return;
+    }
+    if (el && !force && el.getAttribute('data-lang') === L) return;
+    if (el) el.remove();
+    var st = document.getElementById('oons-ios-store-style');
+    if (st) st.remove();
+    try { document.documentElement.classList.remove('oons-has-ios-store'); } catch (_) {}
+    mountStoreBanner();
+  }
+
+  function mountStoreBanner() {
+    if (document.getElementById('oons-ios-store')) return;
+    if (!isIOS() || isStandalone()) return;
+    if (!document.body) return;
+
+    var L = lang();
+    var kind = hostKind();
+    var style = document.createElement('style');
+    style.id = 'oons-ios-store-style';
+    style.textContent = [
+      'html.oons-has-ios-store{--oons-ios-store-h:calc(46px + env(safe-area-inset-top,0px))}',
+      'html.oons-has-ios-store body{padding-top:var(--oons-ios-store-h)}',
+      'html.oons-has-ios-store flt-glass-pane,html.oons-has-ios-store flutter-view{',
+      'top:var(--oons-ios-store-h)!important;height:calc(100% - var(--oons-ios-store-h))!important}',
+      '#oons-ios-store{position:fixed;inset-inline:0;top:0;z-index:2147482800;',
+      'display:flex;align-items:center;justify-content:center;gap:10px;',
+      'min-height:46px;padding:8px 12px;padding-top:max(8px,env(safe-area-inset-top,0px));',
+      'background:#3A2431;color:#F4EBE1;box-shadow:0 4px 16px rgba(0,0,0,.18);',
+      'font:600 13px/1.3 system-ui,-apple-system,sans-serif}',
+      '#oons-ios-store a{appearance:none;border:0;border-radius:999px;min-height:34px;',
+      'padding:0 14px;font:600 13px/34px system-ui,sans-serif;cursor:pointer;',
+      'text-decoration:none;background:#C9B39B;color:#3A2431;white-space:nowrap}'
+    ].join('');
+    document.head.appendChild(style);
+
+    var bar = document.createElement('div');
+    bar.id = 'oons-ios-store';
+    bar.setAttribute('data-lang', L);
+    bar.setAttribute('role', 'region');
+    bar.setAttribute('aria-label', storeLabel(L));
+    bar.dir = L === 'ar' ? 'rtl' : 'ltr';
+    bar.innerHTML = '<a href="' + IOS_STORE + '" target="_blank" rel="noopener">' + storeLabel(L) + '</a>';
+    document.body.appendChild(bar);
+    try { document.documentElement.classList.add('oons-has-ios-store'); } catch (_) {}
+
+    try {
+      if (window.gtag) {
+        gtag('event', 'a2hs_prompt_shown', {
+          surface: kind,
+          host: location.hostname,
+          lang: L,
+          browser_mode: 'ios_store_banner',
+          in_app: inAppInfo() || ''
+        });
+      }
+    } catch (_) {}
   }
 
   function mount() {
@@ -344,7 +447,7 @@
     mountedMode = mode;
     var t = copyFor(kind, mode, L);
     var native = !!deferredPrompt && mode === 'android';
-    var targetUrl = kind === 'landing' ? appUrl() : location.href.split('#')[0];
+    var targetUrl = isIOS() ? IOS_STORE : (kind === 'landing' ? appUrl() : location.href.split('#')[0]);
 
     var style = document.createElement('style');
     style.id = 'oons-a2hs-style';
@@ -378,7 +481,14 @@
     box.dir = L === 'ar' ? 'rtl' : 'ltr';
 
     var primaryHtml = '';
-    if (kind === 'landing' && mode !== 'inapp' && mode !== 'chromeios') {
+    if (isIOS()) {
+      primaryHtml = '<a class="btn primary" href="' + IOS_STORE + '" target="_blank" rel="noopener">' + t.install + '</a>';
+      if (mode === 'inapp' || mode === 'chromeios') {
+        primaryHtml +=
+          '<button type="button" class="ghost" data-a2hs-escape>' + t.openSafari + '</button>' +
+          '<button type="button" class="ghost" data-a2hs-copy>' + t.copyLink + '</button>';
+      }
+    } else if (kind === 'landing' && mode !== 'inapp' && mode !== 'chromeios') {
       primaryHtml = '<a class="btn primary" href="' + appUrl() + '">' + (L === 'en' ? 'Open Oons' : 'افتحي أنس') + '</a>';
     } else if (mode === 'inapp' || mode === 'chromeios') {
       primaryHtml =
@@ -455,8 +565,8 @@
       if (target.getAttribute('data-a2hs-escape') != null) {
         e.preventDefault();
         // Prefer lady app URL so Home Screen icon opens the app.
-        var url = kind === 'landing' || mode === 'inapp' || mode === 'chromeios' ? appUrl() : targetUrl;
-        if (!/^https:\/\//i.test(url)) url = appUrl();
+        var url = isIOS() ? IOS_STORE : (kind === 'landing' || mode === 'inapp' || mode === 'chromeios' ? appUrl() : targetUrl);
+        if (!/^https:\/\//i.test(url)) url = isIOS() ? IOS_STORE : appUrl();
         escapeToSafari(url);
         // Also copy as fallback if scheme is blocked (Meta sometimes still blocks).
         setTimeout(function () {
@@ -496,16 +606,32 @@
     } catch (_) {}
   }
 
+  document.addEventListener('click', function (e) {
+    var a = e.target && e.target.closest ? e.target.closest('a') : null;
+    if (!a || !a.href) return;
+    if (!/apps\.apple\.com|itunes\.apple\.com/i.test(a.href)) return;
+    try {
+      if (window.gtag) {
+        gtag('event', 'download_app', {
+          app_platform: 'ios',
+          link_url: a.href,
+          surface: window.__oonsSurface || (hostKind() === 'landing' ? 'landing' : 'customer')
+        });
+      }
+    } catch (_) {}
+  }, true);
+
   function start() {
     var tries = 0;
     var timer = setInterval(function () {
       tries += 1;
       remount(false);
-      if ((document.getElementById('oons-a2hs') && tries > 4) || tries > 40) clearInterval(timer);
+      remountStoreBanner(false);
+      if (tries > 40) clearInterval(timer);
     }, 250);
     setInterval(function () {
-      if (!document.getElementById('oons-a2hs')) return;
       if (lang() !== mountedLang || browserMode() !== mountedMode) remount(true);
+      remountStoreBanner(false);
     }, 800);
   }
 
