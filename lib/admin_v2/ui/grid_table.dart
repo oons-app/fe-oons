@@ -4,11 +4,12 @@ import 'package:oons/admin_v2/theme/tokens.dart';
 /// A column in [V2GridTable]. Give it either a [fixed] pixel width or a [flex]
 /// factor (matches the prototype's `146px 1.05fr .95fr …` grid tracks).
 class V2Col {
-  const V2Col(this.label, {this.fixed, this.flex = 1, this.align = TextAlign.start});
+  const V2Col(this.label, {this.fixed, this.flex = 1, this.align = TextAlign.start, this.sortKey});
   final String label;
   final double? fixed;
   final double flex;
   final TextAlign align;
+  final String? sortKey;
 
   double get minWidth => fixed ?? (flex * 140).roundToDouble();
 }
@@ -44,6 +45,9 @@ class V2GridTable extends StatelessWidget {
     this.emptyText,
     this.loading = false,
     this.skeletonRows = 6,
+    this.sortKey,
+    this.sortAsc = true,
+    this.onSort,
   });
 
   final List<V2Col> columns;
@@ -52,6 +56,9 @@ class V2GridTable extends StatelessWidget {
   final double actionsWidth;
   final bool bulkMode;
   final String? emptyText;
+  final String? sortKey;
+  final bool sortAsc;
+  final ValueChanged<String>? onSort;
 
   /// When true and there are no [rows] yet, render shimmer skeleton rows
   /// instead of the empty-state text.
@@ -67,6 +74,35 @@ class V2GridTable extends StatelessWidget {
       w += c.minWidth + _gap;
     }
     return w;
+  }
+
+  Widget _headerLabel(V2Col c) {
+    final sortable = c.sortKey != null && onSort != null;
+    final active = sortable && sortKey == c.sortKey;
+    final style = TextStyle(
+      fontSize: 11.5,
+      fontWeight: FontWeight.w600,
+      color: active ? Ops.ink : Ops.greyInk,
+    );
+    final label = Text(c.label, textAlign: c.align, maxLines: 1, overflow: TextOverflow.ellipsis, style: style);
+    if (!sortable) return label;
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () => onSort!(c.sortKey!),
+        behavior: HitTestBehavior.opaque,
+        child: Row(
+          children: [
+            Expanded(child: label),
+            Icon(
+              !active ? Icons.unfold_more : (sortAsc ? Icons.arrow_upward : Icons.arrow_downward),
+              size: 13,
+              color: active ? Ops.ink : Ops.faint,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   List<Widget> _track(List<Widget> cells) {
@@ -116,10 +152,7 @@ class V2GridTable extends StatelessWidget {
                     child: Row(
                       children: _track([
                         if (bulkMode) const SizedBox(),
-                        for (final c in columns)
-                          Text(c.label,
-                              textAlign: c.align,
-                              style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Ops.greyInk)),
+                        for (final c in columns) _headerLabel(c),
                         const SizedBox(),
                       ]),
                     ),

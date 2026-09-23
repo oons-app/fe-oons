@@ -21,6 +21,9 @@ class V2ListView extends StatelessWidget {
     this.emptyText,
     this.actionsWidth = 120,
     this.bulkMode = false,
+    this.sortKey,
+    this.sortAsc = true,
+    this.onSort,
   });
 
   final Widget? strip;
@@ -35,6 +38,9 @@ class V2ListView extends StatelessWidget {
   final String? emptyText;
   final double actionsWidth;
   final bool bulkMode;
+  final String? sortKey;
+  final bool sortAsc;
+  final ValueChanged<String>? onSort;
 
   @override
   Widget build(BuildContext context) {
@@ -73,6 +79,9 @@ class V2ListView extends StatelessWidget {
               actionsWidth: actionsWidth,
               emptyText: emptyText,
               loading: loading,
+              sortKey: sortKey,
+              sortAsc: sortAsc,
+              onSort: onSort,
             ),
           ],
         ],

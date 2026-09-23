@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:oons/admin_v2/features/customers/customers_screen.dart';
 import 'package:oons/admin_v2/theme/theme.dart';
 import 'package:oons/admin_v2/ui/atoms.dart';
 import 'package:oons/admin_v2/ui/buttons.dart';
@@ -129,5 +130,45 @@ void main() {
     await tester.pumpWidget(host(const V2Btn(label: 'Disabled', onPressed: null)));
     final opacity = tester.widget<Opacity>(find.ancestor(of: find.text('Disabled'), matching: find.byType(Opacity)).first);
     expect(opacity.opacity, lessThan(1));
+  });
+
+  testWidgets('V2GridTable sortable header reports the column key', (tester) async {
+    String? tapped;
+    await tester.pumpWidget(host(
+      V2GridTable(
+        sortKey: 'createdAt',
+        sortAsc: false,
+        onSort: (key) => tapped = key,
+        columns: const [
+          V2Col('Customer', sortKey: 'name'),
+          V2Col('Joined', fixed: 110, sortKey: 'createdAt'),
+        ],
+        rows: const [
+          V2GridRow(cells: [Text('Nada'), Text('2026-09-23')]),
+        ],
+      ),
+    ));
+    expect(find.byIcon(Icons.arrow_downward), findsOneWidget);
+    await tester.tap(find.text('Customer'));
+    expect(tapped, 'name');
+    await tester.tap(find.text('Joined'));
+    expect(tapped, 'createdAt');
+  });
+
+  test('compareCustomerRows defaults to newest joined first', () {
+    final older = {'firstName': 'A', 'createdAt': '2026-09-20T10:00:00Z', 'bookingCount': 3};
+    final newer = {'firstName': 'B', 'createdAt': '2026-09-23T10:00:00Z', 'bookingCount': 0};
+    final empty = {'firstName': 'C'};
+    final rows = [older, empty, newer]..sort((a, b) => compareCustomerRows(a, b, 'createdAt', false, 'en'));
+    expect(rows[0]['firstName'], 'B');
+    expect(rows[1]['firstName'], 'A');
+    expect(rows[2]['firstName'], 'C');
+  });
+
+  test('compareCustomerRows sorts bookings and names', () {
+    final a = {'firstName': 'Zeinab', 'bookingCount': 1};
+    final b = {'firstName': 'Amina', 'bookingCount': 4};
+    expect(compareCustomerRows(a, b, 'bookingCount', false, 'en') > 0, isTrue);
+    expect(compareCustomerRows(a, b, 'name', true, 'en') > 0, isTrue);
   });
 }

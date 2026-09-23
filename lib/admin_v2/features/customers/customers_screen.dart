@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -17,6 +18,57 @@ import 'package:oons/admin_v2/ui/grid_table.dart';
 import 'package:oons/admin_v2/ui/list_view.dart';
 import 'package:oons/data/api.dart';
 
+/// Newest registrations first. Empty values always sink to the bottom.
+@visibleForTesting
+int compareCustomerRows(Map<String, dynamic> a, Map<String, dynamic> b, String key, bool asc, String lang) {
+  Object? va;
+  Object? vb;
+  switch (key) {
+    case 'name':
+      va = personName(a, lang, fallbackId: idOf(a)).toLowerCase();
+      vb = personName(b, lang, fallbackId: idOf(b)).toLowerCase();
+      break;
+    case 'phone':
+      va = '${a['phone'] ?? ''}';
+      vb = '${b['phone'] ?? ''}';
+      break;
+    case 'area':
+      va = areaLabel(a['area'] ?? a['areaName'], lang).toLowerCase();
+      vb = areaLabel(b['area'] ?? b['areaName'], lang).toLowerCase();
+      break;
+    case 'bookingCount':
+      va = asInt(a['bookingCount']);
+      vb = asInt(b['bookingCount']);
+      break;
+    case 'lastVisit':
+      va = parseTime(a['lastSlot']) ?? '${a['lastStatus'] ?? ''}';
+      vb = parseTime(b['lastSlot']) ?? '${b['lastStatus'] ?? ''}';
+      break;
+    default:
+      va = parseTime(a['createdAt']);
+      vb = parseTime(b['createdAt']);
+  }
+  final ae = _sortEmpty(va);
+  final be = _sortEmpty(vb);
+  if (ae && be) return 0;
+  if (ae) return 1;
+  if (be) return -1;
+  final cmp = _sortCompare(va, vb);
+  return asc ? cmp : -cmp;
+}
+
+bool _sortEmpty(Object? v) {
+  if (v == null) return true;
+  if (v is String) return v.trim().isEmpty;
+  return false;
+}
+
+int _sortCompare(Object? a, Object? b) {
+  if (a is DateTime && b is DateTime) return a.compareTo(b);
+  if (a is num && b is num) return a.compareTo(b);
+  return '$a'.toLowerCase().compareTo('$b'.toLowerCase());
+}
+
 class CustomersScreen extends ConsumerStatefulWidget {
   const CustomersScreen({super.key});
 
@@ -31,6 +83,8 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
   String q = '';
   String visits = ''; // '', any, none, live, done, dispute
   bool advanced = false;
+  String sortKey = 'createdAt';
+  bool sortAsc = false;
   Timer? _debounce;
 
   static const _visitFilters = [
@@ -65,6 +119,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
       final data = await staffClient.get('/admin/users', query: query);
       setState(() {
         customers = asMapList(data['users'] ?? data['customers']);
+        _applySort(lang: ref.read(localeCodeProvider));
         loading = false;
       });
     } on ApiException catch (e) {
@@ -73,6 +128,23 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
         loading = false;
       });
     }
+  }
+
+  void _applySort({String? lang}) {
+    final code = lang ?? ref.read(localeCodeProvider) ?? 'ar';
+    customers.sort((a, b) => compareCustomerRows(a, b, sortKey, sortAsc, code));
+  }
+
+  void _onSort(String key) {
+    setState(() {
+      if (sortKey == key) {
+        sortAsc = !sortAsc;
+      } else {
+        sortKey = key;
+        sortAsc = key == 'name' || key == 'phone' || key == 'area';
+      }
+      _applySort();
+    });
   }
 
   Future<void> _impersonate(Map c) async {
@@ -115,6 +187,9 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
       resultLabel: '${customers.length} ${lang == 'ar' ? 'مسجّلة' : 'registered'}',
       emptyText: lang == 'ar' ? 'لا عميلات مطابقة' : 'Nothing here yet',
       actionsWidth: canImpersonate || canBook ? 170 : 8,
+      sortKey: sortKey,
+      sortAsc: sortAsc,
+      onSort: _onSort,
       trailingActions: [
         V2Btn.ghost(
           advanced ? (lang == 'ar' ? 'إخفاء الفلاتر' : 'Hide filters') : (lang == 'ar' ? 'فلاتر متقدمة' : 'Advanced'),
@@ -135,12 +210,12 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
             ),
       ],
       columns: [
-        V2Col(lang == 'ar' ? 'العميلة' : 'Customer', flex: 1.1),
-        V2Col(lang == 'ar' ? 'الهاتف' : 'Phone', fixed: 140),
-        V2Col(lang == 'ar' ? 'المنطقة' : 'Area', fixed: 120),
-        V2Col(lang == 'ar' ? 'الحجوزات' : 'Bookings', fixed: 100),
-        V2Col(lang == 'ar' ? 'انضمّت' : 'Joined', fixed: 110),
-        V2Col(lang == 'ar' ? 'آخر حجز' : 'Last visit', fixed: 120),
+        V2Col(lang == 'ar' ? 'العميلة' : 'Customer', flex: 1.1, sortKey: 'name'),
+        V2Col(lang == 'ar' ? 'الهاتف' : 'Phone', fixed: 140, sortKey: 'phone'),
+        V2Col(lang == 'ar' ? 'المنطقة' : 'Area', fixed: 120, sortKey: 'area'),
+        V2Col(lang == 'ar' ? 'الحجوزات' : 'Bookings', fixed: 100, sortKey: 'bookingCount'),
+        V2Col(lang == 'ar' ? 'انضمّت' : 'Joined', fixed: 110, sortKey: 'createdAt'),
+        V2Col(lang == 'ar' ? 'آخر حجز' : 'Last visit', fixed: 120, sortKey: 'lastVisit'),
       ],
       rows: [
         for (final c in customers)
