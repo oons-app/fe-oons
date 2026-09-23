@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -15,17 +17,33 @@ import 'package:oons/data/service_catalog.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   setUrlStrategy(PathUrlStrategy());
-  await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-  await initializeDateFormatting('ar');
-  await initializeDateFormatting('en');
   await Hive.initFlutter();
-  await Hive.openBox('cache');
-  await Hive.openBox('prefs');
-  await _resolveCustomBookingHost();
+  await Future.wait([
+    Hive.openBox('cache'),
+    Hive.openBox('prefs'),
+  ]);
+  // Custom domains need the slug before the first route. lady.oons.app does not.
+  if (kIsWeb && isCustomBookingHost(Uri.base.host)) {
+    await _resolveCustomBookingHost();
+  }
+  // Paint the real app immediately. Ads were staring at the HTML splash while
+  // analytics, date tables, and /areas ran in front of runApp.
+  runApp(const ProviderScope(child: OonsApp()));
+  unawaited(_afterFirstPaint());
+}
+
+Future<void> _afterFirstPaint() async {
+  await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+  await Future.wait([
+    initializeDateFormatting('ar'),
+    initializeDateFormatting('en'),
+  ]);
+  if (!kIsWeb || !isCustomBookingHost(Uri.base.host)) {
+    await _resolveCustomBookingHost();
+  }
   await enableScreenGuard();
   await AppAnalytics.init();
   await refreshServiceCities(activeOnly: true);
-  runApp(const ProviderScope(child: OonsApp()));
 }
 
 Future<void> _resolveCustomBookingHost() async {
