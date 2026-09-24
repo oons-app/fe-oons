@@ -35,10 +35,18 @@ class PayLaunch {
 }
 
 class NeedsRegister implements Exception {
-  NeedsRegister(this.phone);
+  NeedsRegister(this.phone, {this.eventId = ''});
   final String phone;
+  final String eventId;
   @override
   String toString() => 'needsRegister';
+}
+
+class OtpRequestResult {
+  const OtpRequestResult({required this.demo, this.channel = '', this.eventId = ''});
+  final bool demo;
+  final String channel;
+  final String eventId;
 }
 
 class SessionState {
@@ -117,23 +125,28 @@ class Session extends StateNotifier<SessionState> {
     );
   }
 
-  Future<bool> requestOtp(String phone, {String role = 'client'}) async {
+  Future<OtpRequestResult> requestOtp(String phone, {String role = 'client'}) async {
     final r = await api.post('/auth/otp/request', data: {'phone': phone, 'role': role});
-    return r['demo'] == true;
+    return OtpRequestResult(
+      demo: r['demo'] == true,
+      channel: '${r['channel'] ?? r['via'] ?? ''}',
+      eventId: '${r['eventId'] ?? ''}',
+    );
   }
 
-  Future<void> verify(String phone, String code, {String role = 'client'}) async {
+  Future<String> verify(String phone, String code, {String role = 'client'}) async {
     final r = await api.post('/auth/otp/verify', data: {'phone': phone, 'code': code, 'role': role});
+    final eventId = '${r['eventId'] ?? ''}';
     if (r['needsRegister'] == true) {
-      throw NeedsRegister(phone);
+      throw NeedsRegister(phone, eventId: eventId);
     }
     final token = r['accessToken'] as String;
     await api.storage.write(key: 'access', value: token);
     await Hive.box('prefs').put('onboarded', true);
     await _applyMe(token, r);
     final resolvedRole = '${r['role'] ?? role}';
-    await AppAnalytics.login(role: resolvedRole);
     final uid = state.user?.id ?? state.provider?.id;
+    await AppAnalytics.login(role: resolvedRole, eventId: uid != null ? '$uid:login' : eventId);
     if (uid != null) {
       await AppAnalytics.identify(
         userId: uid,
@@ -143,6 +156,7 @@ class Session extends StateNotifier<SessionState> {
         providerSlug: state.provider?.slug,
       );
     }
+    return eventId;
   }
 
   Future<void> registerClient({
@@ -169,9 +183,9 @@ class Session extends StateNotifier<SessionState> {
     await api.storage.write(key: 'access', value: token);
     await Hive.box('prefs').put('onboarded', true);
     await _applyMe(token, r);
-    await AppAnalytics.signUp(role: 'client');
-    await AppAnalytics.clientRegistrationCompleted();
     final uid = state.user?.id;
+    await AppAnalytics.signUp(role: 'client', eventId: uid != null ? '$uid:sign_up' : null);
+    await AppAnalytics.clientRegistrationCompleted(eventId: uid != null ? '$uid:client_registration_completed' : null);
     if (uid != null) {
       await AppAnalytics.identify(userId: uid, audience: AnalyticsAudience.customer, area: state.user?.area, country: 'EG');
     }
@@ -216,9 +230,12 @@ class Session extends StateNotifier<SessionState> {
     await api.storage.write(key: 'access', value: token);
     await Hive.box('prefs').put('onboarded', true);
     await _applyMe(token, r);
-    await AppAnalytics.signUp(role: 'provider');
-    await AppAnalytics.providerRegistrationCompleted(vertical: service);
     final uid = state.provider?.id;
+    await AppAnalytics.signUp(role: 'provider', eventId: uid != null ? '$uid:sign_up' : null);
+    await AppAnalytics.providerRegistrationCompleted(
+      vertical: service,
+      eventId: uid != null ? '$uid:provider_registration_completed' : null,
+    );
     if (uid != null) {
       await AppAnalytics.identify(
         userId: uid,

@@ -303,18 +303,26 @@ class AppAnalytics {
 
   // —— Auth / registration funnels ——
 
-  static Future<void> login({required String role}) async {
+  static Future<void> login({required String role, String? eventId}) async {
     final aud = role == 'provider'
         ? AnalyticsAudience.provider
         : role == 'admin'
             ? AnalyticsAudience.admin
             : AnalyticsAudience.customer;
     await setAudience(aud);
-    await logEvent('login', {'method': 'otp', 'role': role});
+    await logEvent('login', {
+      'method': 'otp',
+      'role': role,
+      if (eventId != null && eventId.isNotEmpty) 'event_id': eventId,
+    });
   }
 
-  static Future<void> signUp({required String role}) async {
-    await logEvent('sign_up', {'method': 'otp', 'role': role});
+  static Future<void> signUp({required String role, String? eventId}) async {
+    await logEvent('sign_up', {
+      'method': 'otp',
+      'role': role,
+      if (eventId != null && eventId.isNotEmpty) 'event_id': eventId,
+    });
   }
 
   static Future<void> staffLogin() async {
@@ -328,19 +336,31 @@ class AppAnalytics {
     });
   }
 
-  static Future<void> otpSent({required String role, bool resend = false}) async {
-    await logEvent('otp_sent', {'role': role, 'resend': resend ? 1 : 0});
+  static Future<void> otpSent({
+    required String role,
+    bool resend = false,
+    String channel = 'whatsapp',
+    String? eventId,
+  }) async {
+    await logEvent('otp_sent', {
+      'role': role,
+      'resend': resend ? 1 : 0,
+      'channel': channel,
+      if (eventId != null && eventId.isNotEmpty) 'event_id': eventId,
+    });
   }
 
   static Future<void> otpVerificationAttempted({
     required String role,
     required bool success,
     bool needsRegister = false,
+    String? eventId,
   }) async {
     await logEvent('otp_verification_attempted', {
       'role': role,
       'success': success ? 1 : 0,
       'needs_register': needsRegister ? 1 : 0,
+      if (eventId != null && eventId.isNotEmpty) 'event_id': eventId,
     });
   }
 
@@ -351,8 +371,11 @@ class AppAnalytics {
     });
   }
 
-  static Future<void> clientRegistrationCompleted() async {
-    await logEvent('client_registration_completed', {'method': 'otp'});
+  static Future<void> clientRegistrationCompleted({String? eventId}) async {
+    await logEvent('client_registration_completed', {
+      'method': 'otp',
+      if (eventId != null && eventId.isNotEmpty) 'event_id': eventId,
+    });
   }
 
   static Future<void> providerRegistrationStarted() async {
@@ -374,9 +397,10 @@ class AppAnalytics {
     await logEvent('provider_portfolio_uploaded', {});
   }
 
-  static Future<void> providerRegistrationCompleted({String? vertical}) async {
+  static Future<void> providerRegistrationCompleted({String? vertical, String? eventId}) async {
     await logEvent('provider_registration_completed', {
       if (vertical != null) 'item_category': vertical,
+      if (eventId != null && eventId.isNotEmpty) 'event_id': eventId,
     });
   }
 

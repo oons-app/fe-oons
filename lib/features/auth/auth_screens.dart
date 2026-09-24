@@ -267,15 +267,19 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                         err = null;
                       });
                       try {
-                        final demo = await ref.read(sessionProvider.notifier).requestOtp(digits, role: effectiveRole);
-                        unawaited(AppAnalytics.otpSent(role: effectiveRole));
+                        final otp = await ref.read(sessionProvider.notifier).requestOtp(digits, role: effectiveRole);
+                        unawaited(AppAnalytics.otpSent(
+                          role: effectiveRole,
+                          channel: otp.channel.isEmpty ? 'none' : otp.channel,
+                          eventId: otp.eventId,
+                        ));
                         if (effectiveRole == 'client') {
                           unawaited(AppAnalytics.clientRegistrationStarted(source: 'auth'));
                         } else {
                           unawaited(AppAnalytics.providerRegistrationStarted());
                         }
                         if (mounted) {
-                          context.go('/otp?phone=${Uri.encodeComponent(digits)}&role=$effectiveRole&demo=${demo ? 1 : 0}');
+                          context.go('/otp?phone=${Uri.encodeComponent(digits)}&role=$effectiveRole&demo=${otp.demo ? 1 : 0}');
                         }
                       } catch (e) {
                         setState(() => err = friendlyError(e, lang));
@@ -397,12 +401,17 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
     }
     setState(() => busy = true);
     try {
-      await ref.read(sessionProvider.notifier).verify(widget.phone, code, role: widget.role);
-      unawaited(AppAnalytics.otpVerificationAttempted(role: widget.role, success: true));
+      final eventId = await ref.read(sessionProvider.notifier).verify(widget.phone, code, role: widget.role);
+      unawaited(AppAnalytics.otpVerificationAttempted(role: widget.role, success: true, eventId: eventId));
       tapSuccess();
       if (mounted) context.go(afterAuthPath(widget.role));
-    } on NeedsRegister {
-      unawaited(AppAnalytics.otpVerificationAttempted(role: widget.role, success: true, needsRegister: true));
+    } on NeedsRegister catch (reg) {
+      unawaited(AppAnalytics.otpVerificationAttempted(
+        role: widget.role,
+        success: true,
+        needsRegister: true,
+        eventId: reg.eventId,
+      ));
       if (widget.role == 'client') {
         unawaited(AppAnalytics.clientRegistrationStarted(source: 'otp'));
       } else {
@@ -496,8 +505,13 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                           ? null
                           : () async {
                               try {
-                                await ref.read(sessionProvider.notifier).requestOtp(widget.phone, role: widget.role);
-                                unawaited(AppAnalytics.otpSent(role: widget.role, resend: true));
+                                final otp = await ref.read(sessionProvider.notifier).requestOtp(widget.phone, role: widget.role);
+                                unawaited(AppAnalytics.otpSent(
+                                  role: widget.role,
+                                  resend: true,
+                                  channel: otp.channel.isEmpty ? 'none' : otp.channel,
+                                  eventId: otp.eventId,
+                                ));
                                 _startCooldown();
                               } catch (e) {
                                 setState(() => err = friendlyError(e, lang));
