@@ -15,4 +15,11 @@ abstract final class AnalyticsPlatform {
 
   static Future<void> setUserProperties(Map<String, String> props) =>
       impl.setUserProperties(props);
+
+  static Future<void> trackMeta(
+    String event, {
+    String? eventId,
+    Map<String, Object>? params,
+  }) =>
+      impl.trackMeta(event, eventId: eventId, params: params);
 }

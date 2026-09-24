@@ -348,6 +348,11 @@ class AppAnalytics {
       'channel': channel,
       if (eventId != null && eventId.isNotEmpty) 'event_id': eventId,
     });
+    await AnalyticsPlatform.trackMeta(
+      'Lead',
+      eventId: eventId,
+      params: {'content_name': 'otp_sent', 'status': role},
+    );
   }
 
   static Future<void> otpVerificationAttempted({
@@ -371,11 +376,17 @@ class AppAnalytics {
     });
   }
 
-  static Future<void> clientRegistrationCompleted({String? eventId}) async {
+  static Future<void> clientRegistrationCompleted({String? eventId, String? userId}) async {
     await logEvent('client_registration_completed', {
       'method': 'otp',
       if (eventId != null && eventId.isNotEmpty) 'event_id': eventId,
     });
+    final metaId = (userId != null && userId.isNotEmpty) ? '$userId:CompleteRegistration' : null;
+    await AnalyticsPlatform.trackMeta(
+      'CompleteRegistration',
+      eventId: metaId,
+      params: const {'status': 'client'},
+    );
   }
 
   static Future<void> providerRegistrationStarted() async {
@@ -397,11 +408,17 @@ class AppAnalytics {
     await logEvent('provider_portfolio_uploaded', {});
   }
 
-  static Future<void> providerRegistrationCompleted({String? vertical, String? eventId}) async {
+  static Future<void> providerRegistrationCompleted({String? vertical, String? eventId, String? userId}) async {
     await logEvent('provider_registration_completed', {
       if (vertical != null) 'item_category': vertical,
       if (eventId != null && eventId.isNotEmpty) 'event_id': eventId,
     });
+    final metaId = (userId != null && userId.isNotEmpty) ? '$userId:CompleteRegistration' : null;
+    await AnalyticsPlatform.trackMeta(
+      'CompleteRegistration',
+      eventId: metaId,
+      params: const {'status': 'provider'},
+    );
   }
 
   static Future<void> providerVettingApproved({required String providerId}) async {

@@ -81,3 +81,15 @@ Future<void> setUserId(String? id) async {
 Future<void> setUserProperties(Map<String, String> props) async {
   _gtag(['set', 'user_properties', _js(props)]);
 }
+
+/// Meta Pixel standard event. [eventId] must match the CAPI event_id.
+Future<void> trackMeta(String event, {String? eventId, Map<String, Object>? params}) async {
+  try {
+    final data = <String, Object>{if (params != null) ...params};
+    final args = <Object?>['track', event, _js(data)];
+    if (eventId != null && eventId.isNotEmpty) {
+      args.add(_js({'eventID': eventId}));
+    }
+    js_util.callMethod(js_util.globalThis, 'fbq', args);
+  } catch (_) {}
+}

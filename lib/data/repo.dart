@@ -185,7 +185,10 @@ class Session extends StateNotifier<SessionState> {
     await _applyMe(token, r);
     final uid = state.user?.id;
     await AppAnalytics.signUp(role: 'client', eventId: uid != null ? '$uid:sign_up' : null);
-    await AppAnalytics.clientRegistrationCompleted(eventId: uid != null ? '$uid:client_registration_completed' : null);
+    await AppAnalytics.clientRegistrationCompleted(
+      eventId: uid != null ? '$uid:client_registration_completed' : null,
+      userId: uid,
+    );
     if (uid != null) {
       await AppAnalytics.identify(userId: uid, audience: AnalyticsAudience.customer, area: state.user?.area, country: 'EG');
     }
@@ -235,6 +238,7 @@ class Session extends StateNotifier<SessionState> {
     await AppAnalytics.providerRegistrationCompleted(
       vertical: service,
       eventId: uid != null ? '$uid:provider_registration_completed' : null,
+      userId: uid,
     );
     if (uid != null) {
       await AppAnalytics.identify(

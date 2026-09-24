@@ -7,3 +7,5 @@ Future<void> logScreen(String name, {String? path}) async {}
 Future<void> setUserId(String? id) async {}
 
 Future<void> setUserProperties(Map<String, String> props) async {}
+
+Future<void> trackMeta(String event, {String? eventId, Map<String, Object>? params}) async {}
