@@ -237,9 +237,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                   Padding(
                     padding: const EdgeInsets.only(top: 6),
                     child: Text(
-                      lang == 'ar'
-                          ? 'اكتبي الرقم من غير صفر الأول — التطبيق بيحط +٢٠ لوحده.'
-                          : 'Skip the leading 0 — the app already adds +20.',
+                      '${a['hint']}',
                       style: const TextStyle(fontSize: 12, height: 1.35, color: Client.body),
                     ),
                   ),
@@ -469,7 +467,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                                 Text('${o['title']}', style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700, color: Client.ink)),
                                 const SizedBox(height: 10),
                                 Text(
-                                  lang == 'ar' ? 'لو فعّلنا الرسائل، الكود بيوصل SMS. في التجربة المحلية الكود بيتسجل على السيرفر فقط.' : 'When SMS is live, the code arrives by text. On a local server it is issued by the API only.',
+                                  '${o['sub']}',
                                   style: const TextStyle(fontSize: 15, height: 1.45, color: Client.body),
                                 ),
                                 const SizedBox(height: 8),

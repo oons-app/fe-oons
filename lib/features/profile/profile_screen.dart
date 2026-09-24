@@ -77,7 +77,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       (icon: '✎', label: '${p['instructions']}', meta: '${user?.instructions.length ?? 0}', onTap: () => context.push('/me/instructions'), danger: false),
       (icon: '▣', label: '${p['pay']}', meta: lang == 'ar' ? 'بطاقة، محفظة موبايل' : 'Card, Mobile Wallet', onTap: () => context.push('/me/pay'), danger: false),
       (icon: '♡', label: '${p['saved']}', meta: '${user?.savedIds.length ?? 0}', onTap: () => context.push('/me/saved'), danger: false),
-      (icon: '◎', label: '${p['notif']}', meta: lang == 'ar' ? 'رسائل + إشعارات' : 'SMS + push', onTap: () => context.push('/me/notif'), danger: false),
+      (icon: '◎', label: '${p['notif']}', meta: lang == 'ar' ? 'واتساب + إشعارات' : 'WhatsApp + push', onTap: () => context.push('/me/notif'), danger: false),
       (icon: '⛨', label: '${p['help']}', meta: '24/7', onTap: () => context.push('/me/help'), danger: false),
       (icon: '¶', label: '${p['terms']}', meta: '', onTap: () => openLegal(context, 'terms'), danger: false),
       (icon: '◌', label: '${p['privacy']}', meta: '', onTap: () => openLegal(context, 'privacy'), danger: false),
