@@ -24,13 +24,13 @@ Future<void> resetProTour() => setProTourDone(false);
 Future<void> showProTour(BuildContext context, {required String lang}) async {
   final steps = lang == 'ar'
       ? const [
-          ('الزيارات', 'هنا هتشوفي الزيارات الجاية واللي فاتت. دوسي على الزيارة للعنوان والـ QR.'),
+          ('الزيارات', 'هنا هتشوفي الزيارات الجاية واللي فاتت. دوسي على الزيارة للعنوان ورمز الباب.'),
           ('خدماتي', 'هنا بتعدّلي الخدمات والمناطق والمواعيد — وتنظيف بالمتر والعاملات.'),
           ('الأرباح', 'متاح للسحب، والفلوس الواقفة ٤٨ ساعة، وطريقة التحويل.'),
           ('حسابي', 'الرقم القومي والمستندات والإشعارات وإعادة الجولة.'),
         ]
       : const [
-          ('Visits', 'Upcoming and past visits. Tap a visit for address and QR.'),
+          ('Visits', 'Upcoming and past visits. Tap a visit for address and door code.'),
           ('Services', 'Edit services, areas, hours — including cleaning packages.'),
           ('Earnings', 'Available balance, 48h hold, and payout method.'),
           ('Account', 'National ID, docs, notifications, and replay this tour.'),

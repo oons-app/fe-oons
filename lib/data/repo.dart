@@ -859,12 +859,12 @@ class Repo {
     return BookingBundle.fromJson(r);
   }
 
-  Future<Map<String, dynamic>> handshakeQr(String id, {required double lat, required double lng}) async {
+  Future<Map<String, dynamic>> handshakeDoor(String id, {required double lat, required double lng}) async {
     return api.get('/bookings/$id/handshake', query: {'lat': lat, 'lng': lng});
   }
 
-  Future<BookingBundle> proHandshake(String id, String token, {required double lat, required double lng}) async {
-    final r = await api.post('/pro/bookings/$id/handshake', data: {'token': token, 'lat': lat, 'lng': lng});
+  Future<BookingBundle> proHandshake(String id, String code, {required double lat, required double lng}) async {
+    final r = await api.post('/pro/bookings/$id/handshake', data: {'code': code, 'lat': lat, 'lng': lng});
     return BookingBundle.fromJson(r);
   }
 

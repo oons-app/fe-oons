@@ -181,11 +181,11 @@ void main() {
     expect('${Copy.of('en')['pro']['earnNote']}', contains('banking'));
   });
 
-  test('handshakeTokenFromScan accepts JWT and oons URLs', () {
-    const jwt = 'aaa.bbb.ccc';
-    expect(handshakeTokenFromScan(jwt), jwt);
-    expect(handshakeTokenFromScan('oons://handshake?t=$jwt'), jwt);
-    expect(handshakeTokenFromScan('not-a-token'), isNull);
+  test('handshakeCodeFromInput accepts a 4-digit door code', () {
+    expect(handshakeCodeFromInput('4192'), '4192');
+    expect(handshakeCodeFromInput(' 4 1 9 2 '), '4192');
+    expect(handshakeCodeFromInput('abc'), isNull);
+    expect(handshakeCodeFromInput('419'), isNull);
   });
 
   test('api client unwraps the ok/data envelope', () {

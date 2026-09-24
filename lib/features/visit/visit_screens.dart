@@ -6,7 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 import 'package:oons/core/format.dart';
 import 'package:oons/core/geo.dart';
 import 'package:oons/core/icons/ons_icons.dart';
@@ -32,18 +31,18 @@ class _VisitScreenState extends ConsumerState<VisitScreen> {
   BookingBundle? data;
   int hs = 0;
   Timer? poll;
-  Timer? qrRefresh;
+  Timer? doorRefresh;
   TrackSocket? track;
-  String? qrPayload;
-  bool qrBusy = false;
-  String? qrError;
+  String? doorCode;
+  bool doorBusy = false;
+  String? doorError;
 
   @override
   void initState() {
     super.initState();
     _load();
     poll = Timer.periodic(const Duration(seconds: 25), (_) => _load());
-    qrRefresh = Timer.periodic(const Duration(minutes: 4), (_) => _refreshQr(force: true));
+    doorRefresh = Timer.periodic(const Duration(minutes: 4), (_) => _refreshDoor(force: true));
     _listenTrack();
   }
 
@@ -69,7 +68,7 @@ class _VisitScreenState extends ConsumerState<VisitScreen> {
   @override
   void dispose() {
     poll?.cancel();
-    qrRefresh?.cancel();
+    doorRefresh?.cancel();
     track?.stop();
     super.dispose();
   }
@@ -77,7 +76,7 @@ class _VisitScreenState extends ConsumerState<VisitScreen> {
   bool _handshakeLive(String? status) =>
       status == 'paid' || status == 'rescheduled' || status == 'on_the_way' || status == 'in_progress';
 
-  bool _canFetchQr(Booking? b) {
+  bool _canFetchDoor(Booking? b) {
     if (b == null) return false;
     if (b.providerCheckIn != null) return false;
     return b.status == 'paid' || b.status == 'rescheduled' || b.status == 'on_the_way' || b.status == 'in_progress';
@@ -93,8 +92,8 @@ class _VisitScreenState extends ConsumerState<VisitScreen> {
     if (b.booking.status == 'completed' || b.booking.status == 'cancelled_client' || b.booking.status == 'cancelled_provider') {
       poll?.cancel();
     }
-    if (_canFetchQr(b.booking)) {
-      _refreshQr();
+    if (_canFetchDoor(b.booking)) {
+      _refreshDoor();
     }
   }
 
@@ -103,7 +102,7 @@ class _VisitScreenState extends ConsumerState<VisitScreen> {
       hs = 3;
     } else if (b.clientCheckIn != null) {
       hs = 2;
-    } else if (qrPayload != null && qrPayload!.isNotEmpty) {
+    } else if (doorCode != null && doorCode!.isNotEmpty) {
       hs = 1;
     } else {
       hs = 0;
@@ -121,38 +120,38 @@ class _VisitScreenState extends ConsumerState<VisitScreen> {
     }
   }
 
-  Future<void> _refreshQr({bool force = false}) async {
+  Future<void> _refreshDoor({bool force = false}) async {
     final b = data?.booking;
-    if (!_canFetchQr(b)) return;
-    if (qrBusy) return;
-    if (!force && qrPayload != null && qrPayload!.isNotEmpty) return;
+    if (!_canFetchDoor(b)) return;
+    if (doorBusy) return;
+    if (!force && doorCode != null && doorCode!.isNotEmpty) return;
     final lang = langOf(ref);
     setState(() {
-      qrBusy = true;
-      qrError = null;
+      doorBusy = true;
+      doorError = null;
     });
     try {
       final pos = await _clientPosition(lang);
       if (pos == null) {
-        setState(() => qrError = lang == 'ar' ? 'فعّلي الموقع عشان يظهر الـ QR.' : 'Turn on location to show your QR.');
+        setState(() => doorError = lang == 'ar' ? 'فعّلي الموقع عشان يظهر رمز الباب.' : 'Turn on location to show your door code.');
         return;
       }
-      final r = await ref.read(repoProvider).handshakeQr(widget.bookingId, lat: pos.latitude, lng: pos.longitude);
-      final qr = '${r['qr'] ?? ''}';
-      if (qr.isEmpty) throw StateError('empty qr');
+      final r = await ref.read(repoProvider).handshakeDoor(widget.bookingId, lat: pos.latitude, lng: pos.longitude);
+      final code = '${r['code'] ?? ''}'.replaceAll(RegExp(r'\D'), '');
+      if (code.length != 4) throw StateError('empty door code');
       final fresh = await ref.read(repoProvider).booking(widget.bookingId);
       if (!mounted) return;
       setState(() {
-        qrPayload = qr;
-        qrError = null;
+        doorCode = code;
+        doorError = null;
         data = fresh;
         _syncHandshakeState(fresh.booking);
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() => qrError = friendlyError(e, lang));
+      setState(() => doorError = friendlyError(e, lang));
     } finally {
-      if (mounted) setState(() => qrBusy = false);
+      if (mounted) setState(() => doorBusy = false);
     }
   }
 
@@ -239,7 +238,7 @@ class _VisitScreenState extends ConsumerState<VisitScreen> {
                           ClientKicker('${tr['ritualTitle']}'),
                           const SizedBox(height: 10),
                           Text(
-                            (b.status == 'paid' || b.status == 'rescheduled') && (qrPayload == null || qrPayload!.isEmpty)
+                            (b.status == 'paid' || b.status == 'rescheduled') && (doorCode == null || doorCode!.isEmpty)
                                 ? '${tr['qrWaiting']}'
                                 : '${tr['qrHint']}',
                             style: const TextStyle(fontSize: 12, height: 1.45, color: Client.muted),
@@ -252,40 +251,45 @@ class _VisitScreenState extends ConsumerState<VisitScreen> {
                               children: [
                                 if (both)
                                   const Icon(Icons.handshake_outlined, size: 48, color: Client.olive)
-                                else if (qrPayload != null && qrPayload!.isNotEmpty)
-                                  Container(
-                                    padding: const EdgeInsets.all(12),
-                                    decoration: BoxDecoration(border: Border.all(color: Client.ink, width: Client.rule), color: Client.bg),
-                                    child: QrImageView(
-                                      data: qrPayload!,
-                                      size: 180,
-                                      backgroundColor: Client.bg,
-                                      errorCorrectionLevel: QrErrorCorrectLevel.M,
+                                else if (doorCode != null && doorCode!.isNotEmpty)
+                                  InkWell(
+                                    onTap: () => _refreshDoor(force: true),
+                                    child: Column(
+                                      children: [
+                                        Ltr(
+                                          child: Text(
+                                            doorCode!.split('').join('  '),
+                                            style: const TextStyle(fontFamily: T.mono, fontSize: 42, fontWeight: FontWeight.w600, letterSpacing: 2, height: 1.1),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Text('${tr['qrRefresh']}', style: const TextStyle(fontSize: 11, color: Client.muted)),
+                                      ],
                                     ),
                                   )
-                                else if (qrError != null)
+                                else if (doorError != null)
                                   SizedBox(
-                                    height: 180,
+                                    height: 120,
                                     child: InkWell(
-                                      onTap: () => _refreshQr(force: true),
+                                      onTap: () => _refreshDoor(force: true),
                                       child: Center(
                                         child: Padding(
                                           padding: const EdgeInsets.all(12),
-                                          child: Text('${tr['qrError']}\n$qrError', textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, color: T.danger, height: 1.45)),
+                                          child: Text('${tr['qrError']}\n$doorError', textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, color: T.danger, height: 1.45)),
                                         ),
                                       ),
                                     ),
                                   )
                                 else
                                   SizedBox(
-                                    height: 180,
+                                    height: 120,
                                     child: Center(
-                                      child: qrBusy
+                                      child: doorBusy
                                           ? const CircularProgressIndicator(color: Client.plum)
                                           : (b.status == 'paid' || b.status == 'rescheduled')
                                               ? Text('${tr['qrWaiting']}', textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, color: Client.muted, height: 1.45))
                                               : InkWell(
-                                                  onTap: () => _refreshQr(force: true),
+                                                  onTap: () => _refreshDoor(force: true),
                                                   child: Text('${tr['qrError']}', style: const TextStyle(fontSize: 12, color: Client.muted)),
                                                 ),
                                     ),
