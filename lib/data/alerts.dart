@@ -8,6 +8,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
+import 'package:oons/core/alert_sound.dart';
 import 'package:oons/data/api.dart';
 import 'package:oons/data/repo.dart';
 import 'package:oons/core/locale.dart';
@@ -66,14 +67,25 @@ final alertToastProvider = StateProvider<AlertToast?>((ref) => null);
 
 class AlertInbox extends StateNotifier<List<InboxAlert>> {
   AlertInbox() : super(const []);
+  final _hidden = <String>{};
 
-  void clear() => state = const [];
+  void clear() {
+    _hidden.clear();
+    state = const [];
+  }
+
+  void hide(String id) {
+    if (id.isEmpty) return;
+    _hidden.add(id);
+    state = state.where((r) => r.id != id).toList();
+  }
 
   /// Replaces the inbox with [incoming] merged onto the current list.
   /// Returns rows that were not in the previous list (by id).
   List<InboxAlert> apply(List<InboxAlert> incoming) {
     final prev = state;
-    final next = mergeInbox(prev, incoming);
+    final visible = incoming.where((r) => r.id.isEmpty || !_hidden.contains(r.id)).toList();
+    final next = mergeInbox(prev, visible);
     state = next;
     return freshAlerts(prev, next);
   }
@@ -356,6 +368,7 @@ class PushController {
   }
 
   Future<void> _sound(String title, String body) async {
+    unawaited(playOonsAlertSound());
     if (kIsWeb) return;
     try {
       await _plugin.show(
@@ -363,12 +376,20 @@ class PushController {
         title,
         body,
         const NotificationDetails(
-          android: AndroidNotificationDetails('oons', 'oons',
-              importance: Importance.high,
-              playSound: true,
-              icon: '@mipmap/ic_launcher'),
+          android: AndroidNotificationDetails(
+            'oons_chime',
+            'Oons alerts',
+            channelDescription: 'Visit updates',
+            importance: Importance.high,
+            playSound: true,
+            sound: RawResourceAndroidNotificationSound('oons_alert'),
+            icon: '@mipmap/ic_launcher',
+          ),
           iOS: DarwinNotificationDetails(
-              presentAlert: true, presentSound: true, sound: 'default'),
+            presentAlert: true,
+            presentSound: true,
+            sound: 'oons_alert.wav',
+          ),
         ),
       );
     } catch (_) {}

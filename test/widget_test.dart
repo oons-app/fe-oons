@@ -110,6 +110,16 @@ void main() {
     expect(freshAlerts([older], merged).map((e) => e.id).toList(), ['b']);
   });
 
+  test('alert inbox hide keeps a row from coming back on apply', () {
+    final inbox = AlertInbox();
+    final a = InboxAlert(id: 'a', title: 'On the way', body: 'x', at: DateTime(2026, 8, 21, 12));
+    inbox.apply([a]);
+    inbox.hide('a');
+    expect(inbox.state, isEmpty);
+    inbox.apply([a]);
+    expect(inbox.state, isEmpty);
+  });
+
   test('alert copy follows app language and keeps the booking ref', () {
     final (title, body) = AlertCopy.of(
       'on_the_way',

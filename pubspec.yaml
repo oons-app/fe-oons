@@ -82,6 +82,7 @@ flutter:
     - assets/images/brand/
     - assets/images/providers/
     - assets/images/work/
+    - assets/sounds/oons_alert.wav
   fonts:
     - family: Archivo
       fonts:

@@ -51,4 +51,19 @@ void main() {
     await tester.tap(find.byTooltip('Dismiss'));
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('swipe any direction dismisses the banner', (tester) async {
+    var gone = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: AlertToastBanner(toast: toast, onDismiss: () => gone++),
+        ),
+      ),
+    );
+    expect(find.byType(AlertToastBanner), findsOneWidget);
+    await tester.drag(find.byType(AlertToastBanner), const Offset(0, -80));
+    await tester.pumpAndSettle();
+    expect(gone, 1);
+  });
 }

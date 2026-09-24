@@ -41,10 +41,10 @@ class AlertsScreen extends ConsumerWidget {
                       itemBuilder: (context, i) {
                         final a = rows[i];
                         final loc = a.localized(lang, provider: ref.read(sessionProvider).isProvider);
-                        return InkWell(
+                        final row = InkWell(
                           onTap: () => openAlertVisit(context, ref, a.bookingId),
                           child: Container(
-                            padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                            padding: const EdgeInsets.fromLTRB(16, 14, 8, 14),
                             decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Client.ink, width: Client.rule))),
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -68,11 +68,21 @@ class AlertsScreen extends ConsumerWidget {
                                     ],
                                   ),
                                 ),
-                                if (a.bookingId != null && a.bookingId!.isNotEmpty)
-                                  const OnsIcon('advance', size: 16, color: Client.muted),
+                                IconButton(
+                                  tooltip: 'Dismiss',
+                                  onPressed: () => ref.read(alertInboxProvider.notifier).hide(a.id),
+                                  icon: const Icon(Icons.close, size: 18, color: Client.muted),
+                                ),
                               ],
                             ),
                           ),
+                        );
+                        if (a.id.isEmpty) return row;
+                        return Dismissible(
+                          key: ValueKey(a.id),
+                          direction: DismissDirection.horizontal,
+                          onDismissed: (_) => ref.read(alertInboxProvider.notifier).hide(a.id),
+                          child: row,
                         );
                       },
                     ),

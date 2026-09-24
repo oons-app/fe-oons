@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:oons/app/router.dart';
+import 'package:oons/core/alert_sound.dart';
 import 'package:oons/core/alert_toast_banner.dart';
 import 'package:oons/core/locale.dart';
 import 'package:oons/core/tokens.dart';
@@ -89,8 +90,11 @@ class _OonsAppState extends ConsumerState<OonsApp> {
         GlobalCupertinoLocalizations.delegate,
       ],
       builder: (context, child) {
-        return PhoneCanvas(
-          child: Builder(
+        return Listener(
+          behavior: HitTestBehavior.translucent,
+          onPointerDown: (_) => unawaited(unlockOonsAlertSound()),
+          child: PhoneCanvas(
+            child: Builder(
             builder: (context) {
               final reduce = MediaQuery.disableAnimationsOf(context);
               final mq = MediaQuery.of(context);
@@ -137,6 +141,7 @@ class _OonsAppState extends ConsumerState<OonsApp> {
                 ),
               );
             },
+            ),
           ),
         );
       },
