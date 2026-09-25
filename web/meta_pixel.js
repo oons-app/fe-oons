@@ -1,13 +1,46 @@
 /**
- * Meta Pixel (dataset 1782365966426827) on *.oons.app.
- * Cookies scoped to oons.app so a click on oons.app still matches lady.oons.app.
+ * Meta Pixel — website dataset 4590005284478511 (oons.app in Events Manager).
+ * 1782365966426827 is only a linked mobile-app identifier; do not init that.
+ * Cookies scoped to .oons.app so a click on oons.app still matches lady.oons.app.
  * Facebook/Instagram in-app browsers almost never tap the cookie banner, so
  * those sessions grant ad storage — that is the paid-click path.
  */
 (function () {
-  var PIXEL_ID = '1782365966426827';
+  var PIXEL_ID = '4590005284478511';
   var ua = navigator.userAgent || '';
   var iab = /FBAN|FBAV|FB_IAB|FBIOS|FB4A|Instagram/i.test(ua);
+
+  function readCookie(name) {
+    var parts = (document.cookie || '').split(';');
+    for (var i = 0; i < parts.length; i++) {
+      var kv = parts[i].trim();
+      var eq = kv.indexOf('=');
+      if (eq > 0 && kv.slice(0, eq) === name) {
+        try { return decodeURIComponent(kv.slice(eq + 1)); } catch (_) { return kv.slice(eq + 1); }
+      }
+    }
+    return '';
+  }
+
+  function writeCookie(name, value) {
+    document.cookie = name + '=' + encodeURIComponent(value) +
+      '; Domain=.oons.app; Path=/; Max-Age=7776000; Secure; SameSite=Lax';
+  }
+
+  // Capture fbclid even when Pixel consent is still revoked — CAPI needs fbc.
+  (function persistFbclid() {
+    try {
+      var params = new URLSearchParams(location.search || '');
+      var fbclid = params.get('fbclid');
+      if (!fbclid) return;
+      try { sessionStorage.setItem('oons_fbclid', fbclid); } catch (_) {}
+      if (readCookie('_fbc') || readCookie('oons_fbc')) return;
+      var fbc = 'fb.1.' + Date.now() + '.' + fbclid;
+      writeCookie('_fbc', fbc);
+      writeCookie('oons_fbc', fbc);
+      try { sessionStorage.setItem('oons_fbc', fbc); } catch (_) {}
+    } catch (_) {}
+  })();
 
   function adsGranted() {
     try {

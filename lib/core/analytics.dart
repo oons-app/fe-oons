@@ -2,6 +2,8 @@ import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:oons/core/analytics_platform.dart';
+import 'package:oons/core/meta_cookies.dart'
+    if (dart.library.html) 'package:oons/core/meta_cookies_web.dart' as meta_ck;
 
 /// GA4 measurement ID for all Oons web hosts (Google tag “oons web”).
 const kGaMeasurementId = 'G-C8QWM0FP6T';
@@ -288,6 +290,7 @@ class AppAnalytics {
 
   static void captureWebAcquisition() {
     if (!kIsWeb) return;
+    meta_ck.persistMetaClickIds();
     final q = Uri.base.queryParameters;
     final utm = (q['utm_medium'] ?? q['utm_source'] ?? '').toLowerCase();
     if (utm.contains('cpc') || utm.contains('paid') || utm == 'ads') {
@@ -336,6 +339,21 @@ class AppAnalytics {
     });
   }
 
+  static Future<void> phoneSubmitted({required String role, String? eventId}) async {
+    await logEvent('phone_submitted', {
+      'role': role,
+      if (eventId != null && eventId.isNotEmpty) 'event_id': eventId,
+    });
+  }
+
+  static Future<void> otpVerified({required String role, bool needsRegister = false, String? eventId}) async {
+    await logEvent('otp_verified', {
+      'role': role,
+      'needs_register': needsRegister ? 1 : 0,
+      if (eventId != null && eventId.isNotEmpty) 'event_id': eventId,
+    });
+  }
+
   static Future<void> otpSent({
     required String role,
     bool resend = false,
@@ -380,6 +398,10 @@ class AppAnalytics {
     await logEvent('client_registration_completed', {
       'method': 'otp',
       if (eventId != null && eventId.isNotEmpty) 'event_id': eventId,
+    });
+    await logEvent('registration_complete', {
+      'method': 'otp',
+      'event_id': (userId != null && userId.isNotEmpty) ? '$userId:registration_complete' : (eventId ?? ''),
     });
     final metaId = (userId != null && userId.isNotEmpty) ? '$userId:CompleteRegistration' : null;
     await AnalyticsPlatform.trackMeta(
