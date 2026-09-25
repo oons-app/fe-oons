@@ -41,6 +41,7 @@ class _Bundle {
 
 class _ServiceRequestsScreenState extends ConsumerState<ServiceRequestsScreen> {
   List<Map<String, dynamic>> requests = [];
+  List<Map<String, dynamic>> nameRequests = [];
   bool loading = true;
   String? error;
   String q = '';
@@ -62,9 +63,13 @@ class _ServiceRequestsScreenState extends ConsumerState<ServiceRequestsScreen> {
         loading = true;
         error = null;
       });
-      final data = await staffClient.get('/admin/service-requests');
+      final results = await Future.wait([
+        staffClient.get('/admin/service-requests'),
+        staffClient.get('/admin/catalog-name-requests').catchError((_) => <String, dynamic>{}),
+      ]);
       setState(() {
-        requests = asMapList(data['requests']);
+        requests = asMapList(results[0]['requests']);
+        nameRequests = asMapList(results[1]['requests']);
         loading = false;
       });
     } on ApiException catch (e) {
@@ -189,6 +194,9 @@ class _ServiceRequestsScreenState extends ConsumerState<ServiceRequestsScreen> {
     ref.listen(v2QueryProvider, (_, n) => setState(() => q = n.trim()));
 
     final bundles = _bundles;
+    final names = q.isEmpty
+        ? nameRequests
+        : nameRequests.where((r) => r.values.join(' ').toLowerCase().contains(q.toLowerCase())).toList();
 
     return ColoredBox(
       color: Ops.page,
@@ -199,10 +207,28 @@ class _ServiceRequestsScreenState extends ConsumerState<ServiceRequestsScreen> {
               : ListView(
                   padding: const EdgeInsets.fromLTRB(Ops.gutter, 20, Ops.gutter, 60),
                   children: [
-                    Text('${bundles.length} ${lang == 'ar' ? 'نتيجة' : 'results'}',
+                    Text(
+                        '${names.length + bundles.length} ${lang == 'ar' ? 'نتيجة' : 'results'}',
                         style: const TextStyle(fontSize: 12.5, color: Ops.muted)),
                     const SizedBox(height: 12),
-                    if (bundles.isEmpty)
+                    if (names.isNotEmpty) ...[
+                      Text(lang == 'ar' ? 'أسماء خدمات مطلوبة' : 'Requested service names',
+                          style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 4),
+                      Text(
+                        lang == 'ar'
+                            ? 'المهنية طلبت اسمًا غير موجود في الكتالوج. الموافقة تضيفه لكل المهنيات.'
+                            : 'The pro asked for a name that is not in the catalog. Approve adds it for every pro.',
+                        style: const TextStyle(fontSize: 12.5, color: Ops.muted, height: 1.35),
+                      ),
+                      const SizedBox(height: 10),
+                      for (final r in names) ...[
+                        _nameCard(r, lang, canWrite),
+                        const SizedBox(height: 12),
+                      ],
+                      const SizedBox(height: 8),
+                    ],
+                    if (bundles.isEmpty && names.isEmpty)
                       Container(
                         padding: const EdgeInsets.symmetric(vertical: 38),
                         decoration: BoxDecoration(
@@ -221,6 +247,86 @@ class _ServiceRequestsScreenState extends ConsumerState<ServiceRequestsScreen> {
                       ],
                   ],
                 ),
+    );
+  }
+
+  Future<void> _decideName(Map<String, dynamic> r, bool approve) async {
+    final lang = ref.read(localeCodeProvider);
+    final id = idOf(r);
+    if (id.isEmpty) return;
+    var note = '';
+    if (!approve) {
+      final ok = await v2Form(
+        context,
+        title: lang == 'ar' ? 'رفض الاسم' : 'Reject name',
+        confirmLabel: lang == 'ar' ? 'رفض' : 'Reject',
+        danger: true,
+        bodyBuilder: (ctx, _) => V2FormField(
+          label: lang == 'ar' ? 'السبب (هتشوفه المهنية)' : 'Reason (the provider will see this)',
+          child: TextField(onChanged: (v) => note = v, maxLines: 3, autofocus: true),
+        ),
+        onValidate: () {
+          if (note.trim().isEmpty) {
+            v2Toast(context, lang == 'ar' ? 'لازم تكتبي السبب' : 'A reason is required', error: true);
+            return false;
+          }
+          return true;
+        },
+      );
+      if (!ok) return;
+    }
+    try {
+      await staffClient.post(
+        approve ? '/admin/catalog-name-requests/$id/approve' : '/admin/catalog-name-requests/$id/reject',
+        data: approve ? {} : {'note': note.trim()},
+      );
+      if (mounted) {
+        v2Toast(context, approve ? (lang == 'ar' ? 'اتضاف الاسم للكتالوج' : 'Name added to the catalog') : (lang == 'ar' ? 'اترفض الاسم' : 'Name rejected'));
+        _load();
+      }
+    } on ApiException catch (e) {
+      if (mounted) v2Toast(context, e.message, error: true);
+    }
+  }
+
+  Widget _nameCard(Map<String, dynamic> r, String lang, bool canWrite) {
+    final suggested = lang == 'ar' ? '${r['suggestedAr'] ?? r['suggestedEn'] ?? ''}' : '${r['suggestedEn'] ?? r['suggestedAr'] ?? ''}';
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Ops.card,
+        borderRadius: BorderRadius.circular(Ops.radiusCard),
+        border: Border.all(color: Ops.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(suggested, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 4),
+          Text(
+            locName(r['categoryName'], lang),
+            style: const TextStyle(fontSize: 12.5, color: Ops.muted),
+          ),
+          const SizedBox(height: 2),
+          InkWell(
+            onTap: () => context.go(V2Paths.provider('${r['providerId']}')),
+            child: Text(
+              personName(r['providerName'] ?? r, lang, fallbackId: '${r['providerId']}'),
+              style: const TextStyle(fontSize: 12.5, color: Ops.inkSoft, decoration: TextDecoration.underline),
+            ),
+          ),
+          if (canWrite) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                V2Btn(label: lang == 'ar' ? 'أضيفي للكتالوج' : 'Add to catalog', onPressed: () => _decideName(r, true), kind: V2BtnKind.primary, size: V2BtnSize.row),
+                const SizedBox(width: 6),
+                V2Btn(label: lang == 'ar' ? 'رفض' : 'Reject', onPressed: () => _decideName(r, false), kind: V2BtnKind.danger, size: V2BtnSize.row),
+              ],
+            ),
+          ],
+        ],
+      ),
     );
   }
 

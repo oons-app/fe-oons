@@ -122,6 +122,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
       'claims': asInt(home['openDisputes']),
       'bookings': _followUp,
       'categoryRequests': openRequests,
+      'serviceRequests': asInt(home['pendingCatalogNames']),
     };
   }
 
@@ -173,6 +174,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
           lang == 'ar' ? 'نزاع' : 'claims', lang == 'ar' ? 'افتح المطالبات' : 'Open claims', V2Paths.claims),
       ('categoryRequests', lang == 'ar' ? 'طلبات التخصص' : 'Category requests', openRequests,
           lang == 'ar' ? 'طلب' : 'requests', lang == 'ar' ? 'وافق أو ارفض' : 'Approve or reject', V2Paths.categoryRequests),
+      ('serviceRequests', lang == 'ar' ? 'أسماء خدمات مطلوبة' : 'Requested service names', asInt(home['pendingCatalogNames']),
+          lang == 'ar' ? 'اسم' : 'names', lang == 'ar' ? 'أضيفي للكتالوج أو ارفضي' : 'Add to the catalog or reject', V2Paths.serviceRequests),
     ];
 
     final kpis = <(String, String, String)>[
