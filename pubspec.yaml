@@ -1,7 +1,7 @@
 name: oons
 description: Oons — women-first home services for Greater Cairo.
 publish_to: "none"
-version: 1.0.2+17
+version: 1.0.2+18
 
 environment:
   sdk: ">=3.4.0 <4.0.0"

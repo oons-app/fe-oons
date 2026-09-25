@@ -77,11 +77,11 @@ const v2Nav = [
     NavItem('refunds', V2Paths.refunds, 'Refunds', 'المرتجعات'),
   ]),
   NavGroup('Admin', 'الإدارة', [
+    NavItem('appUpdate', V2Paths.appUpdate, 'Force update', 'فرض التحديث'),
     NavItem('categories', V2Paths.categories, 'Categories', 'الفئات'),
     NavItem('areas', V2Paths.areas, 'Coverage areas', 'مناطق التغطية'),
     NavItem('staff', V2Paths.staff, 'Staff', 'الفريق'),
     NavItem('payments', V2Paths.payments, 'Payments', 'المدفوعات'),
-    NavItem('appUpdate', V2Paths.appUpdate, 'App update', 'تحديث التطبيق'),
     NavItem('corporate', V2Paths.corporate, 'Corporate', 'الشركات'),
     NavItem('audit', V2Paths.audit, 'Audit', 'سجل التدقيق'),
     NavItem('analytics', V2Paths.analytics, 'Analytics', 'التحليلات'),

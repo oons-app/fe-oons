@@ -170,8 +170,8 @@ class _AppUpdateScreenState extends ConsumerState<AppUpdateScreen> {
   Widget build(BuildContext context) {
     final lang = ref.watch(localeCodeProvider);
     final ar = lang == 'ar';
-    final role = ref.watch(staffSessionProvider).effectiveRole;
-    if (!staffCan(role, 'app.force_update')) {
+    final sess = ref.watch(staffSessionProvider);
+    if (sess.staffRole != roleSuper && !staffCan(sess.effectiveRole, 'app.force_update')) {
       return const V2Gate(allowed: false, child: SizedBox.shrink());
     }
     if (loading) return const Padding(padding: EdgeInsets.only(top: 60), child: V2Loading());

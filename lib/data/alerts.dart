@@ -370,6 +370,10 @@ class PushController {
   Future<void> _sound(String title, String body) async {
     unawaited(playOonsAlertSound());
     if (kIsWeb) return;
+    // Foreground: in-app card + chime only. An iOS banner at the status bar
+    // is what people swipe down — that opens Notification Center / backgrounds the app.
+    final life = WidgetsBinding.instance.lifecycleState;
+    if (life == null || life == AppLifecycleState.resumed) return;
     try {
       await _plugin.show(
         _n++,
@@ -386,7 +390,9 @@ class PushController {
             icon: '@mipmap/ic_launcher',
           ),
           iOS: DarwinNotificationDetails(
-            presentAlert: true,
+            presentAlert: false,
+            presentBanner: false,
+            presentList: true,
             presentSound: true,
             sound: 'oons_alert.wav',
           ),

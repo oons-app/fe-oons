@@ -194,6 +194,43 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
       child: ListView(
         padding: const EdgeInsets.fromLTRB(Ops.gutter, 20, Ops.gutter, 60),
         children: [
+          if (ref.watch(staffSessionProvider).staffRole == roleSuper) ...[
+            Material(
+              color: Ops.card,
+              child: InkWell(
+                onTap: () => context.go(V2Paths.appUpdate),
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Ops.borderStrong),
+                    borderRadius: BorderRadius.circular(Ops.radiusCard),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(lang == 'ar' ? 'فرض تحديث التطبيق' : 'Force app update',
+                                style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700)),
+                            const SizedBox(height: 3),
+                            Text(
+                              lang == 'ar'
+                                  ? 'اقفلي نسخ iOS و Android القديمة حتى يثبّتن من المتجر.'
+                                  : 'Lock old iOS and Android builds until they install from the store.',
+                              style: const TextStyle(fontSize: 12.5, color: Ops.muted, height: 1.35),
+                            ),
+                          ],
+                        ),
+                      ),
+                      V2Btn.danger(lang == 'ar' ? 'فتح' : 'Open', onPressed: () => context.go(V2Paths.appUpdate), size: V2BtnSize.sm),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+          ],
           // ---- Needs your attention -------------------------------------
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,

@@ -73,7 +73,8 @@ class V2Sidebar extends ConsumerWidget {
                     ),
                   ),
                   for (final item in g.items)
-                    if (canSeeScreen(role, item.id))
+                    if (canSeeScreen(role, item.id) ||
+                        (item.id == 'appUpdate' && sess.staffRole == roleSuper))
                       _NavTile(
                         label: lang == 'ar' ? item.labelAr : item.labelEn,
                         selected: loc == item.path || loc.startsWith('${item.path}/'),
