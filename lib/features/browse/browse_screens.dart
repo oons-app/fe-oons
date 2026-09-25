@@ -17,14 +17,16 @@ import 'package:oons/features/client/client_chrome.dart';
 import 'package:oons/core/open_external.dart';
 import 'package:oons/features/system/empty_states.dart';
 import 'package:oons/features/system/nearest_match.dart';
+import 'package:oons/features/system/uncovered_area.dart';
 import 'package:oons/features/system/progress.dart';
 import 'package:oons/features/reviews/reviews_screens.dart';
 import 'package:oons/l10n/copy.dart';
 
 class BrowseScreen extends ConsumerStatefulWidget {
-  const BrowseScreen({super.key, required this.service, this.initialQuery});
+  const BrowseScreen({super.key, required this.service, this.initialQuery, this.initialArea});
   final String service;
   final String? initialQuery;
+  final String? initialArea;
   @override
   ConsumerState<BrowseScreen> createState() => _BrowseScreenState();
 }
@@ -49,9 +51,14 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
     super.initState();
     query = widget.initialQuery?.trim() ?? '';
     _q = TextEditingController(text: query);
-    final userArea = ref.read(sessionProvider).user?.area.trim();
-    if (userArea != null && userArea.isNotEmpty) {
-      area = userArea.toLowerCase();
+    final fromQuery = widget.initialArea?.trim();
+    if (fromQuery != null && fromQuery.isNotEmpty) {
+      area = fromQuery.toLowerCase();
+    } else {
+      final userArea = ref.read(sessionProvider).user?.area.trim();
+      if (userArea != null && userArea.isNotEmpty) {
+        area = userArea.toLowerCase();
+      }
     }
     _loadCategories();
     _refreshList();
@@ -262,6 +269,20 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
                       ),
                       if (list.isEmpty && query.isNotEmpty)
                         _noMatch(lang)
+                      else if (list.isEmpty && (area ?? '').isNotEmpty && priceMax == null && (categoryId == null || categoryId!.isEmpty))
+                        UncoveredAreaEmpty(
+                          lang: lang,
+                          area: area!,
+                          suggested: suggestedCoveredAreaIds(exclude: area, limit: 3),
+                          onPickSuggested: (slug) => setState(() {
+                            area = slug;
+                            _refreshList();
+                          }),
+                          onAnyArea: () => setState(() {
+                            area = null;
+                            _refreshList();
+                          }),
+                        )
                       else if (list.isEmpty)
                         Padding(
                           padding: const EdgeInsets.all(24),
@@ -421,7 +442,7 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
                           Expanded(
                             child: ClientPrimaryButton(
                               label: '${b['apply']}',
-                              onTap: () {
+                              onTap: () async {
                                 setState(() {
                                   area = nextArea;
                                   dateMode = nextDate;
@@ -432,6 +453,20 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
                                 });
                                 unawaited(_loadCategories());
                                 Navigator.pop(ctx);
+                                final picked = nextArea;
+                                if (picked == null || picked.isEmpty || !areaHasNoProviders(picked) || !mounted) return;
+                                final swap = await showUncoveredAreaSheet(
+                                  context,
+                                  lang: lang,
+                                  area: picked,
+                                  suggested: suggestedCoveredAreaIds(exclude: picked, limit: 3),
+                                );
+                                if (!mounted || swap == null || swap.isEmpty) return;
+                                setState(() {
+                                  area = swap;
+                                  _refreshList();
+                                });
+                                unawaited(_loadCategories());
                               },
                             ),
                           ),

@@ -9,7 +9,9 @@ import 'package:oons/core/widgets.dart';
 import 'package:oons/data/models.dart';
 import 'package:oons/data/repo.dart';
 import 'package:oons/data/reviews.dart';
+import 'package:oons/data/service_catalog.dart';
 import 'package:oons/features/client/client_chrome.dart';
+import 'package:oons/features/system/uncovered_area.dart';
 import 'package:oons/features/client/client_tour.dart';
 import 'package:oons/features/reviews/reviews_screens.dart';
 import 'package:oons/l10n/copy.dart';
@@ -105,6 +107,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         final addrLine = street.isEmpty
             ? areaLabel
             : (street.length > 28 ? '$areaLabel · ${street.substring(0, 28)}…' : '$areaLabel · $street');
+        final coverage = data?['coverage'] is Map ? Map<String, dynamic>.from(data!['coverage'] as Map) : null;
+        final coverageArea = '${coverage?['area'] ?? area}'.trim().toLowerCase();
+        final hasProviders = coverage != null
+            ? coverage['hasProviders'] == true
+            : !areaHasNoProviders(coverageArea);
+        final coverageKnown = coverage != null || areaCoverageIsKnown(coverageArea);
+        final showUncovered = data != null && coverageKnown && coverageArea.isNotEmpty && !hasProviders;
+        final suggested = coverageSuggestions(exclude: coverageArea, fromApi: coverage?['suggested']);
 
         return Stack(
           children: [
@@ -158,6 +168,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ],
                   ),
                 ),
+                if (showUncovered)
+                  UncoveredAreaBanner(
+                    lang: lang,
+                    area: coverageArea,
+                    suggested: suggested,
+                    onChangeArea: () => context.push('/me/addresses'),
+                    onPickSuggested: (slug) => context.push('/browse/beauty?area=${Uri.encodeComponent(slug)}'),
+                  ),
                 KeyedSubtree(
                   key: trustKey,
                   child: ClientTrustBanner(

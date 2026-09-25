@@ -19,6 +19,7 @@ import 'package:oons/data/models.dart';
 import 'package:oons/data/repo.dart';
 import 'package:oons/data/service_catalog.dart';
 import 'package:oons/features/me/delivery_map.dart';
+import 'package:oons/features/system/uncovered_area.dart';
 import 'package:oons/l10n/copy.dart';
 import 'package:oons/l10n/errors.dart';
 
@@ -214,7 +215,7 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
                     children: allCatalogAreaIds().map((id) {
                       final on = area == id;
                       return InkWell(
-                        onTap: () {
+                        onTap: () async {
                           final c = coordsForArea(id);
                           streetDirty = false;
                           setState(() {
@@ -222,6 +223,20 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
                             city = areaIsGiza(id) ? 'giza' : 'cairo';
                           });
                           mapKey.currentState?.moveTo(c.$1, c.$2);
+                          if (!areaHasNoProviders(id) || !mounted) return;
+                          final pick = await showUncoveredAreaSheet(
+                            context,
+                            lang: lang,
+                            area: id,
+                            suggested: suggestedCoveredAreaIds(exclude: id, limit: 3),
+                          );
+                          if (!mounted || pick == null || pick.isEmpty) return;
+                          final next = coordsForArea(pick);
+                          setState(() {
+                            area = pick;
+                            city = areaIsGiza(pick) ? 'giza' : 'cairo';
+                          });
+                          mapKey.currentState?.moveTo(next.$1, next.$2);
                         },
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),

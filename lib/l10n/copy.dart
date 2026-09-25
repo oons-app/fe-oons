@@ -133,6 +133,16 @@ class Copy {
       'notInArea': 'Not in your area yet',
       'prosNearYou': 'pros near you',
     },
+    'coverage': {
+      'title': 'No professionals in {area} yet',
+      'body': 'Try {areas} — that neighbourhood already has bookable specialists.',
+      'bodyNone': 'We don’t have bookable specialists in {area} yet.',
+      'promise': 'We’ll try our best to cover {area} soon.',
+      'cta': 'Choose an area that has coverage',
+      'ctaArea': 'See {area}',
+      'ctaAny': 'Browse all areas',
+      'keep': 'Keep this area',
+    },
     'svc': {
       'beauty': 'Coiffeur & beauty',
       'cleaning': 'Home cleaning',
@@ -1448,6 +1458,16 @@ class Copy {
       'availableHere': 'متاح في منطقتكِ',
       'notInArea': 'غير متاح في منطقتكِ بعد',
       'prosNearYou': 'متخصصات قريبات منكِ',
+    },
+    'coverage': {
+      'title': 'مفيش متخصصات في {area} لسه',
+      'body': 'جرّبي {areas} — المنطقة دي فيها متخصصات تقدري تحجزي معاهن.',
+      'bodyNone': 'لسه مفيش متخصصات تقدري تحجزي معاهن في {area}.',
+      'promise': 'هنعمل اللي نقدر عليه عشان نغطي {area} قريب.',
+      'cta': 'اختاري منطقة فيها تغطية',
+      'ctaArea': 'شوفي {area}',
+      'ctaAny': 'كل المناطق',
+      'keep': 'خلّي المنطقة دي',
     },
     'svc': {
       'beauty': 'كوافير وتجميل',

@@ -151,6 +151,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (c, s) => BrowseScreen(
           service: s.pathParameters['service']!,
           initialQuery: s.uri.queryParameters['q'],
+          initialArea: s.uri.queryParameters['area'],
         ),
       ),
       GoRoute(path: '/provider/:id', builder: (c, s) => ProviderScreen(id: s.pathParameters['id']!)),
