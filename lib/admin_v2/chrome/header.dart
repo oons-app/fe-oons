@@ -173,6 +173,7 @@ String headerSubFor(String path, String lang) {
   if (path == V2Paths.categories) return ar ? 'إنشاء، تعديل، إعادة ترتيب، قفل الفئات.' : 'Create, edit, reorder, lock verticals.';
   if (path == V2Paths.areas) return ar ? 'المدن، رسوم الانتقال، القفل.' : 'Cities, travel fees, lock/unlock.';
   if (path == V2Paths.payments) return ar ? 'وضع البوابة، إعفاء الرسوم، المعاملات.' : 'Gateway mode, fee waiver, transactions.';
+  if (path == V2Paths.appUpdate) return ar ? 'فرض تحديث تطبيقات iOS و Android من المتجر.' : 'Force iOS and Android store apps to update.';
   if (path == V2Paths.audit) return ar ? 'كل إجراء، بمن ومتى.' : 'Every action, with who and when.';
   if (path == V2Paths.heatmap) return ar ? 'العرض والطلب حسب المنطقة.' : 'Supply and demand by area.';
   if (path == V2Paths.vetting) return ar ? 'طابور الانتظار ومهل التحقق.' : 'Pending queue and wait times.';

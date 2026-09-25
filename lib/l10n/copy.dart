@@ -22,6 +22,11 @@ class Copy {
       'otpExpired': 'That code has expired. Request a new one.',
       'tooMany': 'Too many attempts. Request a new code.',
     },
+    'forceUpdate': {
+      'title': 'Update required',
+      'body': 'This version of Oons can no longer be used. Install the latest from the store to continue.',
+      'cta': 'Update Oons',
+    },
     'ob': [
       {
         'kicker': '01 / Who comes in',
@@ -1332,6 +1337,11 @@ class Copy {
       'otpBad': 'الرمز غير مطابق.',
       'otpExpired': 'انتهت صلاحية الرمز. اطلبي رمزًا جديدًا.',
       'tooMany': 'محاولات كثيرة. اطلبي رمزًا جديدًا.',
+    },
+    'forceUpdate': {
+      'title': 'تحديث مطلوب',
+      'body': 'هذا الإصدار من أنس لم يعد يعمل. ثبّتي الأحدث من المتجر للمتابعة.',
+      'cta': 'حدّثي أنس',
     },
     'ob': [
       {

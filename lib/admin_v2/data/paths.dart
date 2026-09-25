@@ -19,6 +19,7 @@ abstract final class V2Paths {
   static const staff = '/staff';
   static const matrix = '/matrix';
   static const payments = '/payments';
+  static const appUpdate = '/app-update';
   static const clientPayments = '/client-payments';
   static const corporate = '/corporate';
   static const audit = '/audit';
@@ -80,6 +81,7 @@ const v2Nav = [
     NavItem('areas', V2Paths.areas, 'Coverage areas', 'مناطق التغطية'),
     NavItem('staff', V2Paths.staff, 'Staff', 'الفريق'),
     NavItem('payments', V2Paths.payments, 'Payments', 'المدفوعات'),
+    NavItem('appUpdate', V2Paths.appUpdate, 'App update', 'تحديث التطبيق'),
     NavItem('corporate', V2Paths.corporate, 'Corporate', 'الشركات'),
     NavItem('audit', V2Paths.audit, 'Audit', 'سجل التدقيق'),
     NavItem('analytics', V2Paths.analytics, 'Analytics', 'التحليلات'),

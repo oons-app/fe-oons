@@ -48,6 +48,8 @@ bool staffCan(String role, String perm) {
       return false;
     case 'payments.settings':
       return role == roleFinance;
+    case 'app.force_update':
+      return false;
     case 'providers.vet':
     case 'id.photos':
       return role == roleOps || role == roleVendor;
@@ -149,6 +151,7 @@ const allPermKeys = [
   'provider_categories.write',
   'service_requests.write',
   'payments.settings',
+  'app.force_update',
   'staff.write',
   'corporate.write',
   'audit.read',

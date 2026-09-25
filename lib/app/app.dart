@@ -8,6 +8,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:oons/app/router.dart';
 import 'package:oons/core/alert_sound.dart';
 import 'package:oons/core/alert_toast_banner.dart';
+import 'package:oons/core/force_update.dart';
 import 'package:oons/core/locale.dart';
 import 'package:oons/core/tokens.dart';
 import 'package:oons/core/widgets.dart';
@@ -132,6 +133,7 @@ class _OonsAppState extends ConsumerState<OonsApp> {
                                 right: 0,
                                 child: _ToastOverlayHost(),
                               ),
+                              const ForceUpdateGate(),
                             ],
                           ),
                         ),
