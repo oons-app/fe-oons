@@ -7,6 +7,7 @@ import 'package:oons/admin_v2/data/paths.dart';
 import 'package:oons/admin_v2/data/session.dart';
 import 'package:oons/admin_v2/features/analytics/analytics_screen.dart';
 import 'package:oons/admin_v2/features/app_update/app_update_screen.dart';
+import 'package:oons/admin_v2/features/push/push_screen.dart';
 import 'package:oons/admin_v2/features/areas/areas_screen.dart';
 import 'package:oons/admin_v2/features/audit/audit_screen.dart';
 import 'package:oons/admin_v2/features/batches/batches_screen.dart';
@@ -124,6 +125,7 @@ final v2RouterProvider = Provider<GoRouter>((ref) {
           GoRoute(path: V2Paths.matrix, builder: (_, __) => const MatrixScreen()),
           GoRoute(path: V2Paths.payments, builder: (_, __) => const PaymentsScreen()),
           GoRoute(path: V2Paths.appUpdate, builder: (_, __) => const AppUpdateScreen()),
+          GoRoute(path: V2Paths.push, builder: (_, __) => const PushCampaignsScreen()),
           GoRoute(path: V2Paths.clientPayments, builder: (_, __) => const ClientPaymentsScreen()),
           GoRoute(path: V2Paths.corporate, builder: (_, __) => const CorporateScreen()),
           GoRoute(path: V2Paths.audit, builder: (_, __) => const AuditScreen()),

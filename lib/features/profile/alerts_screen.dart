@@ -42,7 +42,7 @@ class AlertsScreen extends ConsumerWidget {
                         final a = rows[i];
                         final loc = a.localized(lang, provider: ref.read(sessionProvider).isProvider);
                         final row = InkWell(
-                          onTap: () => openAlertVisit(context, ref, a.bookingId),
+                          onTap: () => openAlert(context, ref, a),
                           child: Container(
                             padding: const EdgeInsets.fromLTRB(16, 14, 8, 14),
                             decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Client.ink, width: Client.rule))),

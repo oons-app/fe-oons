@@ -20,6 +20,7 @@ abstract final class V2Paths {
   static const matrix = '/matrix';
   static const payments = '/payments';
   static const appUpdate = '/app-update';
+  static const push = '/push';
   static const clientPayments = '/client-payments';
   static const corporate = '/corporate';
   static const audit = '/audit';
@@ -78,6 +79,7 @@ const v2Nav = [
   ]),
   NavGroup('Admin', 'الإدارة', [
     NavItem('appUpdate', V2Paths.appUpdate, 'Force update', 'فرض التحديث'),
+    NavItem('push', V2Paths.push, 'Push campaigns', 'إشعارات التطبيق'),
     NavItem('categories', V2Paths.categories, 'Categories', 'الفئات'),
     NavItem('areas', V2Paths.areas, 'Coverage areas', 'مناطق التغطية'),
     NavItem('staff', V2Paths.staff, 'Staff', 'الفريق'),

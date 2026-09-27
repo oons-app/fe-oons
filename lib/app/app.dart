@@ -161,11 +161,23 @@ class _ToastLayer extends ConsumerWidget {
         toast: toast,
         onDismiss: () => ref.read(alertToastProvider.notifier).state = null,
         onOpen: () {
-          final dest = toast.bookingId;
           ref.read(alertToastProvider.notifier).state = null;
-          if (dest == null || dest.isEmpty) return;
-          final path = ref.read(sessionProvider).isProvider ? '/pro/job/$dest' : '/visit/$dest';
-          ref.read(routerProvider).push(path);
+          rememberPendingCoupon(toast.couponCode);
+          final dest = toast.path;
+          if (dest != null && dest.startsWith('/') && !dest.startsWith('//')) {
+            ref.read(routerProvider).go(dest);
+            return;
+          }
+          if (toast.bookingId != null && toast.bookingId!.isNotEmpty) {
+            final path = ref.read(sessionProvider).isProvider
+                ? '/pro/job/${toast.bookingId}'
+                : '/visit/${toast.bookingId}';
+            ref.read(routerProvider).push(path);
+            return;
+          }
+          if (toast.type == 'coupon' || toast.type == 'marketing') {
+            ref.read(routerProvider).go(ref.read(sessionProvider).isProvider ? '/pro' : '/home');
+          }
         },
       ),
     );

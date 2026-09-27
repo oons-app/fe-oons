@@ -7,6 +7,9 @@ class AlertCopy {
     String? fallbackTitle,
     String? fallbackBody,
   }) {
+    if (type == 'marketing' || type == 'coupon') {
+      return (fallbackTitle ?? '', fallbackBody ?? '');
+    }
     final table = lang == 'en' ? _en : _ar;
     final pair = table['$type.$party'] ?? table[type] ?? table['default']!;
     var title = pair.$1;

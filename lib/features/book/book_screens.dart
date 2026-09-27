@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:oons/core/analytics.dart';
 import 'package:oons/core/format.dart';
 import 'package:oons/core/locale.dart';
@@ -284,6 +285,13 @@ class _BookScreenState extends ConsumerState<BookScreen> {
         if ((draft?.areaM ?? '').isNotEmpty) homeSqm.text = draft!.areaM;
         if ((draft?.notes ?? '').isNotEmpty) notes.text = draft!.notes;
         if ((draft?.coupon ?? '').isNotEmpty) coupon.text = draft!.coupon;
+        if (coupon.text.isEmpty) {
+          final pending = Hive.box('prefs').get('pending_coupon');
+          if (pending is String && pending.trim().isNotEmpty) {
+            coupon.text = pending.trim();
+            couponOpen = true;
+          }
+        }
         noteChipIds
           ..clear()
           ..addAll(draft?.noteChipIds ?? const []);

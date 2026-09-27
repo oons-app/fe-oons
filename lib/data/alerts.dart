@@ -1,12 +1,14 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:http/http.dart' as http;
 import 'package:oons/core/alert_sound.dart';
 import 'package:oons/data/api.dart';
@@ -15,10 +17,13 @@ import 'package:oons/core/locale.dart';
 import 'package:oons/l10n/alert_copy.dart';
 
 class AlertToast {
-  const AlertToast({required this.title, required this.body, this.bookingId});
+  const AlertToast({required this.title, required this.body, this.bookingId, this.couponCode, this.path, this.type = ''});
   final String title;
   final String body;
   final String? bookingId;
+  final String? couponCode;
+  final String? path;
+  final String type;
 }
 
 class InboxAlert {
@@ -28,6 +33,8 @@ class InboxAlert {
     required this.body,
     this.type = '',
     this.bookingId,
+    this.couponCode,
+    this.path,
     this.at,
   });
   final String id;
@@ -35,6 +42,8 @@ class InboxAlert {
   final String title;
   final String body;
   final String? bookingId;
+  final String? couponCode;
+  final String? path;
   final DateTime? at;
 
   factory InboxAlert.fromMap(Map m) {
@@ -42,12 +51,16 @@ class InboxAlert {
     final raw = m['at'];
     if (raw is String) at = DateTime.tryParse(raw);
     final bid = m['bookingId']?.toString();
+    final code = m['couponCode']?.toString();
+    final path = m['path']?.toString();
     return InboxAlert(
       id: '${m['id'] ?? ''}',
       type: '${m['type'] ?? ''}',
       title: '${m['title'] ?? ''}',
       body: '${m['body'] ?? ''}',
       bookingId: (bid == null || bid.isEmpty || bid == 'null') ? null : bid,
+      couponCode: (code == null || code.isEmpty || code == 'null') ? null : code,
+      path: (path == null || path.isEmpty || path == 'null') ? null : path,
       at: at,
     );
   }
@@ -130,12 +143,34 @@ List<InboxAlert> freshAlerts(List<InboxAlert> prev, List<InboxAlert> next) {
   return next.where((r) => r.id.isNotEmpty && !seen.contains(r.id)).toList();
 }
 
+void rememberPendingCoupon(String? code) {
+  if (code == null || code.isEmpty) return;
+  try {
+    Hive.box('prefs').put('pending_coupon', code);
+  } catch (_) {}
+}
+
 void openAlertVisit(BuildContext context, WidgetRef ref, String? bookingId) {
-  if (bookingId == null || bookingId.isEmpty) return;
-  final path = ref.read(sessionProvider).isProvider
-      ? '/pro/job/$bookingId'
-      : '/visit/$bookingId';
-  context.push(path);
+  openAlert(context, ref, InboxAlert(id: '', title: '', body: '', bookingId: bookingId));
+}
+
+void openAlert(BuildContext context, WidgetRef ref, InboxAlert a) {
+  rememberPendingCoupon(a.couponCode);
+  final dest = a.path;
+  if (dest != null && dest.startsWith('/') && !dest.startsWith('//')) {
+    context.go(dest);
+    return;
+  }
+  if (a.bookingId != null && a.bookingId!.isNotEmpty) {
+    final path = ref.read(sessionProvider).isProvider
+        ? '/pro/job/${a.bookingId}'
+        : '/visit/${a.bookingId}';
+    context.push(path);
+    return;
+  }
+  if (a.type == 'coupon' || a.type == 'marketing') {
+    context.go(ref.read(sessionProvider).isProvider ? '/pro' : '/home');
+  }
 }
 
 final pushControllerProvider = Provider<PushController>((ref) {
@@ -184,6 +219,9 @@ class PushController {
         await _registerToken(existing);
       }
     } catch (_) {}
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      unawaited(_registerFcm());
+    }
     _firstPoll = true;
     await _pollInbox();
     // SSE carries live alerts; HTTP poll is a slow backup (was 4s and made the lab feel laggy).
@@ -232,6 +270,20 @@ class PushController {
             IOSFlutterLocalNotificationsPlugin>()
         ?.requestPermissions(alert: true, badge: true, sound: true);
     _ready = true;
+  }
+
+  Future<void> _registerFcm() async {
+    try {
+      final messaging = FirebaseMessaging.instance;
+      await messaging.requestPermission(alert: true, badge: true, sound: true);
+      final token = await messaging.getToken();
+      if (token != null && token.isNotEmpty) {
+        await _registerToken(token);
+      }
+      messaging.onTokenRefresh.listen((t) {
+        unawaited(_registerToken(t));
+      });
+    } catch (_) {}
   }
 
   Future<void> _registerToken(String token) async {
@@ -359,7 +411,14 @@ class PushController {
     final loc =
         row.localized(lang, provider: _ref.read(sessionProvider).isProvider);
     _ref.read(alertToastProvider.notifier).state =
-        AlertToast(title: loc.$1, body: loc.$2, bookingId: row.bookingId);
+        AlertToast(
+          title: loc.$1,
+          body: loc.$2,
+          bookingId: row.bookingId,
+          couponCode: row.couponCode,
+          path: row.path,
+          type: row.type,
+        );
     _hideToast?.cancel();
     _hideToast = Timer(const Duration(seconds: 6), () {
       _ref.read(alertToastProvider.notifier).state = null;
