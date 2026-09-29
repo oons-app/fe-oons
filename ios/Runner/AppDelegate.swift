@@ -2,12 +2,14 @@ import Flutter
 import UIKit
 import UserNotifications
 import FirebaseCore
+import AVFoundation
 
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
   private static var pushChannel: FlutterMethodChannel?
   private static var pendingToken: String?
   private var privacyOverlay: UIView?
+  private var alertPlayer: AVAudioPlayer?
 
   override func application(
     _ application: UIApplication,
@@ -16,6 +18,7 @@ import FirebaseCore
     if FirebaseApp.app() == nil {
       FirebaseApp.configure()
     }
+    configureAlertAudioSession()
     UNUserNotificationCenter.current().delegate = self
     UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, _ in
       guard granted else { return }
@@ -28,9 +31,11 @@ import FirebaseCore
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
-    let channel = FlutterMethodChannel(name: "oons/push", binaryMessenger: engineBridge.applicationRegistrar.messenger())
-    AppDelegate.pushChannel = channel
-    channel.setMethodCallHandler { call, result in
+    let messenger = engineBridge.applicationRegistrar.messenger()
+
+    let push = FlutterMethodChannel(name: "oons/push", binaryMessenger: messenger)
+    AppDelegate.pushChannel = push
+    push.setMethodCallHandler { call, result in
       if call.method == "getToken" {
         result(AppDelegate.pendingToken)
       } else {
@@ -38,7 +43,34 @@ import FirebaseCore
       }
     }
     if let token = AppDelegate.pendingToken {
-      channel.invokeMethod("token", arguments: token)
+      push.invokeMethod("token", arguments: token)
+    }
+
+    let sound = FlutterMethodChannel(name: "oons/alert_sound", binaryMessenger: messenger)
+    sound.setMethodCallHandler { [weak self] call, result in
+      switch call.method {
+      case "unlock":
+        self?.prepareBundledAlertSound()
+        result(nil)
+      case "play":
+        self?.playBundledAlertSound()
+        result(nil)
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
+  }
+
+  override func userNotificationCenter(
+    _ center: UNUserNotificationCenter,
+    willPresent notification: UNNotification,
+    withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+  ) {
+    // Show banner + play sound even while the app is foregrounded.
+    if #available(iOS 14.0, *) {
+      completionHandler([.banner, .list, .sound, .badge])
+    } else {
+      completionHandler([.alert, .sound, .badge])
     }
   }
 
@@ -68,6 +100,28 @@ import FirebaseCore
     didFailToRegisterForRemoteNotificationsWithError error: Error
   ) {
     super.application(application, didFailToRegisterForRemoteNotificationsWithError: error)
+  }
+
+  private func configureAlertAudioSession() {
+    let session = AVAudioSession.sharedInstance()
+    try? session.setCategory(.ambient, options: [.mixWithOthers])
+    try? session.setActive(true, options: [])
+  }
+
+  private func prepareBundledAlertSound() {
+    configureAlertAudioSession()
+    if alertPlayer == nil {
+      guard let url = Bundle.main.url(forResource: "oons_alert", withExtension: "wav") else { return }
+      alertPlayer = try? AVAudioPlayer(contentsOf: url)
+      alertPlayer?.prepareToPlay()
+    }
+  }
+
+  private func playBundledAlertSound() {
+    prepareBundledAlertSound()
+    alertPlayer?.currentTime = 0
+    alertPlayer?.volume = 0.85
+    alertPlayer?.play()
   }
 
   private func windows() -> [UIWindow] {
