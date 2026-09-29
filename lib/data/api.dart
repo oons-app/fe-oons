@@ -331,6 +331,19 @@ String publicBookingUrl(String slug, {String? customDomain}) {
   return 'https://$s.oons.app';
 }
 
+/// Provider invite / affiliate URL — same booking page with `?r=` attribution token.
+String providerInviteUrl(String slug, {String? customDomain, String? broughtToken}) {
+  final base = publicBookingUrl(slug, customDomain: customDomain);
+  final tok = (broughtToken ?? '').trim();
+  if (tok.isEmpty) return base;
+  final uri = Uri.tryParse(base);
+  if (uri == null || !uri.hasScheme) {
+    final sep = base.contains('?') ? '&' : '?';
+    return '$base${sep}r=${Uri.encodeQueryComponent(tok)}';
+  }
+  return uri.replace(queryParameters: {...uri.queryParameters, 'r': tok}).toString();
+}
+
 /// Always-works path on the customer app host.
 String publicBookingPathUrl(String slug) {
   final s = slug.trim().toLowerCase();

@@ -140,6 +140,7 @@ class ProviderP {
     this.slug,
     this.slugAliases = const [],
     this.customDomains = const [],
+    this.broughtClientToken,
   });
   final String id;
   final Loc firstName;
@@ -171,6 +172,8 @@ class ProviderP {
   final String? slug;
   final List<String> slugAliases;
   final List<ProviderDomain> customDomains;
+  /// Affiliate token for `?r=` invite links (provider-brought clients).
+  final String? broughtClientToken;
 
   String name(String lang) => '${firstName.of(lang)} ${lastName.of(lang)}';
 
@@ -215,6 +218,10 @@ class ProviderP {
             .whereType<Map>()
             .map((e) => ProviderDomain.fromJson(e))
             .toList(),
+        broughtClientToken: (() {
+          final t = '${j['broughtClientToken'] ?? ''}'.trim();
+          return t.isEmpty ? null : t;
+        })(),
       );
 }
 

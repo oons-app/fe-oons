@@ -950,11 +950,11 @@ class AppAnalytics {
     });
   }
 
-  static Future<void> shareProviderLink({required String slug}) async {
+  static Future<void> shareProviderLink({required String slug, String method = 'copy_link'}) async {
     await logEvent('share', {
       'content_type': 'provider',
       'item_id': slug,
-      'method': 'copy_link',
+      'method': method,
     });
   }
 }

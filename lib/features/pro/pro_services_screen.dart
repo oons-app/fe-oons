@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:oons/core/analytics.dart';
 import 'package:oons/core/format.dart';
 import 'package:oons/core/locale.dart';
+import 'package:oons/core/open_external.dart';
 import 'package:oons/core/pro_format.dart';
 import 'package:oons/core/tokens.dart';
 import 'package:oons/core/widgets.dart';
@@ -1284,12 +1285,25 @@ class _ProServicesScreenState extends ConsumerState<ProServicesScreen> {
   }
 
   Widget _bookingLinkCard(String lang, Map m, Map p, ProviderP? me) {
+    final slug = slugCtrl.text.trim();
+    final inviteUrl = slug.isEmpty
+        ? ''
+        : providerInviteUrl(
+            slug,
+            customDomain: me?.liveCustomDomain,
+            broughtToken: me?.broughtClientToken,
+          );
     return ProCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           ProSectionWithHelp('${m['bookingLink']}', help: '${m['tipLink']}'),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
+          Text(
+            '${m['inviteLinkHint'] ?? m['tipLink']}',
+            style: const TextStyle(fontSize: 12, color: Pro.muted, height: 1.4),
+          ),
+          const SizedBox(height: 10),
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -1312,30 +1326,55 @@ class _ProServicesScreenState extends ConsumerState<ProServicesScreen> {
                     ),
                   ),
                 ),
-                if (slugCtrl.text.trim().isNotEmpty)
-                  InkWell(
-                    onTap: () {
-                      final meNow = ref.read(sessionProvider).provider;
-                      final slug = slugCtrl.text.trim();
-                      final url = publicBookingUrl(slug, customDomain: meNow?.liveCustomDomain);
-                      Clipboard.setData(ClipboardData(text: url));
-                      unawaited(AppAnalytics.shareProviderLink(slug: slug));
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${p['linkCopied']}')));
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(color: Pro.plum, borderRadius: BorderRadius.circular(8)),
-                      child: Text(lang == 'ar' ? 'كوبي' : 'Copy', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white)),
-                    ),
-                  ),
               ],
             ),
           ),
-          if (slugCtrl.text.trim().isNotEmpty) ...[
+          if (inviteUrl.isNotEmpty) ...[
             const SizedBox(height: 8),
-            Text(
-              publicBookingUrl(slugCtrl.text.trim(), customDomain: me?.liveCustomDomain),
+            SelectableText(
+              inviteUrl,
               style: const TextStyle(fontFamily: T.mono, fontSize: 11, color: Pro.muted),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: inviteUrl));
+                      unawaited(AppAnalytics.shareProviderLink(slug: slug, method: 'copy_invite'));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('${m['inviteCopied'] ?? p['linkCopied']}')),
+                      );
+                    },
+                    icon: const Icon(Icons.link, size: 16),
+                    label: Text('${m['copyInvite'] ?? p['shareLink']}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Pro.plum,
+                      side: const BorderSide(color: Pro.plum),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: () {
+                      final body = '${m['inviteWhatsAppBody'] ?? ''}\n$inviteUrl';
+                      final wa = Uri.parse('https://wa.me/?text=${Uri.encodeComponent(body)}');
+                      unawaited(AppAnalytics.shareProviderLink(slug: slug, method: 'whatsapp_invite'));
+                      unawaited(openExternal(wa.toString()));
+                    },
+                    icon: const Icon(Icons.chat, size: 16),
+                    label: Text('${m['whatsappInvite']}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF25D366),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ],
