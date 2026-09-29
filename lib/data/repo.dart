@@ -16,9 +16,9 @@ import 'package:uuid/uuid.dart';
 
 final sessionProvider = StateNotifierProvider<Session, SessionState>((ref) => Session());
 
-void persistBroughtFromUri() {
-  if (!kIsWeb) return;
-  final q = Uri.base.queryParameters;
+void persistBroughtFromUri([Uri? uri]) {
+  final q = (uri ?? (kIsWeb ? Uri.base : null))?.queryParameters;
+  if (q == null) return;
   final r = (q['r'] ?? '').trim();
   if (r.isNotEmpty) {
     Hive.box('prefs').put('broughtToken', r);
@@ -479,6 +479,10 @@ class Repo {
       if (guests != null && guests.isNotEmpty) 'guests': guests,
       if (couponCode != null && couponCode.trim().isNotEmpty) 'couponCode': couponCode.trim(),
       if (toolsFromProvider) 'toolsFromProvider': true,
+      if ((Hive.box('prefs').get('broughtToken') as String?)?.isNotEmpty == true)
+        'broughtToken': Hive.box('prefs').get('broughtToken'),
+      if ((Hive.box('prefs').get('signupPromo') as String?)?.isNotEmpty == true)
+        'promoCode': Hive.box('prefs').get('signupPromo'),
     });
     final bundle = BookingBundle.fromJson(r);
     final addr = bundle.booking.address;
@@ -509,6 +513,8 @@ class Repo {
     List<String>? verticals,
     String? area,
     List<String>? categoryIds,
+    List<String>? serviceItemIds,
+    Map<String, int>? lineAmounts,
   }) async {
     final r = await api.post('/coupons/validate', data: {
       'code': code,
@@ -518,6 +524,8 @@ class Repo {
       if (verticals != null && verticals.isNotEmpty) 'verticals': verticals,
       if (area != null && area.isNotEmpty) 'area': area,
       if (categoryIds != null && categoryIds.isNotEmpty) 'categoryIds': categoryIds,
+      if (serviceItemIds != null && serviceItemIds.isNotEmpty) 'serviceItemIds': serviceItemIds,
+      if (lineAmounts != null && lineAmounts.isNotEmpty) 'lineAmounts': lineAmounts,
     });
     return Map<String, dynamic>.from(r);
   }

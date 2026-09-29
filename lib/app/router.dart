@@ -102,6 +102,7 @@ final routerProvider = Provider<GoRouter>((ref) {
     initialLocation: '/home',
     refreshListenable: refresh,
     redirect: (ctx, st) {
+      persistBroughtFromUri(st.uri);
       final sess = ref.read(sessionProvider);
       return gateRedirect(
         loc: routePath(st),
