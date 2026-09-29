@@ -46,12 +46,26 @@ class _ProCouponsScreenState extends ConsumerState<ProCouponsScreen> {
 
   Future<void> _openEditor({Map<String, dynamic>? existing}) async {
     final lang = langOf(ref);
+    final sessionItems = ref.read(sessionProvider).provider?.items ?? const [];
     final changed = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Pro.bg,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
-      builder: (ctx) => _CouponEditorSheet(lang: lang, existing: existing, repo: ref.read(repoProvider)),
+      builder: (ctx) => _CouponEditorSheet(
+        lang: lang,
+        existing: existing,
+        repo: ref.read(repoProvider),
+        seedItems: [
+          for (final it in sessionItems)
+            {
+              'id': it.id,
+              'name': {'en': it.name.en, 'ar': it.name.ar},
+              'active': it.active,
+              'approvalState': it.approvalState,
+            },
+        ],
+      ),
     );
     if (changed == true) {
       await _load();
@@ -162,10 +176,17 @@ class _ProCouponsScreenState extends ConsumerState<ProCouponsScreen> {
 }
 
 class _CouponEditorSheet extends StatefulWidget {
-  const _CouponEditorSheet({required this.lang, required this.existing, required this.repo});
+  const _CouponEditorSheet({
+    required this.lang,
+    required this.existing,
+    required this.repo,
+    this.seedItems = const [],
+  });
   final String lang;
   final Map<String, dynamic>? existing;
   final Repo repo;
+  /// Session snapshot so the picker isn't empty while /me refreshes.
+  final List<Map<String, dynamic>> seedItems;
 
   @override
   State<_CouponEditorSheet> createState() => _CouponEditorSheetState();
@@ -183,11 +204,12 @@ class _CouponEditorSheetState extends State<_CouponEditorSheet> {
   DateTime? endsAt;
   late bool active = widget.existing?['active'] != false;
   bool busy = false;
+  bool catalogLoading = false;
   late Set<String> selectedServices = {
     for (final id in (widget.existing?['serviceItemIds'] as List? ?? const []))
       if ('$id'.trim().isNotEmpty) '$id'.trim(),
   };
-  List<Map<String, dynamic>> catalogItems = const [];
+  late List<Map<String, dynamic>> catalogItems = List.of(widget.seedItems);
 
   bool get ar => widget.lang == 'ar';
   bool get isEdit => widget.existing != null;
@@ -219,18 +241,34 @@ class _CouponEditorSheetState extends State<_CouponEditorSheet> {
     _loadCatalog();
   }
 
+  List<Map<String, dynamic>> _normalizeItems(List? raw) {
+    final out = <Map<String, dynamic>>[];
+    for (final item in raw ?? const []) {
+      if (item is! Map) continue;
+      final m = Map<String, dynamic>.from(item);
+      final id = '${m['id'] ?? ''}'.trim();
+      if (id.isEmpty || id == 'null') continue;
+      out.add(m);
+    }
+    return out;
+  }
+
   Future<void> _loadCatalog() async {
+    setState(() => catalogLoading = true);
     try {
-      final me = await api.get('/pro/me');
-      final raw = (me['items'] as List?) ??
-          (me['provider'] is Map ? ((me['provider'] as Map)['items'] as List?) : null) ??
-          const [];
+      // There is no GET /pro/me — provider catalogue lives on GET /me → provider.items.
+      final me = await api.get('/me');
+      final provider = me['provider'];
+      final raw = provider is Map ? provider['items'] as List? : null;
+      final items = _normalizeItems(raw);
       if (!mounted) return;
       setState(() {
-        catalogItems = raw.whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList();
+        if (items.isNotEmpty) catalogItems = items;
+        catalogLoading = false;
       });
     } catch (_) {
-      // ignore — picker simply stays empty
+      if (!mounted) return;
+      setState(() => catalogLoading = false);
     }
   }
 
@@ -272,7 +310,7 @@ class _CouponEditorSheetState extends State<_CouponEditorSheet> {
       );
       return;
     }
-    final amountRaw = double.tryParse(amount.text.trim()) ?? 0;
+    final amountRaw = double.tryParse(toWesternDigits(amount.text.trim())) ?? 0;
     if (amountRaw <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(ar ? 'أدخلي قيمة الخصم.' : 'Enter a discount amount.')),
@@ -292,15 +330,16 @@ class _CouponEditorSheetState extends State<_CouponEditorSheet> {
         'discountType': discountType,
         'amount': discountType == 'percent' ? amountRaw.round() : (amountRaw * 100).round(),
         if (maxDiscount.text.trim().isNotEmpty)
-          'maxDiscount': ((double.tryParse(maxDiscount.text.trim()) ?? 0) * 100).round(),
+          'maxDiscount': ((double.tryParse(toWesternDigits(maxDiscount.text.trim())) ?? 0) * 100).round(),
         if (minService.text.trim().isNotEmpty)
-          'minService': ((double.tryParse(minService.text.trim()) ?? 0) * 100).round(),
+          'minService': ((double.tryParse(toWesternDigits(minService.text.trim())) ?? 0) * 100).round(),
         if (maxRedemptions.text.trim().isNotEmpty)
-          'maxRedemptions': int.tryParse(maxRedemptions.text.trim()) ?? 0,
-        if (maxPerUser.text.trim().isNotEmpty) 'maxPerUser': int.tryParse(maxPerUser.text.trim()) ?? 0,
+          'maxRedemptions': int.tryParse(toWesternDigits(maxRedemptions.text.trim())) ?? 0,
+        if (maxPerUser.text.trim().isNotEmpty)
+          'maxPerUser': int.tryParse(toWesternDigits(maxPerUser.text.trim())) ?? 0,
         'serviceItemIds': selectedServices.toList(),
-        'startsAt': startsAt?.toUtc().toIso8601String(),
-        'endsAt': endsAt?.toUtc().toIso8601String(),
+        if (startsAt != null) 'startsAt': startsAt!.toUtc().toIso8601String(),
+        if (endsAt != null) 'endsAt': endsAt!.toUtc().toIso8601String(),
         'active': active,
       };
       final id = widget.existing?['id'] as String?;
@@ -436,16 +475,24 @@ class _CouponEditorSheetState extends State<_CouponEditorSheet> {
             const SizedBox(height: 6),
             ProField(controller: maxPerUser, mono: true, keyboard: TextInputType.number),
             const SizedBox(height: 12),
-            _label(ar ? 'خدمات محددةة (فارغ = الكل)' : 'Specific services (blank = all)'),
+            _label(ar ? 'خدمات محددة (فارغ = الكل)' : 'Specific services (blank = all)'),
             const SizedBox(height: 6),
-            if (catalogItems.isEmpty)
+            if (catalogLoading && catalogItems.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: LinearProgressIndicator(minHeight: 2, color: Pro.plum),
+              )
+            else if (catalogItems.isEmpty)
               Text(
-                ar ? 'مفيش خدمات على ملفك لسه.' : 'No services on your profile yet.',
+                ar
+                    ? 'مفيش خدمات على ملفك لسه — احفظي الكوبون من غير اختيار عشان يطبّق على كل خدماتك.'
+                    : 'No services on your profile yet — save without a pick to apply to all your services.',
                 style: const TextStyle(fontSize: 12, color: Pro.muted),
               )
             else
               ...catalogItems.map((it) {
-                final id = '${it['id'] ?? ''}';
+                final id = '${it['id'] ?? ''}'.trim();
+                if (id.isEmpty) return const SizedBox.shrink();
                 final nameMap = it['name'];
                 String label = id;
                 if (nameMap is Map) {
@@ -453,12 +500,16 @@ class _CouponEditorSheetState extends State<_CouponEditorSheet> {
                   if (n.isNotEmpty) label = n;
                 }
                 final on = selectedServices.contains(id);
+                final paused = it['active'] == false;
                 return CheckboxListTile(
                   dense: true,
                   contentPadding: EdgeInsets.zero,
                   value: on,
                   activeColor: Pro.plum,
-                  title: Text(label, style: const TextStyle(fontSize: 13, color: Pro.ink)),
+                  title: Text(
+                    paused ? (ar ? '$label (متوقفة)' : '$label (paused)') : label,
+                    style: const TextStyle(fontSize: 13, color: Pro.ink),
+                  ),
                   subtitle: Text(id, style: const TextStyle(fontSize: 11, fontFamily: T.mono, color: Pro.muted)),
                   onChanged: (v) => setState(() {
                     if (v == true) {
