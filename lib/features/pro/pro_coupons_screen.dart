@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:oons/core/locale.dart';
 import 'package:oons/core/pro_format.dart';
 import 'package:oons/core/tokens.dart';
+import 'package:oons/data/api.dart';
 import 'package:oons/data/repo.dart';
 import 'package:oons/features/pro/pro_chrome.dart';
 import 'package:oons/l10n/errors.dart';
@@ -140,6 +141,8 @@ class _ProCouponsScreenState extends ConsumerState<ProCouponsScreen> {
                 [
                   valueLabel,
                   '${ar ? 'استخدام' : 'used'} ${digits(redeemed, ar: ar)}${limit > 0 ? '/${digits(limit, ar: ar)}' : ''}',
+                  if ((c['serviceItemIds'] as List?)?.isNotEmpty == true)
+                    '${(c['serviceItemIds'] as List).length} ${ar ? 'خدمة' : 'services'}',
                   if (ends != null) '${ar ? 'تنتهي' : 'ends'} ${_fmtDate(ends)}',
                 ].join(' · '),
                 style: const TextStyle(fontSize: 12, color: Pro.muted, fontFamily: T.mono),
@@ -180,6 +183,11 @@ class _CouponEditorSheetState extends State<_CouponEditorSheet> {
   DateTime? endsAt;
   late bool active = widget.existing?['active'] != false;
   bool busy = false;
+  late Set<String> selectedServices = {
+    for (final id in (widget.existing?['serviceItemIds'] as List? ?? const []))
+      if ('$id'.trim().isNotEmpty) '$id'.trim(),
+  };
+  List<Map<String, dynamic>> catalogItems = const [];
 
   bool get ar => widget.lang == 'ar';
   bool get isEdit => widget.existing != null;
@@ -208,6 +216,22 @@ class _CouponEditorSheetState extends State<_CouponEditorSheet> {
     super.initState();
     startsAt = DateTime.tryParse('${widget.existing?['startsAt'] ?? ''}');
     endsAt = DateTime.tryParse('${widget.existing?['endsAt'] ?? ''}');
+    _loadCatalog();
+  }
+
+  Future<void> _loadCatalog() async {
+    try {
+      final me = await api.get('/pro/me');
+      final raw = (me['items'] as List?) ??
+          (me['provider'] is Map ? ((me['provider'] as Map)['items'] as List?) : null) ??
+          const [];
+      if (!mounted) return;
+      setState(() {
+        catalogItems = raw.whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList();
+      });
+    } catch (_) {
+      // ignore — picker simply stays empty
+    }
   }
 
   @override
@@ -274,6 +298,7 @@ class _CouponEditorSheetState extends State<_CouponEditorSheet> {
         if (maxRedemptions.text.trim().isNotEmpty)
           'maxRedemptions': int.tryParse(maxRedemptions.text.trim()) ?? 0,
         if (maxPerUser.text.trim().isNotEmpty) 'maxPerUser': int.tryParse(maxPerUser.text.trim()) ?? 0,
+        'serviceItemIds': selectedServices.toList(),
         'startsAt': startsAt?.toUtc().toIso8601String(),
         'endsAt': endsAt?.toUtc().toIso8601String(),
         'active': active,
@@ -410,6 +435,40 @@ class _CouponEditorSheetState extends State<_CouponEditorSheet> {
             _label(ar ? 'أقصى استخدام لكل عميلة (اختياري)' : 'Max per user (optional)'),
             const SizedBox(height: 6),
             ProField(controller: maxPerUser, mono: true, keyboard: TextInputType.number),
+            const SizedBox(height: 12),
+            _label(ar ? 'خدمات محددةة (فارغ = الكل)' : 'Specific services (blank = all)'),
+            const SizedBox(height: 6),
+            if (catalogItems.isEmpty)
+              Text(
+                ar ? 'مفيش خدمات على ملفك لسه.' : 'No services on your profile yet.',
+                style: const TextStyle(fontSize: 12, color: Pro.muted),
+              )
+            else
+              ...catalogItems.map((it) {
+                final id = '${it['id'] ?? ''}';
+                final nameMap = it['name'];
+                String label = id;
+                if (nameMap is Map) {
+                  final n = '${nameMap[ar ? 'ar' : 'en'] ?? nameMap['en'] ?? nameMap['ar'] ?? ''}'.trim();
+                  if (n.isNotEmpty) label = n;
+                }
+                final on = selectedServices.contains(id);
+                return CheckboxListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  value: on,
+                  activeColor: Pro.plum,
+                  title: Text(label, style: const TextStyle(fontSize: 13, color: Pro.ink)),
+                  subtitle: Text(id, style: const TextStyle(fontSize: 11, fontFamily: T.mono, color: Pro.muted)),
+                  onChanged: (v) => setState(() {
+                    if (v == true) {
+                      selectedServices = {...selectedServices, id};
+                    } else {
+                      selectedServices = {...selectedServices}..remove(id);
+                    }
+                  }),
+                );
+              }),
             const SizedBox(height: 12),
             _label(ar ? 'تبدأ في (اختياري)' : 'Starts on (optional)'),
             const SizedBox(height: 6),

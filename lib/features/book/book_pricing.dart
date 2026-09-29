@@ -127,13 +127,20 @@ int bookCartDuration(List<BookLine> lines) {
   return d < 1 ? 90 : d;
 }
 
+int bookClientServiceFee(List<BookLine> lines, int bps) {
+  if (bps <= 0) return 0;
+  return (bookSubtotal(lines) * bps) ~/ 10000;
+}
+
 int bookExclusiveTotal({
   required List<BookLine> lines,
   required bool toolsFromProvider,
   int discount = 0,
   int trustFee = 0,
+  int clientServiceFeeBps = 0,
 }) {
-  final raw = bookSubtotal(lines) + bookTravel(lines) + bookTools(lines: lines, toolsFromProvider: toolsFromProvider) + trustFee - discount;
+  final fee = bookClientServiceFee(lines, clientServiceFeeBps);
+  final raw = bookSubtotal(lines) + bookTravel(lines) + bookTools(lines: lines, toolsFromProvider: toolsFromProvider) + trustFee + fee - discount;
   return raw < 0 ? 0 : raw;
 }
 
@@ -143,6 +150,7 @@ int bookInclusiveTotal({
   required ProcessingFeeSchedule fees,
   int discount = 0,
   int trustFee = 0,
+  int clientServiceFeeBps = 0,
   String method = 'card',
 }) {
   final base = bookExclusiveTotal(
@@ -150,6 +158,7 @@ int bookInclusiveTotal({
     toolsFromProvider: toolsFromProvider,
     discount: discount,
     trustFee: trustFee,
+    clientServiceFeeBps: clientServiceFeeBps,
   );
   return fees.charge(base, method);
 }

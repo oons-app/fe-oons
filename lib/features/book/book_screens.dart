@@ -143,6 +143,7 @@ class _BookScreenState extends ConsumerState<BookScreen> {
         toolsFromProvider: toolsFromProvider,
         discount: couponOk ? couponDiscount : 0,
         trustFee: ref.read(sessionProvider).trustFee,
+        clientServiceFeeBps: ref.read(sessionProvider).clientServiceFeeBps,
       );
 
   int get inclusive => bookInclusiveTotal(
@@ -151,6 +152,7 @@ class _BookScreenState extends ConsumerState<BookScreen> {
         fees: fees,
         discount: couponOk ? couponDiscount : 0,
         trustFee: ref.read(sessionProvider).trustFee,
+        clientServiceFeeBps: ref.read(sessionProvider).clientServiceFeeBps,
       );
 
   Address? _selectedAddress() {
@@ -387,9 +389,13 @@ class _BookScreenState extends ConsumerState<BookScreen> {
     });
     final verts = <String>{};
     final cats = <String>{};
+    final itemIds = <String>[];
+    final lineAmounts = <String, int>{};
     for (final l in lines) {
       verts.add(l.item.vertical ?? p!.service);
       if ((l.item.categoryId ?? '').isNotEmpty) cats.add(l.item.categoryId!);
+      itemIds.add(l.item.id);
+      lineAmounts[l.item.id] = (lineAmounts[l.item.id] ?? 0) + l.amount;
     }
     try {
       final r = await ref.read(repoProvider).validateCoupon(
@@ -400,6 +406,8 @@ class _BookScreenState extends ConsumerState<BookScreen> {
             verticals: verts.toList(),
             area: _selectedAddress()?.area,
             categoryIds: cats.toList(),
+            serviceItemIds: itemIds,
+            lineAmounts: lineAmounts,
           );
       if (!mounted) return;
       final ok = r['ok'] == true;

@@ -12,6 +12,7 @@ import 'package:oons/app/web_host.dart';
 import 'package:oons/core/analytics.dart';
 import 'package:oons/core/screen_guard.dart';
 import 'package:oons/data/api.dart';
+import 'package:oons/data/repo.dart';
 import 'package:oons/data/service_catalog.dart';
 
 Future<void> main() async {
@@ -22,6 +23,7 @@ Future<void> main() async {
     Hive.openBox('cache'),
     Hive.openBox('prefs'),
   ]);
+  persistBroughtFromUri();
   // Custom domains need the slug before the first route. lady.oons.app does not.
   if (kIsWeb && isCustomBookingHost(Uri.base.host)) {
     await _resolveCustomBookingHost();

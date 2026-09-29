@@ -104,7 +104,10 @@ class _CouponsScreenState extends ConsumerState<CouponsScreen> {
     final lang = ref.read(localeCodeProvider);
     final code = TextEditingController(text: '${c?['code'] ?? ''}');
     var type = _isPercent(c ?? {}) || c == null ? 'percent' : 'fixed';
-    var scope = '${c?['scope'] ?? 'Platform'}';
+    var kind = '${c?['kind'] ?? c?['scope'] ?? 'platform'}'.toLowerCase();
+    if (kind == 'Platform' || kind == 'platform') kind = 'platform';
+    if (kind == 'Provider' || kind == 'provider') kind = 'provider';
+    final owner = TextEditingController(text: '${c?['ownerProviderId'] ?? ''}');
     var vertical = '${c?['vertical'] ?? ''}';
     final areas = TextEditingController(text: asDynList(c?['areas']).join(', '));
     final value = TextEditingController(
@@ -114,64 +117,184 @@ class _CouponsScreenState extends ConsumerState<CouponsScreen> {
                 ? '${asInt(c['amount'] ?? c['discountValue'])}'
                 : '${asInt(c['amount'] ?? c['discountValue']) / 100}');
     final limit = TextEditingController(text: '${c?['maxRedemptions'] ?? c?['limit'] ?? ''}');
+    var selectedServices = asDynList(c?['serviceItemIds']).map((e) => '$e').where((s) => s.isNotEmpty).toSet();
+    var catalogItems = <Map<String, dynamic>>[];
+    var catalogLoading = false;
+    var catalogError = '';
+
+    Future<void> loadCatalog(String providerId, void Function(void Function()) setLocal) async {
+      final pid = providerId.trim();
+      if (pid.isEmpty) {
+        setLocal(() {
+          catalogItems = [];
+          catalogError = '';
+          catalogLoading = false;
+        });
+        return;
+      }
+      setLocal(() {
+        catalogLoading = true;
+        catalogError = '';
+      });
+      try {
+        final data = await staffClient.get('/admin/providers/$pid');
+        final items = asMapList(data['items'] ?? data['provider']?['items']);
+        setLocal(() {
+          catalogItems = items;
+          catalogLoading = false;
+        });
+      } on ApiException catch (e) {
+        setLocal(() {
+          catalogItems = [];
+          catalogLoading = false;
+          catalogError = e.message;
+        });
+      } catch (e) {
+        setLocal(() {
+          catalogItems = [];
+          catalogLoading = false;
+          catalogError = '$e';
+        });
+      }
+    }
+
     try {
       final ok = await v2Form(
         context,
         title: c == null ? (lang == 'ar' ? 'كوبون جديد' : 'New coupon') : (lang == 'ar' ? 'تعديل الكوبون' : 'Edit coupon'),
-        bodyBuilder: (ctx, setLocal) => Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            V2FormField(label: lang == 'ar' ? 'الكود' : 'Code', child: TextField(controller: code)),
-            const SizedBox(height: 12),
-            V2FormField(
-              label: lang == 'ar' ? 'النطاق' : 'Scope',
-              child: DropdownButtonFormField<String>(
-                initialValue: scope,
-                items: const [DropdownMenuItem(value: 'Platform', child: Text('Platform')), DropdownMenuItem(value: 'Provider', child: Text('Provider'))],
-                onChanged: (v) => scope = v ?? 'Platform',
+        bodyBuilder: (ctx, setLocal) {
+          if (kind == 'provider' && catalogItems.isEmpty && !catalogLoading && catalogError.isEmpty && owner.text.trim().isNotEmpty) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (ctx.mounted) loadCatalog(owner.text, setLocal);
+            });
+          }
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              V2FormField(label: lang == 'ar' ? 'الكود' : 'Code', child: TextField(controller: code)),
+              const SizedBox(height: 12),
+              V2FormField(
+                label: lang == 'ar' ? 'النطاق' : 'Kind',
+                child: DropdownButtonFormField<String>(
+                  initialValue: kind,
+                  items: const [
+                    DropdownMenuItem(value: 'platform', child: Text('Platform')),
+                    DropdownMenuItem(value: 'provider', child: Text('Provider')),
+                  ],
+                  onChanged: (v) => setLocal(() {
+                    kind = v ?? 'platform';
+                    if (kind != 'provider') {
+                      selectedServices = {};
+                      catalogItems = [];
+                    } else if (owner.text.trim().isNotEmpty) {
+                      loadCatalog(owner.text, setLocal);
+                    }
+                  }),
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-            V2FormField(
-              label: lang == 'ar' ? 'النوع' : 'Type',
-              child: DropdownButtonFormField<String>(
-                initialValue: type,
-                items: const [DropdownMenuItem(value: 'percent', child: Text('Percent')), DropdownMenuItem(value: 'fixed', child: Text('Fixed'))],
-                onChanged: (v) => setLocal(() => type = v ?? 'percent'),
+              if (kind == 'provider') ...[
+                const SizedBox(height: 12),
+                V2FormField(
+                  label: lang == 'ar' ? 'معرّف المتخصصة' : 'Owner provider ID',
+                  child: TextField(
+                    controller: owner,
+                    onChanged: (v) {
+                      selectedServices = {};
+                      loadCatalog(v, setLocal);
+                    },
+                  ),
+                ),
+                const SizedBox(height: 12),
+                V2FormField(
+                  label: lang == 'ar' ? 'خدمات محددة (فارغ = الكل)' : 'Services (blank = all)',
+                  child: catalogLoading
+                      ? const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 8),
+                          child: LinearProgressIndicator(minHeight: 2),
+                        )
+                      : catalogError.isNotEmpty
+                          ? Text(catalogError, style: const TextStyle(color: Ops.terracotta, fontSize: 12))
+                          : catalogItems.isEmpty
+                              ? Text(
+                                  lang == 'ar'
+                                      ? 'أدخلي معرّف المتخصصة لتحميل الخدمات.'
+                                      : 'Enter a provider ID to load her services.',
+                                  style: const TextStyle(fontSize: 12, color: Ops.muted),
+                                )
+                              : Column(
+                                  children: [
+                                    for (final it in catalogItems)
+                                      CheckboxListTile(
+                                        dense: true,
+                                        contentPadding: EdgeInsets.zero,
+                                        value: selectedServices.contains('${it['id']}'),
+                                        title: Text(
+                                          () {
+                                            final n = locName(it['name'], lang).trim();
+                                            return n.isNotEmpty ? n : '${it['id']}';
+                                          }(),
+                                          style: const TextStyle(fontSize: 13),
+                                        ),
+                                        subtitle: Text('${it['id']}', style: const TextStyle(fontSize: 11, fontFamily: Ops.mono, color: Ops.muted)),
+                                        onChanged: (on) => setLocal(() {
+                                          final id = '${it['id']}';
+                                          if (on == true) {
+                                            selectedServices = {...selectedServices, id};
+                                          } else {
+                                            selectedServices = {...selectedServices}..remove(id);
+                                          }
+                                        }),
+                                      ),
+                                  ],
+                                ),
+                ),
+              ],
+              const SizedBox(height: 12),
+              V2FormField(
+                label: lang == 'ar' ? 'النوع' : 'Type',
+                child: DropdownButtonFormField<String>(
+                  initialValue: type,
+                  items: const [DropdownMenuItem(value: 'percent', child: Text('Percent')), DropdownMenuItem(value: 'fixed', child: Text('Fixed'))],
+                  onChanged: (v) => setLocal(() => type = v ?? 'percent'),
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-            V2FormField(
-              label: type == 'fixed' ? (lang == 'ar' ? 'القيمة (ج.م)' : 'Value (EGP)') : (lang == 'ar' ? 'النسبة %' : 'Percent %'),
-              child: TextField(controller: value, keyboardType: TextInputType.number),
-            ),
-            const SizedBox(height: 12),
-            V2FormField(
-                label: lang == 'ar' ? 'حد الاستخدام' : 'Redemption limit',
-                child: TextField(controller: limit, keyboardType: TextInputType.number)),
-            const SizedBox(height: 12),
-            V2FormField(
-              label: lang == 'ar' ? 'العمودية' : 'Vertical',
-              child: DropdownButtonFormField<String>(
-                initialValue: vertical.isEmpty ? '' : vertical,
-                items: [
-                  DropdownMenuItem(value: '', child: Text(lang == 'ar' ? 'كل العموديات' : 'All verticals')),
-                  for (final v in const ['beauty', 'cleaning', 'chef', 'childcare', 'wellness'])
-                    DropdownMenuItem(value: v, child: Text(verticalLabel(v, lang))),
-                ],
-                onChanged: (v) => vertical = v ?? '',
+              const SizedBox(height: 12),
+              V2FormField(
+                label: type == 'fixed' ? (lang == 'ar' ? 'القيمة (ج.م)' : 'Value (EGP)') : (lang == 'ar' ? 'النسبة %' : 'Percent %'),
+                child: TextField(controller: value, keyboardType: TextInputType.number),
               ),
-            ),
-            const SizedBox(height: 12),
-            V2FormField(
-              label: lang == 'ar' ? 'مناطق (مفصولة بفواصل، فارغ = الكل)' : 'Areas (comma-separated, blank = all)',
-              child: TextField(controller: areas),
-            ),
-          ],
-        ),
+              const SizedBox(height: 12),
+              V2FormField(
+                  label: lang == 'ar' ? 'حد الاستخدام' : 'Redemption limit',
+                  child: TextField(controller: limit, keyboardType: TextInputType.number)),
+              const SizedBox(height: 12),
+              V2FormField(
+                label: lang == 'ar' ? 'العمودية' : 'Vertical',
+                child: DropdownButtonFormField<String>(
+                  initialValue: vertical.isEmpty ? '' : vertical,
+                  items: [
+                    DropdownMenuItem(value: '', child: Text(lang == 'ar' ? 'كل العموديات' : 'All verticals')),
+                    for (final v in const ['beauty', 'cleaning', 'chef', 'childcare', 'wellness'])
+                      DropdownMenuItem(value: v, child: Text(verticalLabel(v, lang))),
+                  ],
+                  onChanged: (v) => vertical = v ?? '',
+                ),
+              ),
+              const SizedBox(height: 12),
+              V2FormField(
+                label: lang == 'ar' ? 'مناطق (مفصولة بفواصل، فارغ = الكل)' : 'Areas (comma-separated, blank = all)',
+                child: TextField(controller: areas),
+              ),
+            ],
+          );
+        },
         onValidate: () {
           if (code.text.trim().isEmpty) {
             v2Toast(context, lang == 'ar' ? 'الكود مطلوب' : 'Code is required', error: true);
+            return false;
+          }
+          if (kind == 'provider' && owner.text.trim().isEmpty) {
+            v2Toast(context, lang == 'ar' ? 'معرّف المتخصصة مطلوب' : 'Owner provider ID is required', error: true);
             return false;
           }
           return true;
@@ -183,11 +306,13 @@ class _CouponsScreenState extends ConsumerState<CouponsScreen> {
       final areaList = areas.text.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
       final payload = {
         'code': code.text.trim(),
-        'scope': scope,
+        'kind': kind,
         'discountType': type,
         'amount': amount,
         'vertical': vertical,
         'areas': areaList,
+        'serviceItemIds': kind == 'provider' ? selectedServices.toList() : <String>[],
+        if (kind == 'provider') 'ownerProviderId': owner.text.trim(),
         if (limit.text.trim().isNotEmpty) 'maxRedemptions': int.tryParse(limit.text.trim()),
         if (c == null) 'active': true,
       };
@@ -209,6 +334,7 @@ class _CouponsScreenState extends ConsumerState<CouponsScreen> {
       value.dispose();
       limit.dispose();
       areas.dispose();
+      owner.dispose();
     }
   }
 
@@ -356,10 +482,12 @@ class _CouponsScreenState extends ConsumerState<CouponsScreen> {
                       style: const TextStyle(fontSize: 13, fontFamily: Ops.mono, fontWeight: FontWeight.w600)),
                   Text(
                     [
-                      '${c['scope'] ?? 'Platform'}',
+                      '${c['kind'] ?? c['scope'] ?? 'platform'}',
                       if ('${c['vertical'] ?? ''}'.trim().isNotEmpty) verticalLabel(c['vertical'], lang),
                       if (asDynList(c['areas']).isNotEmpty)
                         '${asDynList(c['areas']).length} ${lang == 'ar' ? 'منطقة' : 'areas'}',
+                      if (asDynList(c['serviceItemIds']).isNotEmpty)
+                        '${asDynList(c['serviceItemIds']).length} ${lang == 'ar' ? 'خدمة' : 'services'}',
                     ].join(' · '),
                     style: const TextStyle(fontSize: 11, color: Ops.mutedSoft),
                   ),
