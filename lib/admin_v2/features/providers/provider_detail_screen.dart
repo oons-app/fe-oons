@@ -991,10 +991,21 @@ class _ProviderDetailScreenState extends ConsumerState<ProviderDetailScreen> {
     final sizeTo = TextEditingController(
         text: existing?['sizeToSqm'] == null ? '' : '${asInt(existing?['sizeToSqm'])}');
     final workers = TextEditingController(text: '${asInt(existing?['workerCount'] ?? 1)}');
-    final benefitCtls = <TextEditingController>[
+    final benefitEn = <TextEditingController>[
       for (final b in asDynList(existing?['benefits']))
-        TextEditingController(text: locName(b, lang)),
+        TextEditingController(text: locName(b, 'en')),
     ];
+    final benefitAr = <TextEditingController>[
+      for (final b in asDynList(existing?['benefits']))
+        TextEditingController(text: locName(b, 'ar')),
+    ];
+    // Keep lists aligned if locName ever returns empty for one side.
+    while (benefitAr.length < benefitEn.length) {
+      benefitAr.add(TextEditingController());
+    }
+    while (benefitEn.length < benefitAr.length) {
+      benefitEn.add(TextEditingController());
+    }
 
     var categoryId = '${existing?['categoryId'] ?? ''}';
     var kind = '${existing?['kind'] ?? 'standard'}' == 'cleaning' ? 'cleaning' : 'standard';
@@ -1003,7 +1014,19 @@ class _ProviderDetailScreenState extends ConsumerState<ProviderDetailScreen> {
     if (state.isEmpty) state = 'approved';
 
     void disposeAll() {
-      for (final c in [nameEn, nameAr, duration, price, travel, note, sizeFrom, sizeTo, workers, ...benefitCtls]) {
+      for (final c in [
+        nameEn,
+        nameAr,
+        duration,
+        price,
+        travel,
+        note,
+        sizeFrom,
+        sizeTo,
+        workers,
+        ...benefitEn,
+        ...benefitAr,
+      ]) {
         c.dispose();
       }
     }
@@ -1114,26 +1137,53 @@ class _ProviderDetailScreenState extends ConsumerState<ProviderDetailScreen> {
               ],
               const SizedBox(height: 10),
               V2FormField(
-                label: ar ? 'الخدمة شاملة إيه (سطر لكل ميزة)' : "What's included (one line each)",
+                label: ar ? 'الخدمة شاملة إيه (سطر لكل ميزة — عربي وإنجليزي)' : "What's included (one line each — AR & EN)",
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    for (var i = 0; i < benefitCtls.length; i++)
+                    for (var i = 0; i < benefitEn.length; i++)
                       Padding(
-                        padding: const EdgeInsets.only(bottom: 6),
-                        child: Row(children: [
-                          Expanded(child: TextField(controller: benefitCtls[i])),
-                          IconButton(
-                            icon: const Icon(Icons.close, size: 16, color: Ops.muted),
-                            onPressed: () => sb(() => benefitCtls.removeAt(i).dispose()),
-                          ),
-                        ]),
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: benefitAr[i],
+                                decoration: InputDecoration(
+                                  isDense: true,
+                                  labelText: ar ? 'عربي' : 'AR',
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: TextField(
+                                controller: benefitEn[i],
+                                decoration: InputDecoration(
+                                  isDense: true,
+                                  labelText: ar ? 'إنجليزي' : 'EN',
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.close, size: 16, color: Ops.muted),
+                              onPressed: () => sb(() {
+                                benefitEn.removeAt(i).dispose();
+                                benefitAr.removeAt(i).dispose();
+                              }),
+                            ),
+                          ],
+                        ),
                       ),
-                    if (benefitCtls.length < 12)
+                    if (benefitEn.length < 12)
                       Align(
                         alignment: AlignmentDirectional.centerStart,
                         child: V2Btn.ghost(ar ? '+ سطر' : '+ Line',
-                            onPressed: () => sb(() => benefitCtls.add(TextEditingController())),
+                            onPressed: () => sb(() {
+                                  benefitEn.add(TextEditingController());
+                                  benefitAr.add(TextEditingController());
+                                }),
                             size: V2BtnSize.sm),
                       ),
                   ],
@@ -1212,8 +1262,16 @@ class _ProviderDetailScreenState extends ConsumerState<ProviderDetailScreen> {
         'approvalState': state,
         'approvalNote': note.text.trim(),
         'benefits': [
-          for (final c in benefitCtls)
-            if (c.text.trim().isNotEmpty) {'en': c.text.trim(), 'ar': c.text.trim()},
+          for (var i = 0; i < benefitEn.length; i++)
+            if (benefitEn[i].text.trim().isNotEmpty || benefitAr[i].text.trim().isNotEmpty)
+              {
+                'en': benefitEn[i].text.trim().isNotEmpty
+                    ? benefitEn[i].text.trim()
+                    : benefitAr[i].text.trim(),
+                'ar': benefitAr[i].text.trim().isNotEmpty
+                    ? benefitAr[i].text.trim()
+                    : benefitEn[i].text.trim(),
+              },
         ],
         if (kind == 'cleaning') ...{
           'sizeFromSqm': int.tryParse(sizeFrom.text.trim()) ?? 0,

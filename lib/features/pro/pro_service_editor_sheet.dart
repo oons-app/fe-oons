@@ -358,17 +358,27 @@ class _ProServiceEditorSheetState extends State<_ProServiceEditorSheet> {
         : ProServiceDraft(id: 'new');
     _primeBenefits();
     if (draft.categoryId != null) {
-      _applyKindForCategory(draft.categoryId!);
+      // Only infer kind from the specialty when *adding* a service. On edit,
+      // keep the stored kind — a standard package under a cleaning specialty
+      // (benefit-based "what's included", no size tiers) must not be rewritten
+      // into kind=cleaning, or the sheet swaps the benefits UI for the size
+      // checklist and a price-only save can fail or mutate the package shape.
+      if (widget.existing == null) {
+        _applyKindForCategory(draft.categoryId!);
+      }
       _loadNameChips(draft.categoryId!);
     }
   }
 
   /// One controller per "what's included" line. The provider types in a
-  /// single language; the server mirrors it across both locales the same way
-  /// it does for a service name, so there's no second field to fill in.
+  /// single language; new lines are mirrored across both locales (same as a
+  /// service name). Existing bilingual lines keep the other locale unless she
+  /// edits the visible text.
   final List<TextEditingController> benefitCtrls = [];
+  late final List<Loc> _originalBenefits;
 
   void _primeBenefits() {
+    _originalBenefits = List.of(draft.benefits);
     for (final b in draft.benefits) {
       benefitCtrls.add(TextEditingController(text: b.of(widget.lang).isEmpty ? b.en : b.of(widget.lang)));
     }
@@ -431,13 +441,34 @@ class _ProServiceEditorSheetState extends State<_ProServiceEditorSheet> {
 
   /// Pull the live controller text back onto the draft. Called before handing
   /// the draft back, so a benefit typed but not "confirmed" isn't lost.
+  /// Unchanged lines keep their existing en+ar pair so a price-only save
+  /// never wipes the other language.
   void _syncBenefits() {
+    final out = <Loc>[];
+    for (var i = 0; i < benefitCtrls.length; i++) {
+      final t = benefitCtrls[i].text.trim();
+      if (t.isEmpty) continue;
+      if (i < _originalBenefits.length) {
+        final old = _originalBenefits[i];
+        final shown = old.of(widget.lang).isEmpty ? old.en : old.of(widget.lang);
+        if (t == shown.trim()) {
+          out.add(old);
+          continue;
+        }
+        if (widget.lang == 'ar') {
+          final keepEn = old.en.trim().isNotEmpty && old.en.trim() != old.ar.trim();
+          out.add(Loc(keepEn ? old.en : t, t));
+        } else {
+          final keepAr = old.ar.trim().isNotEmpty && old.ar.trim() != old.en.trim();
+          out.add(Loc(t, keepAr ? old.ar : t));
+        }
+      } else {
+        out.add(Loc(t, t));
+      }
+    }
     draft.benefits
       ..clear()
-      ..addAll(benefitCtrls
-          .map((c) => c.text.trim())
-          .where((t) => t.isNotEmpty)
-          .map((t) => Loc(t, t)));
+      ..addAll(out);
   }
 
   @override
