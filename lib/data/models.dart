@@ -557,6 +557,11 @@ class Booking {
     this.providerId,
     this.durationMin = 0,
     this.paymentReceiptUrl,
+    this.pricingEra,
+    this.pricingModel,
+    this.clientServiceFeeAmount = 0,
+    this.introFeeAmount = 0,
+    this.wholesaleRateAmount = 0,
   });
   final String id;
   final String ref;
@@ -598,6 +603,11 @@ class Booking {
   final String? providerId;
   final int durationMin;
   final String? paymentReceiptUrl;
+  final String? pricingEra;
+  final String? pricingModel;
+  final int clientServiceFeeAmount;
+  final int introFeeAmount;
+  final int wholesaleRateAmount;
 
   int amountDue({int processingFee = 0}) {
     if (chargedAmount > 0) return chargedAmount;
@@ -617,8 +627,15 @@ class Booking {
     return out;
   }
 
-  /// Provider take-home: post-commission for relationship pricing; legacy transport+Amana otherwise.
+  /// Provider take-home: v2 marketplace = total − client fee − intro; wholesale = rate.
   int get serviceEarning {
+    if (pricingEra == 'v2') {
+      if (pricingModel == 'wholesale_partner') {
+        return wholesaleRateAmount < 0 ? 0 : wholesaleRateAmount;
+      }
+      final e = total - clientServiceFeeAmount - introFeeAmount;
+      return e < 0 ? 0 : e;
+    }
     final hasTrust = lineItems.any((li) => li.key == 'trust_fee') || relationshipTier != null && relationshipTier!.isNotEmpty;
     if (hasTrust || trustFeeAmount > 0 || commissionAmount > 0) {
       final trust = trustFeeAmount > 0
@@ -679,6 +696,11 @@ class Booking {
         providerId: j['providerId'] == null || '${j['providerId']}'.isEmpty ? null : '${j['providerId']}',
         durationMin: (j['durationMin'] as num?)?.toInt() ?? 0,
         paymentReceiptUrl: j['paymentReceiptUrl'] == null || '${j['paymentReceiptUrl']}'.trim().isEmpty ? null : '${j['paymentReceiptUrl']}',
+        pricingEra: j['pricingEra'] == null || '${j['pricingEra']}'.isEmpty ? null : '${j['pricingEra']}',
+        pricingModel: j['pricingModel'] == null || '${j['pricingModel']}'.isEmpty ? null : '${j['pricingModel']}',
+        clientServiceFeeAmount: (j['clientServiceFeeAmount'] as num?)?.toInt() ?? 0,
+        introFeeAmount: (j['introFeeAmount'] as num?)?.toInt() ?? 0,
+        wholesaleRateAmount: (j['wholesaleRateAmount'] as num?)?.toInt() ?? 0,
       );
 
   Booking withLocation(double lat, double lng) => Booking(
@@ -720,6 +742,11 @@ class Booking {
         providerId: providerId,
         durationMin: durationMin,
         paymentReceiptUrl: paymentReceiptUrl,
+        pricingEra: pricingEra,
+        pricingModel: pricingModel,
+        clientServiceFeeAmount: clientServiceFeeAmount,
+        introFeeAmount: introFeeAmount,
+        wholesaleRateAmount: wholesaleRateAmount,
       );
 }
 

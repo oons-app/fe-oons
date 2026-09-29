@@ -143,6 +143,7 @@ class _BookScreenState extends ConsumerState<BookScreen> {
         toolsFromProvider: toolsFromProvider,
         discount: couponOk ? couponDiscount : 0,
         trustFee: ref.read(sessionProvider).trustFee,
+        clientServiceFeeBps: ref.read(sessionProvider).clientServiceFeeBps,
       );
 
   int get inclusive => bookInclusiveTotal(
@@ -151,6 +152,7 @@ class _BookScreenState extends ConsumerState<BookScreen> {
         fees: fees,
         discount: couponOk ? couponDiscount : 0,
         trustFee: ref.read(sessionProvider).trustFee,
+        clientServiceFeeBps: ref.read(sessionProvider).clientServiceFeeBps,
       );
 
   Address? _selectedAddress() {

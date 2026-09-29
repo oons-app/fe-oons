@@ -16,6 +16,19 @@ import 'package:uuid/uuid.dart';
 
 final sessionProvider = StateNotifierProvider<Session, SessionState>((ref) => Session());
 
+void persistBroughtFromUri() {
+  if (!kIsWeb) return;
+  final q = Uri.base.queryParameters;
+  final r = (q['r'] ?? '').trim();
+  if (r.isNotEmpty) {
+    Hive.box('prefs').put('broughtToken', r);
+  }
+  final promo = (q['promo'] ?? q['c'] ?? '').trim();
+  if (promo.isNotEmpty) {
+    Hive.box('prefs').put('signupPromo', promo);
+  }
+}
+
 class PayLaunch {
   const PayLaunch({
     required this.bundle,
@@ -58,6 +71,7 @@ class SessionState {
     this.online = true,
     this.feeWaived = false,
     this.trustFee = 0,
+    this.clientServiceFeeBps = 1000,
   });
   final String? token;
   final UserMe? user;
@@ -70,12 +84,15 @@ class SessionState {
   /// (money.TrustFeeDisabled) — kept as a real field, not deleted, in case
   /// that policy ever changes.
   final int trustFee;
+  /// Marketplace client service fee in bps of listed service (playbook v2, default 10%).
+  final int clientServiceFeeBps;
   bool get authed => token != null;
   bool get isProvider => role == 'provider';
 }
 
 class Session extends StateNotifier<SessionState> {
   Session() : super(const SessionState()) {
+    persistBroughtFromUri();
     _restore();
   }
 
@@ -122,11 +139,20 @@ class Session extends StateNotifier<SessionState> {
       // money.TrustFeeDisabled), but a 100 EGP fallback for a missing field
       // is a landmine for a fee that no longer applies. Default to 0.
       trustFee: (me['trustFee'] as num?)?.toInt() ?? 0,
+      clientServiceFeeBps: (me['clientServiceFeeBps'] as num?)?.toInt() ?? 1000,
     );
   }
 
   Future<OtpRequestResult> requestOtp(String phone, {String role = 'client'}) async {
-    final r = await api.post('/auth/otp/request', data: {'phone': phone, 'role': role});
+    persistBroughtFromUri();
+    final r = await api.post('/auth/otp/request', data: {
+      'phone': phone,
+      'role': role,
+      if ((Hive.box('prefs').get('broughtToken') as String?)?.isNotEmpty == true)
+        'broughtToken': Hive.box('prefs').get('broughtToken'),
+      if ((Hive.box('prefs').get('signupPromo') as String?)?.isNotEmpty == true)
+        'promoCode': Hive.box('prefs').get('signupPromo'),
+    });
     return OtpRequestResult(
       demo: r['demo'] == true,
       channel: '${r['channel'] ?? r['via'] ?? ''}',
@@ -169,6 +195,7 @@ class Session extends StateNotifier<SessionState> {
     bool privacyConsent = false,
     String legalSexMarker = 'female',
   }) async {
+    persistBroughtFromUri();
     final r = await api.post('/auth/client/register', data: {
       'phone': phone,
       'code': code,
@@ -178,6 +205,10 @@ class Session extends StateNotifier<SessionState> {
       'termsConsent': termsConsent,
       'privacyConsent': privacyConsent,
       'legalSexMarker': legalSexMarker,
+      if ((Hive.box('prefs').get('broughtToken') as String?)?.isNotEmpty == true)
+        'broughtToken': Hive.box('prefs').get('broughtToken'),
+      if ((Hive.box('prefs').get('signupPromo') as String?)?.isNotEmpty == true)
+        'promoCode': Hive.box('prefs').get('signupPromo'),
     });
     final token = r['accessToken'] as String;
     await api.storage.write(key: 'access', value: token);
@@ -300,6 +331,7 @@ class Session extends StateNotifier<SessionState> {
         online: state.online,
         feeWaived: state.feeWaived,
         trustFee: state.trustFee,
+        clientServiceFeeBps: state.clientServiceFeeBps,
       );
 
   void setProvider(ProviderP p) => state = SessionState(
@@ -310,6 +342,7 @@ class Session extends StateNotifier<SessionState> {
         online: state.online,
         feeWaived: state.feeWaived,
         trustFee: state.trustFee,
+        clientServiceFeeBps: state.clientServiceFeeBps,
       );
 
   void setOnline(bool v) => state = SessionState(
@@ -320,6 +353,7 @@ class Session extends StateNotifier<SessionState> {
         online: v,
         feeWaived: state.feeWaived,
         trustFee: state.trustFee,
+        clientServiceFeeBps: state.clientServiceFeeBps,
       );
 }
 
