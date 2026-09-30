@@ -1,7 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:oons/admin_v2/chrome/header.dart';
+import 'package:oons/admin_v2/data/booking_alerts.dart';
+import 'package:oons/admin_v2/data/permissions.dart';
+import 'package:oons/core/alert_sound.dart';
 import 'package:oons/admin_v2/chrome/impersonation_banner.dart';
 import 'package:oons/admin_v2/chrome/sidebar.dart';
 import 'package:oons/admin_v2/data/paths.dart';
@@ -54,6 +59,7 @@ class _V2ShellState extends ConsumerState<V2Shell> {
               context.go(V2Paths.providers);
             },
           ),
+        if (sess.staffRole == roleSuper) const SuperAdminBookingAlerts(),
         V2Header(
           title: headerTitleFor(path, lang),
           subtitle: headerSubFor(path, lang),
@@ -69,26 +75,34 @@ class _V2ShellState extends ConsumerState<V2Shell> {
     );
 
     if (compact) {
-      return Scaffold(
-        backgroundColor: Ops.page,
-        drawer: Drawer(child: V2Sidebar(lang: lang)),
-        appBar: AppBar(
-          backgroundColor: Ops.plum,
-          foregroundColor: Ops.plumText,
-          title: Text(t(V2Copy.backOffice, lang), style: const TextStyle(fontSize: 14)),
+      return Listener(
+        behavior: HitTestBehavior.translucent,
+        onPointerDown: (_) => unawaited(unlockOonsAlertSound()),
+        child: Scaffold(
+          backgroundColor: Ops.page,
+          drawer: Drawer(child: V2Sidebar(lang: lang)),
+          appBar: AppBar(
+            backgroundColor: Ops.plum,
+            foregroundColor: Ops.plumText,
+            title: Text(t(V2Copy.backOffice, lang), style: const TextStyle(fontSize: 14)),
+          ),
+          body: body,
         ),
-        body: body,
       );
     }
 
-    return Scaffold(
-      backgroundColor: Ops.page,
-      body: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          V2Sidebar(lang: lang),
-          Expanded(child: body),
-        ],
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: (_) => unawaited(unlockOonsAlertSound()),
+      child: Scaffold(
+        backgroundColor: Ops.page,
+        body: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            V2Sidebar(lang: lang),
+            Expanded(child: body),
+          ],
+        ),
       ),
     );
   }
