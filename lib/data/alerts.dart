@@ -87,6 +87,12 @@ class AlertInbox extends StateNotifier<List<InboxAlert>> {
     state = const [];
   }
 
+  /// Server inbox for the current account. Drops rows that belonged to a previous login.
+  void replace(List<InboxAlert> incoming) {
+    final visible = incoming.where((r) => r.id.isEmpty || !_hidden.contains(r.id)).toList();
+    state = mergeInbox(const [], visible);
+  }
+
   void hide(String id) {
     if (id.isEmpty) return;
     _hidden.add(id);
@@ -198,6 +204,7 @@ class PushController {
   bool _polling = false;
   String? _sseToken;
   int _sseBackoffSec = 3;
+  int _gen = 0;
 
   Future<void> start() async {
     final token = _ref.read(sessionProvider).token;
@@ -232,6 +239,8 @@ class PushController {
 
   void stop() {
     _alive = false;
+    _gen++;
+    _polling = false;
     _stopSse();
     _poll?.cancel();
     _poll = null;
@@ -289,6 +298,9 @@ class PushController {
   Future<void> _registerToken(String token) async {
     if (token.isEmpty) return;
     try {
+      Hive.box('prefs').put('pushToken', token);
+    } catch (_) {}
+    try {
       await api.post('/me/devices', data: {
         'platform':
             defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android',
@@ -302,15 +314,19 @@ class PushController {
     // When SSE is healthy, skip the backup poll to keep the radio quiet on high-latency links.
     if (_sseLive && !_firstPoll) return;
     _polling = true;
+    final gen = _gen;
     try {
       final r = await api.get('/me/alerts');
+      if (!_alive || gen != _gen) return;
       final raw = r['alerts'];
       if (raw is! List) return;
       final rows = raw
           .whereType<Map>()
           .map((m) => InboxAlert.fromMap(Map<String, dynamic>.from(m)))
           .toList();
-      final fresh = _ref.read(alertInboxProvider.notifier).apply(rows);
+      final prev = _ref.read(alertInboxProvider);
+      _ref.read(alertInboxProvider.notifier).replace(rows);
+      final fresh = freshAlerts(prev, _ref.read(alertInboxProvider));
       if (_firstPoll) {
         _firstPoll = false;
         return;
@@ -326,9 +342,10 @@ class PushController {
 
   void _retrySse() {
     final wait = Duration(seconds: _sseBackoffSec);
+    final gen = _gen;
     _sseBackoffSec = (_sseBackoffSec * 2).clamp(3, 30);
     Future<void>.delayed(wait, () {
-      if (_alive) unawaited(_listenSse());
+      if (_alive && gen == _gen) unawaited(_listenSse());
     });
   }
 
@@ -347,6 +364,7 @@ class PushController {
     final token = _ref.read(sessionProvider).token;
     if (token == null) return;
     _sseToken = token;
+    final gen = _gen;
     final uri = Uri.parse(_eventsUrl());
     _http = http.Client();
     try {
@@ -355,6 +373,7 @@ class PushController {
       req.headers['Accept'] = 'text/event-stream';
       req.headers['Accept-Encoding'] = 'identity';
       final res = await _http!.send(req);
+      if (!_alive || gen != _gen) return;
       if (res.statusCode != 200) {
         _sseLive = false;
         _retrySse();
@@ -370,7 +389,7 @@ class PushController {
         while (idx >= 0) {
           final frame = data.substring(0, idx);
           data = data.substring(idx + 2);
-          _onFrame(frame);
+          _onFrame(frame, gen);
           idx = data.indexOf('\n\n');
         }
         buf
@@ -389,7 +408,8 @@ class PushController {
     }
   }
 
-  void _onFrame(String frame) {
+  void _onFrame(String frame, int gen) {
+    if (gen != _gen || !_alive) return;
     for (final line in frame.split('\n')) {
       if (!line.startsWith('data:')) continue;
       final raw = line.substring(5).trim();
@@ -397,6 +417,7 @@ class PushController {
       try {
         final m = jsonDecode(raw);
         if (m is! Map) continue;
+        if (gen != _gen || !_alive) return;
         final row = InboxAlert.fromMap(Map<String, dynamic>.from(m));
         if (row.title.isEmpty && row.type.isEmpty) continue;
         _ref.read(alertInboxProvider.notifier).upsert(row);

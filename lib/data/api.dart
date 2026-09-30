@@ -277,9 +277,9 @@ class ApiClient {
     }
   }
 
-  Future<Map<String, dynamic>> delete(String path) async {
+  Future<Map<String, dynamic>> delete(String path, {Object? data}) async {
     try {
-      final r = await _dio.delete(path);
+      final r = await _dio.delete(path, data: data);
       return unwrapEnvelope(r.data);
     } on DioException catch (e) {
       throw e.error is ApiException ? e.error as ApiException : ApiException(0, 'offline');

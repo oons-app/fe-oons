@@ -110,6 +110,17 @@ void main() {
     expect(freshAlerts([older], merged).map((e) => e.id).toList(), ['b']);
   });
 
+  test('alert inbox replace drops the previous account', () {
+    final inbox = AlertInbox();
+    inbox.apply([
+      InboxAlert(id: 'pro', title: 'New job', body: 'x', at: DateTime(2026, 8, 21, 12)),
+    ]);
+    inbox.replace([
+      InboxAlert(id: 'client', title: 'On the way', body: 'y', at: DateTime(2026, 8, 21, 13)),
+    ]);
+    expect(inbox.state.map((e) => e.id).toList(), ['client']);
+  });
+
   test('alert inbox hide keeps a row from coming back on apply', () {
     final inbox = AlertInbox();
     final a = InboxAlert(id: 'a', title: 'On the way', body: 'x', at: DateTime(2026, 8, 21, 12));

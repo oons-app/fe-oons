@@ -294,10 +294,26 @@ class Session extends StateNotifier<SessionState> {
   }
 
   Future<void> signOut() async {
+    await _releasePushDevice();
     await api.storage.deleteAll();
     await Hive.box('prefs').delete('role');
     state = SessionState(online: state.online);
     await AppAnalytics.clearIdentity();
+  }
+
+  Future<void> _releasePushDevice() async {
+    String? token;
+    try {
+      final raw = Hive.box('prefs').get('pushToken');
+      if (raw is String && raw.isNotEmpty) token = raw;
+    } catch (_) {}
+    if (token == null) return;
+    try {
+      await api.delete('/me/devices', data: {'token': token});
+    } catch (_) {}
+    try {
+      await Hive.box('prefs').delete('pushToken');
+    } catch (_) {}
   }
 
   Future<void> patchMe({List<String>? savedIds, String? defaultAddressId, String? locale, String? nationalId}) async {
