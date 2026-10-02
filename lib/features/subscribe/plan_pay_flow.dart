@@ -165,64 +165,79 @@ class _PaySheetState extends ConsumerState<_PaySheet> {
     final selected = addrs.where((a) => a.id == addressId).isNotEmpty
         ? addressId
         : (addrs.isEmpty ? null : addrs.firstWhere((a) => a.isDefault, orElse: () => addrs.first).id);
+    final methods = Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const ClientKicker('طريقة الدفع'),
+          const SizedBox(height: 8),
+          BookPayMethodTile(
+            selected: method == 'manual',
+            kind: BookPayKind.transfer,
+            title: '${co['instapayManual']}',
+            note: '${co['instapayManualNote']}',
+            onTap: () => setState(() => method = 'manual'),
+          ),
+          BookPayMethodTile(
+            selected: method == 'card',
+            kind: BookPayKind.card,
+            title: '${co['card']}',
+            note: '${co['cardNote']}',
+            onTap: () => setState(() => method = 'card'),
+          ),
+          BookPayMethodTile(
+            selected: method == 'instapay',
+            kind: BookPayKind.wallet,
+            title: '${co['instapay']}',
+            note: '${co['instapayNote']}',
+            onTap: () => setState(() => method = 'instapay'),
+          ),
+          const SizedBox(height: 12),
+          ClientPrimaryButton(
+            label: MD.cta(arFmt(widget.total / 100)),
+            enabled: selected != null,
+            onTap: () => Navigator.of(context).pop(_Choice(selected!, method)),
+          ),
+        ],
+      ),
+    );
     return SafeArea(
       child: ConstrainedBox(
-        constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.9),
+        constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.92),
         child: addrs.isEmpty
             ? SingleChildScrollView(child: OnsEmpty.noAddress(lang: 'ar', onAdd: _addAddress))
-            : SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const ClientKicker('العنوان'),
-                    const SizedBox(height: 8),
-                    for (final a in addrs)
-                      ClientSelectRow(
-                        selected: a.id == selected,
-                        title: a.label.of('ar').isEmpty ? a.label.en : a.label.of('ar'),
-                        subtitle: a.line1.of('ar').isEmpty ? a.line1.en : a.line1.of('ar'),
-                        onTap: () => setState(() => addressId = a.id),
+            : Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const ClientKicker('العنوان'),
+                          const SizedBox(height: 8),
+                          for (final a in addrs)
+                            ClientSelectRow(
+                              selected: a.id == selected,
+                              title: a.label.of('ar').isEmpty ? a.label.en : a.label.of('ar'),
+                              subtitle: a.line1.of('ar').isEmpty ? a.line1.en : a.line1.of('ar'),
+                              onTap: () => setState(() => addressId = a.id),
+                            ),
+                          Align(
+                            alignment: AlignmentDirectional.centerStart,
+                            child: TextButton(
+                              onPressed: _addAddress,
+                              child: const Text('ضيفي عنوان تاني', style: TextStyle(color: Client.plum, fontWeight: FontWeight.w700)),
+                            ),
+                          ),
+                        ],
                       ),
-                    Align(
-                      alignment: AlignmentDirectional.centerStart,
-                      child: TextButton(
-                        onPressed: _addAddress,
-                        child: const Text('ضيفي عنوان تاني', style: TextStyle(color: Client.plum, fontWeight: FontWeight.w700)),
-                      ),
                     ),
-                    const SizedBox(height: 8),
-                    const ClientKicker('طريقة الدفع'),
-                    const SizedBox(height: 8),
-                    BookPayMethodTile(
-                      selected: method == 'card',
-                      kind: BookPayKind.card,
-                      title: '${co['card']}',
-                      note: '${co['cardNote']}',
-                      onTap: () => setState(() => method = 'card'),
-                    ),
-                    BookPayMethodTile(
-                      selected: method == 'instapay',
-                      kind: BookPayKind.wallet,
-                      title: '${co['instapay']}',
-                      note: '${co['instapayNote']}',
-                      onTap: () => setState(() => method = 'instapay'),
-                    ),
-                    BookPayMethodTile(
-                      selected: method == 'manual',
-                      kind: BookPayKind.transfer,
-                      title: '${co['instapayManual']}',
-                      note: '${co['instapayManualNote']}',
-                      onTap: () => setState(() => method = 'manual'),
-                    ),
-                    const SizedBox(height: 12),
-                    ClientPrimaryButton(
-                      label: MD.cta(arFmt(widget.total / 100)),
-                      enabled: selected != null,
-                      onTap: () => Navigator.of(context).pop(_Choice(selected!, method)),
-                    ),
-                  ],
-                ),
+                  ),
+                  methods,
+                ],
               ),
       ),
     );

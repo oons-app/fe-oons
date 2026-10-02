@@ -133,7 +133,7 @@
       }, 250);
 
       if (!('serviceWorker' in navigator)) return;
-      var KEY = 'oons_sw_cleared_v2';
+      var KEY = 'oons_sw_cleared_v3';
       navigator.serviceWorker.getRegistrations().then(function (regs) {
         return Promise.all(regs.map(function (r) { return r.unregister(); }));
       }).then(function () {
