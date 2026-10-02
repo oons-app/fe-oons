@@ -28,6 +28,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
   List<Map<String, dynamic>> bookings = [];
   List<Map<String, dynamic>> addresses = [];
   bool loading = true;
+  bool phoneBlocked = false;
   String? error;
 
   @override
@@ -44,8 +45,17 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
       });
       final data = await staffClient.get('/admin/users/${widget.customerId}');
       final user = unwrapEntity(data, const ['user', 'customer', 'client']);
+      var blocked = false;
+      if (ref.read(staffSessionProvider).staffRole == roleSuper) {
+        try {
+          final list = await staffClient.get('/admin/blocked-phones');
+          final phone = '${user['phone'] ?? ''}';
+          blocked = asMapList(list['phones']).any((p) => sameEgPhone('${p['phone']}', phone));
+        } catch (_) {}
+      }
       setState(() {
         customer = user;
+        phoneBlocked = blocked;
         bookings = asMapList(data['bookings']);
         addresses = asMapList(user['addresses'] ?? data['addresses'] ?? []);
         loading = false;
@@ -74,6 +84,44 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
     } on ApiException catch (e) {
       if (mounted) v2Toast(context, e.message, error: true);
     }
+  }
+
+  Future<void> _toggleBlock() async {
+    final phone = '${customer?['phone'] ?? ''}'.trim();
+    final lang = ref.read(localeCodeProvider);
+    final ar = lang == 'ar';
+    if (phone.isEmpty) {
+      v2Toast(context, ar ? 'مفيش رقم على الحساب' : 'This account has no phone number', error: true);
+      return;
+    }
+    if (!phoneBlocked) {
+      final ok = await v2Confirm(
+        context,
+        title: ar ? 'إيقاف الرقم' : 'Block this number',
+        body: ar
+            ? 'الرقم $phone مش هيقدر يدخل التطبيق، ولا يكمل جلسة مفتوحة.'
+            : '$phone will not be able to sign in or keep an open session.',
+        confirmLabel: ar ? 'إيقاف' : 'Block',
+        danger: true,
+      );
+      if (!ok || !mounted) return;
+      try {
+        await staffClient.post('/admin/blocked-phones', data: {'phone': phone, 'reason': 'customer'});
+        if (mounted) v2Toast(context, ar ? 'تم إيقاف الرقم' : 'Number blocked');
+      } on ApiException catch (e) {
+        if (mounted) v2Toast(context, e.message, error: true);
+        return;
+      }
+    } else {
+      try {
+        await staffClient.delete('/admin/blocked-phones/$phone');
+        if (mounted) v2Toast(context, ar ? 'تم فك الإيقاف' : 'Number unblocked');
+      } on ApiException catch (e) {
+        if (mounted) v2Toast(context, e.message, error: true);
+        return;
+      }
+    }
+    _load();
   }
 
   Future<void> _impersonate() async {
@@ -403,7 +451,9 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final lang = ref.watch(localeCodeProvider);
-    final role = ref.watch(staffSessionProvider).effectiveRole;
+    final sess = ref.watch(staffSessionProvider);
+    final role = sess.effectiveRole;
+    final canBlock = sess.staffRole == roleSuper;
     if (!staffCan(role, 'users.read')) return const V2Gate(allowed: false, child: SizedBox.shrink());
     if (loading) return const Padding(padding: EdgeInsets.only(top: 60), child: V2Loading());
     if (error != null) {
@@ -604,6 +654,11 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
                     large: true),
               Text('${c['phone'] ?? ''}', style: const TextStyle(fontSize: 13, color: Ops.muted, fontFamily: Ops.mono)),
               const SizedBox(width: 1),
+              if (canBlock)
+                V2Btn.danger(
+                  phoneBlocked ? (lang == 'ar' ? 'فك الإيقاف' : 'Unblock') : (lang == 'ar' ? 'إيقاف الرقم' : 'Ban'),
+                  onPressed: _toggleBlock,
+                ),
               if (staffCan(role, 'users.impersonate')) V2Btn.imp('Impersonate', onPressed: _impersonate),
               if (canWrite) V2Btn.ghost(lang == 'ar' ? 'تعديل' : 'Edit', onPressed: _edit),
               if (staffCan(role, 'bookings.write'))
@@ -692,4 +747,16 @@ class _NoteComposerState extends State<_NoteComposer> {
       ],
     );
   }
+}
+
+/// True when two Egyptian mobiles are the same number, ignoring +20 and a leading 0.
+bool sameEgPhone(String a, String b) {
+  String digits(String s) {
+    final d = s.replaceAll(RegExp(r'\D'), '');
+    if (d.startsWith('20') && d.length > 10) return d.substring(2).replaceFirst(RegExp(r'^0+'), '');
+    return d.replaceFirst(RegExp(r'^0+'), '');
+  }
+
+  final left = digits(a);
+  return left.isNotEmpty && left == digits(b);
 }

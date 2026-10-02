@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:oons/admin_v2/chrome/modal.dart';
 import 'package:oons/admin_v2/chrome/toast.dart';
 import 'package:oons/admin_v2/data/maps.dart';
 import 'package:oons/admin_v2/data/paths.dart';
@@ -129,6 +130,33 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
     });
   }
 
+  Future<void> _block(Map c) async {
+    final lang = ref.read(localeCodeProvider);
+    final ar = lang == 'ar';
+    final phone = '${c['phone'] ?? ''}'.trim();
+    final name = personName(c, lang, fallbackId: idOf(c));
+    if (phone.isEmpty) {
+      if (mounted) v2Toast(context, ar ? 'مفيش رقم على الحساب' : 'This account has no phone number', error: true);
+      return;
+    }
+    final ok = await v2Confirm(
+      context,
+      title: ar ? 'إيقاف الرقم' : 'Block this number',
+      body: ar
+          ? '$name ($phone) مش هتقدر تدخل التطبيق، ولا تكمل جلسة مفتوحة.'
+          : '$name ($phone) will not be able to sign in or keep an open session.',
+      confirmLabel: ar ? 'إيقاف' : 'Block',
+      danger: true,
+    );
+    if (!ok || !mounted) return;
+    try {
+      await staffClient.post('/admin/blocked-phones', data: {'phone': phone, 'reason': 'customer'});
+      if (mounted) v2Toast(context, ar ? 'تم إيقاف الرقم' : 'Number blocked');
+    } on ApiException catch (e) {
+      if (mounted) v2Toast(context, e.message, error: true);
+    }
+  }
+
   Future<void> _impersonate(Map c) async {
     final lang = ref.read(localeCodeProvider);
     final id = idOf(c);
@@ -148,10 +176,12 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
   @override
   Widget build(BuildContext context) {
     final lang = ref.watch(localeCodeProvider);
-    final role = ref.watch(staffSessionProvider).effectiveRole;
+    final sess = ref.watch(staffSessionProvider);
+    final role = sess.effectiveRole;
     if (!staffCan(role, 'users.read')) return const V2Gate(allowed: false, child: SizedBox.shrink());
     final canImpersonate = staffCan(role, 'users.impersonate');
     final canBook = staffCan(role, 'bookings.write');
+    final canBlock = sess.staffRole == roleSuper;
 
     ref.listen(v2QueryProvider, (_, next) {
       _debounce?.cancel();
@@ -168,7 +198,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
       onRetry: _load,
       resultLabel: '${customers.length} ${lang == 'ar' ? 'مسجّلة' : 'registered'}',
       emptyText: lang == 'ar' ? 'لا عميلات مطابقة' : 'Nothing here yet',
-      actionsWidth: canImpersonate || canBook ? 170 : 8,
+      actionsWidth: (canImpersonate || canBook ? 170 : 8) + (canBlock ? 88 : 0),
       sortKey: sortKey,
       sortAsc: sortAsc,
       onSort: _onSort,
@@ -221,6 +251,8 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                     ),
             ],
             actions: [
+              if (canBlock)
+                V2Btn.danger(lang == 'ar' ? 'إيقاف' : 'Ban', onPressed: () => _block(c), size: V2BtnSize.row),
               if (canImpersonate) V2Btn.imp('Impersonate', onPressed: () => _impersonate(c), size: V2BtnSize.row),
               if (canBook)
                 V2Btn(label: lang == 'ar' ? 'حجز' : 'Book', onPressed: () => context.go(V2Paths.customer(idOf(c))), size: V2BtnSize.row),
