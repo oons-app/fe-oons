@@ -33,15 +33,16 @@ import 'package:oons/l10n/errors.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class ProRegisterScreen extends ConsumerStatefulWidget {
-  const ProRegisterScreen({super.key, required this.phone, required this.code});
+  const ProRegisterScreen({super.key, required this.phone, required this.code, @visibleForTesting this.initialStep = 0});
   final String phone;
   final String code;
+  final int initialStep;
   @override
   ConsumerState<ProRegisterScreen> createState() => _ProRegisterScreenState();
 }
 
 class _ProRegisterScreenState extends ConsumerState<ProRegisterScreen> {
-  int step = 0;
+  late int step = widget.initialStep;
   final first = TextEditingController();
   final last = TextEditingController();
   final legal = TextEditingController();
@@ -51,11 +52,16 @@ class _ProRegisterScreenState extends ConsumerState<ProRegisterScreen> {
   final specialty = TextEditingController();
   final years = TextEditingController(text: '3');
   final payout = TextEditingController();
-  String service = 'beauty';
-  final areas = <String>{'madinaty'};
+  // A provider can offer several categories (beauty, cleaning, chef), each with
+  // its own specialties, in as many areas as she likes. None is pre-picked:
+  // she has to say where she works.
+  final services = <String>[];
+  final areas = <String>{};
   final consents = <String, bool>{'terms': false, 'data': false, 'backgroundCheck': false, 'womenOnly': false, 'tax': false};
   final selectedCategories = <String>{};
-  List<Map<String, dynamic>> categoryOptions = [];
+  final catsByVertical = <String, List<Map<String, dynamic>>>{};
+  final catsLoading = <String>{};
+  final catsFailed = <String>{};
   List<int>? idBytes;
   String? idName;
   List<int>? fishBytes;
@@ -80,9 +86,51 @@ class _ProRegisterScreenState extends ConsumerState<ProRegisterScreen> {
       if (!mounted) return;
       setState(() {
         areas.removeWhere((a) => !allCatalogAreaIds().contains(a));
-        if (areas.isEmpty) areas.add('madinaty');
       });
     }));
+  }
+
+  Future<void> _loadSpecialties(String vertical) async {
+    if (catsByVertical.containsKey(vertical) || catsLoading.contains(vertical)) return;
+    setState(() {
+      catsLoading.add(vertical);
+      catsFailed.remove(vertical);
+    });
+    try {
+      final cats = await ref.read(repoProvider).categories(vertical: vertical, activeOnly: true);
+      if (mounted) setState(() => catsByVertical[vertical] = cats);
+    } catch (_) {
+      if (mounted) setState(() => catsFailed.add(vertical));
+    } finally {
+      if (mounted) setState(() => catsLoading.remove(vertical));
+    }
+  }
+
+  void _toggleService(String vertical) {
+    setState(() {
+      if (services.contains(vertical)) {
+        services.remove(vertical);
+        // Specialties belong to their category: unticking it drops them.
+        for (final c in catsByVertical[vertical] ?? const <Map<String, dynamic>>[]) {
+          selectedCategories.remove('${c['id']}');
+        }
+      } else {
+        services.add(vertical);
+      }
+    });
+    if (services.contains(vertical)) unawaited(_loadSpecialties(vertical));
+  }
+
+  /// Why step 2 ("your work") cannot continue yet, or null.
+  String? _workError(Map p) {
+    if (services.isEmpty) return '${p['needServices']}';
+    for (final v in services) {
+      final picked = (catsByVertical[v] ?? const <Map<String, dynamic>>[])
+          .any((c) => selectedCategories.contains('${c['id']}'));
+      if (!picked) return '${p['needSpecialties']}';
+    }
+    if (areas.isEmpty) return '${p['needAreas']}';
+    return null;
   }
 
   late final String _phone;
@@ -181,50 +229,53 @@ class _ProRegisterScreenState extends ConsumerState<ProRegisterScreen> {
             ],
             if (step == 1) ...[
               Kicker('${p['service']}'),
+              const SizedBox(height: 4),
+              Text('${p['serviceHint']}', style: const TextStyle(fontSize: 12, color: T.muted)),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
                 children: ['beauty', 'cleaning', 'chef'].map((id) {
-                  final on = service == id;
-                  return InkWell(
-                    onTap: () async {
-                      setState(() { service = id; selectedCategories.clear(); });
-                      try {
-                        final cats = await ref.read(repoProvider).categories(vertical: id, activeOnly: true);
-                        if (mounted) setState(() => categoryOptions = cats);
-                      } catch (_) {}
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      decoration: BoxDecoration(color: on ? T.action : T.surface, border: Border.all(color: T.ink, width: T.rule)),
-                      child: Text('${svc[id]}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: on ? T.white : T.ink)),
-                    ),
-                  );
+                  final on = services.contains(id);
+                  return _choiceChip('${svc[id]}', on, () => _toggleService(id), size: 13);
                 }).toList(),
               ),
-
-              if (categoryOptions.isNotEmpty) ...[
+              // Specialties, grouped under the category they belong to.
+              for (final v in services) ...[
                 const SizedBox(height: 16),
-                Kicker('${p['categories']}'),
+                Kicker('${p['specialtiesIn']} ${svc[v]}'),
                 const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: categoryOptions.map((c) {
-                    final id = '${c['id']}';
-                    final on = selectedCategories.contains(id);
-                    final name = c['name'] is Map ? Loc.fromJson(c['name'] as Map).of(lang) : '${c['name'] ?? c['slug']}';
-                    return InkWell(
-                      onTap: () => setState(() { if (on) selectedCategories.remove(id); else selectedCategories.add(id); }),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        decoration: BoxDecoration(color: on ? T.action : T.surface, border: Border.all(color: T.ink, width: T.rule)),
-                        child: Text(name, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: on ? T.white : T.ink)),
-                      ),
-                    );
-                  }).toList(),
-                ),
+                if (catsLoading.contains(v) && !catsByVertical.containsKey(v))
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: T.action)),
+                  )
+                else if (catsFailed.contains(v))
+                  InkWell(
+                    onTap: () => unawaited(_loadSpecialties(v)),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      child: Text('${p['catsLoadFailed']}',
+                          style: const TextStyle(fontSize: 13, color: T.danger, fontWeight: FontWeight.w700, decoration: TextDecoration.underline)),
+                    ),
+                  )
+                else
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: (catsByVertical[v] ?? const <Map<String, dynamic>>[]).map((c) {
+                      final id = '${c['id']}';
+                      final on = selectedCategories.contains(id);
+                      final name = c['name'] is Map ? Loc.fromJson(c['name'] as Map).of(lang) : '${c['name'] ?? c['slug']}';
+                      return _choiceChip(name, on, () => setState(() {
+                            if (on) {
+                              selectedCategories.remove(id);
+                            } else {
+                              selectedCategories.add(id);
+                            }
+                          }));
+                    }).toList(),
+                  ),
               ],
               const SizedBox(height: 16),
               Kicker('${p['specialtyHint']}'),
@@ -236,26 +287,21 @@ class _ProRegisterScreenState extends ConsumerState<ProRegisterScreen> {
               _field(years, digits: true),
               const SizedBox(height: 16),
               Kicker('${p['areas']}'),
+              const SizedBox(height: 4),
+              Text('${p['areasHint']}', style: const TextStyle(fontSize: 12, color: T.muted)),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
                 children: allCatalogAreaIds().map((id) {
                   final on = areas.contains(id);
-                  return InkWell(
-                    onTap: () => setState(() {
-                      if (on && areas.length > 1) {
-                        areas.remove(id);
-                      } else {
-                        areas.add(id);
-                      }
-                    }),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      decoration: BoxDecoration(color: on ? T.action : T.surface, border: Border.all(color: T.ink, width: T.rule)),
-                      child: Text(areaName(id, lang), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: on ? T.white : T.ink)),
-                    ),
-                  );
+                  return _choiceChip(areaName(id, lang), on, () => setState(() {
+                        if (on) {
+                          areas.remove(id);
+                        } else {
+                          areas.add(id);
+                        }
+                      }), size: 13);
                 }).toList(),
               ),
             ],
@@ -322,9 +368,12 @@ class _ProRegisterScreenState extends ConsumerState<ProRegisterScreen> {
                     return;
                   }
                 }
-                if (step == 1 && selectedCategories.isEmpty) {
-                  setState(() => err = lang == 'ar' ? 'اختاري فئة واحدة واحدة على الأقل.' : 'Pick at least one category.');
-                  return;
+                if (step == 1) {
+                  final problem = _workError(p);
+                  if (problem != null) {
+                    setState(() => err = problem);
+                    return;
+                  }
                 }
                 if (step < 3) {
                   if (step == 0) {
@@ -332,7 +381,7 @@ class _ProRegisterScreenState extends ConsumerState<ProRegisterScreen> {
                   }
                   if (step == 1) {
                     unawaited(AppAnalytics.providerCategorySelected(
-                      vertical: service,
+                      vertical: services.join(','),
                       categoryCount: selectedCategories.length,
                     ));
                   }
@@ -345,15 +394,6 @@ class _ProRegisterScreenState extends ConsumerState<ProRegisterScreen> {
                     err = null;
                     step += 1;
                   });
-                  if (step == 1) {
-                    // Load subcategory chips for the default vertical.
-                    () async {
-                      try {
-                        final cats = await ref.read(repoProvider).categories(vertical: service, activeOnly: true);
-                        if (mounted) setState(() => categoryOptions = cats);
-                      } catch (_) {}
-                    }();
-                  }
                   return;
                 }
                 if (consents.values.any((v) => !v)) {
@@ -367,7 +407,8 @@ class _ProRegisterScreenState extends ConsumerState<ProRegisterScreen> {
                         code: _code,
                         firstName: first.text.trim(),
                         lastName: last.text.trim(),
-                        service: service,
+                        service: services.first,
+                        services: services,
                         areas: areas.toList(),
                         specialty: specialty.text.trim().isEmpty ? null : specialty.text.trim(),
                         years: int.tryParse(years.text),
@@ -493,6 +534,23 @@ class _ProRegisterScreenState extends ConsumerState<ProRegisterScreen> {
                 style: const TextStyle(fontSize: 12, color: T.action, fontWeight: FontWeight.w700),
               ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _choiceChip(String label, bool on, VoidCallback onTap, {double size = 12}) {
+    return Semantics(
+      button: true,
+      selected: on,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 44),
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(color: on ? T.action : T.surface, border: Border.all(color: T.ink, width: T.rule)),
+          child: Text(label, style: TextStyle(fontSize: size, fontWeight: FontWeight.w700, color: on ? T.white : T.ink)),
         ),
       ),
     );
@@ -697,6 +755,13 @@ class _ProJobsScreenState extends ConsumerState<ProJobsScreen> {
                                               crossAxisAlignment: CrossAxisAlignment.start,
                                               children: [
                                                 Text(name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Pro.ink)),
+                                                if ((row.planTag ?? '').isNotEmpty)
+                                                  Container(
+                                                    margin: const EdgeInsets.only(top: 4),
+                                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                                    color: Pro.plum,
+                                                    child: Text(row.planTag!, style: const TextStyle(color: Pro.bg, fontSize: 11, fontWeight: FontWeight.w700)),
+                                                  ),
                                                 const SizedBox(height: 2),
                                                 Text(bk.serviceName.of(lang), style: const TextStyle(fontSize: 12, color: Pro.muted)),
                                               ],
@@ -1864,37 +1929,10 @@ class _ProAccountScreenState extends ConsumerState<ProAccountScreen> {
                   lang == 'ar' ? 'العربية' : 'English',
                   () => ref.read(localeProvider.notifier).toggle(),
                 ),
+                _settingsRow('${profile['delete']}', '', () => _confirmDeleteAccount(lang, profile), danger: true),
                 _settingsRow('${profile['signOut']}', '', () => ref.read(sessionProvider.notifier).signOut()),
               ],
             ),
-          ),
-          const SizedBox(height: 10),
-          ProSoftButton(
-            label: '${profile['delete']}',
-            danger: true,
-            onTap: () async {
-              final ok = await showDialog<bool>(
-                context: context,
-                builder: (ctx) => AlertDialog(
-                  title: Text('${profile['delete']}', style: const TextStyle(fontWeight: FontWeight.w800)),
-                  content: Text('${profile['deleteBody']}'),
-                  actions: [
-                    TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('${profile['keep']}')),
-                    TextButton(
-                      onPressed: () => Navigator.pop(ctx, true),
-                      child: Text('${profile['delete']}', style: const TextStyle(color: Pro.danger)),
-                    ),
-                  ],
-                ),
-              );
-              if (ok != true) return;
-              try {
-                await ref.read(sessionProvider.notifier).deleteAccount();
-              } catch (e) {
-                if (!context.mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendlyError(e, lang))));
-              }
-            },
           ),
         ],
       ),
@@ -1969,7 +2007,31 @@ class _ProAccountScreenState extends ConsumerState<ProAccountScreen> {
     );
   }
 
-  Widget _settingsRow(String label, String value, VoidCallback onTap) {
+  Future<void> _confirmDeleteAccount(String lang, Map profile) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('${profile['delete']}', style: const TextStyle(fontWeight: FontWeight.w800)),
+        content: Text('${profile['deleteBody']}'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('${profile['keep']}')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('${profile['delete']}', style: const TextStyle(color: Pro.danger)),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await ref.read(sessionProvider.notifier).deleteAccount();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendlyError(e, lang))));
+    }
+  }
+
+  Widget _settingsRow(String label, String value, VoidCallback onTap, {bool danger = false}) {
     return InkWell(
       onTap: onTap,
       child: Container(
@@ -1980,10 +2042,10 @@ class _ProAccountScreenState extends ConsumerState<ProAccountScreen> {
         ),
         child: Row(
           children: [
-            Expanded(child: Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Pro.ink))),
+            Expanded(child: Text(label, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: danger ? Pro.danger : Pro.ink))),
             if (value.isNotEmpty) Text(value, style: const TextStyle(fontSize: 12, color: Pro.muted)),
             const SizedBox(width: 8),
-            const Icon(Icons.chevron_left, size: 18, color: Color(0xFFC9BCC4)),
+            Icon(Icons.chevron_left, size: 18, color: danger ? Pro.danger.withValues(alpha: 0.45) : const Color(0xFFC9BCC4)),
           ],
         ),
       ),

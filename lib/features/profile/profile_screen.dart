@@ -71,6 +71,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final pct = _profilePct(user);
     final ini = user?.initials.of(lang) ?? (lang == 'ar' ? 'ن أ' : 'N A');
     final menu = <({String icon, String label, String meta, VoidCallback onTap, bool danger})>[
+      if (ref.watch(sessionProvider).subscriptionsPilot)
+        (icon: '↻', label: 'باقتي', meta: lang == 'ar' ? 'تنظيف شهري' : 'Monthly cleaning', onTap: () => context.push('/me/plan'), danger: false),
       (icon: '▣', label: '${p['identity']}', meta: user?.identityComplete == true ? (lang == 'ar' ? 'مكتمل' : 'Done') : (lang == 'ar' ? 'مطلوب' : 'Needed'), onTap: () => context.push('/me/identity'), danger: false),
       (icon: '★', label: '${p['reviews']}', meta: lang == 'ar' ? 'اقري التقييمات' : 'Read them', onTap: () => context.push('/reviews'), danger: false),
       (icon: '◉', label: '${p['addresses']}', meta: '${user?.addresses.length ?? 0}', onTap: () => context.push('/me/addresses'), danger: false),

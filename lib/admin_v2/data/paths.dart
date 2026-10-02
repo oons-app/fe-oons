@@ -21,6 +21,7 @@ abstract final class V2Paths {
   static const payments = '/payments';
   static const appUpdate = '/app-update';
   static const push = '/push';
+  static const blockedPhones = '/blocked-phones';
   static const clientPayments = '/client-payments';
   static const corporate = '/corporate';
   static const audit = '/audit';
@@ -29,6 +30,7 @@ abstract final class V2Paths {
   static const workerVetting = '/worker-vetting';
   static const impersonate = '/impersonate';
   static const refunds = '/refunds';
+  static const subscribers = '/subscribers';
   static const analytics = '/analytics';
   static const liveMap = '/live-map';
 
@@ -61,6 +63,7 @@ const v2Nav = [
     NavItem('home', V2Paths.home, 'Ops console', 'لوحة التشغيل'),
     NavItem('live', V2Paths.live, 'Live visits', 'زيارات مباشرة'),
     NavItem('bookings', V2Paths.bookings, 'Bookings', 'الحجوزات'),
+    NavItem('subscribers', V2Paths.subscribers, 'Subscribers', 'المشتركات'),
     NavItem('claims', V2Paths.claims, 'Claims', 'المطالبات'),
   ]),
   NavGroup('People', 'الأشخاص', [
@@ -80,6 +83,7 @@ const v2Nav = [
   NavGroup('Admin', 'الإدارة', [
     NavItem('appUpdate', V2Paths.appUpdate, 'Force update', 'فرض التحديث'),
     NavItem('push', V2Paths.push, 'Push campaigns', 'إشعارات التطبيق'),
+    NavItem('blockedPhones', V2Paths.blockedPhones, 'Blocked numbers', 'أرقام موقوفة'),
     NavItem('categories', V2Paths.categories, 'Categories', 'الفئات'),
     NavItem('areas', V2Paths.areas, 'Coverage areas', 'مناطق التغطية'),
     NavItem('staff', V2Paths.staff, 'Staff', 'الفريق'),

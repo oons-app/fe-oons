@@ -345,6 +345,11 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
   String? err;
   int cooldown = 20;
   Timer? tick;
+  // The four boxes only display the code; typing happens in a transparent field
+  // laid over them, so the phone's own number keyboard (and SMS/one-time-code
+  // suggestions) is used instead of an on-screen pad drawn by the app.
+  final _field = TextEditingController();
+  final _focus = FocusNode();
 
   @override
   void initState() {
@@ -355,6 +360,8 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
   @override
   void dispose() {
     tick?.cancel();
+    _field.dispose();
+    _focus.dispose();
     super.dispose();
   }
 
@@ -372,18 +379,28 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
     });
   }
 
-  void _digit(String d) {
-    if (code.length >= 4) return;
+  /// Keeps only the digits (Arabic-Indic and Persian included), at most four.
+  void _onCode(String raw) {
+    final digits = StringBuffer();
+    for (final u in raw.runes) {
+      if (u >= 0x30 && u <= 0x39) {
+        digits.writeCharCode(u);
+      } else if (u >= 0x0660 && u <= 0x0669) {
+        digits.writeCharCode(0x30 + u - 0x0660);
+      } else if (u >= 0x06F0 && u <= 0x06F9) {
+        digits.writeCharCode(0x30 + u - 0x06F0);
+      }
+    }
+    final next = digits.toString().length > 4 ? digits.toString().substring(0, 4) : digits.toString();
+    if (_field.text != next) {
+      _field.value = TextEditingValue(text: next, selection: TextSelection.collapsed(offset: next.length));
+    }
+    if (next == code) return;
     setState(() {
-      code += d;
+      code = next;
       err = null;
     });
     if (code.length == 4) _verify();
-  }
-
-  void _backspace() {
-    if (code.isEmpty) return;
-    setState(() => code = code.substring(0, code.length - 1));
   }
 
   Future<void> _verify() async {
@@ -428,10 +445,12 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
       }
     } catch (e) {
       unawaited(AppAnalytics.otpVerificationAttempted(role: widget.role, success: false));
+      _field.clear();
       setState(() {
         err = friendlyError(e, lang);
         code = '';
       });
+      if (mounted) _focus.requestFocus();
     } finally {
       if (mounted) setState(() => busy = false);
     }
@@ -476,14 +495,48 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                                 const SizedBox(height: 8),
                                 Ltr(child: Text('+20 ${egPhoneNational(widget.phone)}', style: const TextStyle(fontFamily: T.mono, fontSize: 13, color: Client.plum))),
                                 const SizedBox(height: 20),
-                                ClientOtpBoxes(code: code, error: err != null),
+                                Stack(
+                                  children: [
+                                    ClientOtpBoxes(code: code, error: err != null),
+                                    Positioned.fill(
+                                      child: Semantics(
+                                        textField: true,
+                                        label: '${o['title']}',
+                                        child: TextField(
+                                          key: const Key('otp-input'),
+                                          controller: _field,
+                                          focusNode: _focus,
+                                          autofocus: true,
+                                          enabled: !busy,
+                                          keyboardType: TextInputType.number,
+                                          textInputAction: TextInputAction.done,
+                                          autofillHints: const [AutofillHints.oneTimeCode],
+                                          autocorrect: false,
+                                          enableSuggestions: false,
+                                          enableInteractiveSelection: false,
+                                          showCursor: false,
+                                          maxLength: 4,
+                                          // The text itself is drawn by the boxes underneath.
+                                          style: const TextStyle(color: Colors.transparent, fontSize: 1),
+                                          cursorColor: Colors.transparent,
+                                          decoration: const InputDecoration(
+                                            border: InputBorder.none,
+                                            counterText: '',
+                                            contentPadding: EdgeInsets.zero,
+                                            fillColor: Colors.transparent,
+                                          ),
+                                          onChanged: _onCode,
+                                          onSubmitted: (_) => _verify(),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                                 if (err != null)
                                   Padding(
                                     padding: const EdgeInsets.only(top: 10),
                                     child: Text(err!, style: const TextStyle(color: T.danger, fontSize: 13)),
                                   ),
-                                const SizedBox(height: 20),
-                                ClientNumpad(onDigit: _digit, onBackspace: _backspace, compact: true),
                               ],
                             ),
                           ),

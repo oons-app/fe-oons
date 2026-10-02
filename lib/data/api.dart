@@ -77,10 +77,13 @@ String apiHost() {
 }
 
 class ApiException implements Exception {
-  ApiException(this.status, this.message, {this.code});
+  ApiException(this.status, this.message, {this.code, this.conflictIndex});
   final int status;
   final String message;
   final String? code;
+
+  /// Subscription holds: index of the visit whose slot was lost (409 slot_taken).
+  final int? conflictIndex;
   bool get isOffline => status == 0;
   bool get isPayFail => status == 402;
   bool get isNotFound => status == 404;
@@ -177,8 +180,13 @@ class ApiClient {
         }
         String msg = e.message ?? 'error';
         String? code;
+        int? conflictIndex;
         if (body is Map) {
           final err = body['error'];
+          final ci = err is Map && err['conflictIndex'] != null
+              ? err['conflictIndex']
+              : (body['data'] is Map ? (body['data'] as Map)['conflictIndex'] : null);
+          if (ci is num) conflictIndex = ci.toInt();
           if (err is Map && err['message'] != null) {
             msg = '${err['message']}';
           }
@@ -189,7 +197,7 @@ class ApiClient {
         h.reject(DioException(
           requestOptions: e.requestOptions,
           response: e.response,
-          error: ApiException(status, msg, code: code),
+          error: ApiException(status, msg, code: code, conflictIndex: conflictIndex),
         ));
       },
     ));

@@ -25,6 +25,10 @@ import 'package:oons/features/system/system_screens.dart';
 import 'package:oons/features/visit/visit_screens.dart';
 import 'package:oons/features/public/public_book_screen.dart';
 import 'package:oons/features/legal/legal_screen.dart';
+import 'package:oons/features/subscribe/month_dates_screen.dart';
+import 'package:oons/features/subscribe/my_plan_screens.dart';
+import 'package:oons/features/subscribe/plan_models.dart';
+import 'package:oons/features/subscribe/subscription_screens.dart';
 
 @visibleForTesting
 String routePathFromUri(Uri uri) {
@@ -156,9 +160,34 @@ final routerProvider = Provider<GoRouter>((ref) {
         ),
       ),
       GoRoute(path: '/provider/:id', builder: (c, s) => ProviderScreen(id: s.pathParameters['id']!)),
+      GoRoute(path: '/plans/:id', builder: (c, s) => CleaningPlansScreen(providerId: s.pathParameters['id']!, providerName: s.uri.queryParameters['name'] ?? '')),
+      GoRoute(
+        path: '/plan/included',
+        builder: (c, s) => PlanIncludedScreen(
+          providerId: s.uri.queryParameters['providerId'] ?? '',
+          planId: s.uri.queryParameters['planId'] ?? '',
+          providerName: s.uri.queryParameters['name'] ?? '',
+          initial: s.extra is PlanData ? s.extra as PlanData : null,
+        ),
+      ),
+      GoRoute(
+        path: '/plans/:planId/schedule',
+        builder: (c, s) => PlanScheduleScreen(
+          providerId: s.uri.queryParameters['providerId'] ?? '',
+          planId: s.pathParameters['planId']!,
+        ),
+      ),
+      GoRoute(path: '/me/plan', builder: (c, s) => const MyPlanScreen()),
+      GoRoute(path: '/me/plan/:id/cancel', builder: (c, s) => CancelPlanScreen(subscriptionId: s.pathParameters['id']!)),
+      GoRoute(path: '/me/plan/:id/bill', builder: (c, s) => PlanBillScreen(id: s.pathParameters['id']!)),
+      GoRoute(path: '/me/plan/:id', builder: (c, s) => MyPlanScreen(id: s.pathParameters['id'])),
       GoRoute(
         path: '/book/:id',
-        builder: (c, s) => BookScreen(providerId: s.pathParameters['id']!, itemId: s.uri.queryParameters['item']),
+        builder: (c, s) => BookScreen(
+          providerId: s.pathParameters['id']!,
+          itemId: s.uri.queryParameters['item'],
+          initialMode: s.uri.queryParameters['mode'],
+        ),
       ),
       GoRoute(path: '/checkout/:id', builder: (c, s) => CheckoutScreen(bookingId: s.pathParameters['id']!)),
       GoRoute(

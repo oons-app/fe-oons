@@ -141,6 +141,9 @@ class ProviderP {
     this.slugAliases = const [],
     this.customDomains = const [],
     this.broughtClientToken,
+    this.planFromPiastres,
+    this.planCount = 0,
+    this.planSavePct = 0,
   });
   final String id;
   final Loc firstName;
@@ -174,6 +177,11 @@ class ProviderP {
   final List<ProviderDomain> customDomains;
   /// Affiliate token for `?r=` invite links (provider-brought clients).
   final String? broughtClientToken;
+  /// Set only when the cleaning-subscription pilot badge is present.
+  final int? planFromPiastres;
+  final int planCount;
+  final int planSavePct;
+  bool get hasPlan => planCount > 0 && planFromPiastres != null;
 
   String name(String lang) => '${firstName.of(lang)} ${lastName.of(lang)}';
 
@@ -222,6 +230,9 @@ class ProviderP {
           final t = '${j['broughtClientToken'] ?? ''}'.trim();
           return t.isEmpty ? null : t;
         })(),
+        planFromPiastres: j['planBadge'] is Map ? (j['planBadge']['fromPiastres'] as num?)?.toInt() : null,
+        planCount: j['planBadge'] is Map ? (j['planBadge']['count'] as num?)?.toInt() ?? 0 : 0,
+        planSavePct: j['planBadge'] is Map ? (j['planBadge']['savePct'] as num?)?.toInt() ?? 0 : 0,
       );
 }
 
@@ -379,6 +390,7 @@ class BookingBundle {
     this.clientRating,
     this.clientReviewCount,
     this.clientLocked = false,
+    this.planTag,
     this.settlement,
     this.processingFees = const {},
     this.instapayManualNumber = '01117198333',
@@ -395,6 +407,7 @@ class BookingBundle {
   final double? clientRating;
   final int? clientReviewCount;
   final bool clientLocked;
+  final String? planTag;
   final Map<String, dynamic>? settlement;
   /// Paymob surcharge estimates by method key (`card` / `instapay`), piastres.
   final Map<String, int> processingFees;
@@ -443,6 +456,7 @@ class BookingBundle {
       clientRating: clientRating,
       clientReviewCount: clientReviewCount,
       clientLocked: j['clientLocked'] == true,
+      planTag: '${j['planTag'] ?? ''}'.trim().isEmpty ? null : '${j['planTag']}',
       settlement: j['settlement'] is Map ? Map<String, dynamic>.from(j['settlement'] as Map) : null,
       processingFees: fees,
       instapayManualNumber: '${j['instapayManualNumber'] ?? '01117198333'}'.trim().isEmpty
@@ -464,6 +478,7 @@ class BookingBundle {
         clientRating: clientRating,
         clientReviewCount: clientReviewCount,
         clientLocked: clientLocked,
+        planTag: planTag,
         settlement: settlement,
         processingFees: processingFees,
         instapayManualNumber: instapayManualNumber,

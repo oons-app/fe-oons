@@ -104,7 +104,7 @@ bool canSeeScreen(String role, String screenId) {
     'home', 'live', 'bookings', 'booking', 'claims', 'customers', 'customer',
     'providers', 'provider', 'categoryRequests', 'serviceRequests', 'batches', 'heatmap', 'vetting', 'workerVetting', 'audit',
     'coupons', 'categories', 'areas', 'impersonate',
-    'refunds', 'clientPayments', 'analytics', 'liveMap',
+    'refunds', 'clientPayments', 'analytics', 'liveMap', 'subscribers',
   };
   const finance = {
     'home', 'payouts', 'ledger', 'coupons', 'batches', 'payments', 'audit', 'bookings', 'booking',
@@ -154,6 +154,7 @@ const allPermKeys = [
   'payments.settings',
   'app.force_update',
   'push.campaigns',
+  'phones.block',
   'staff.write',
   'corporate.write',
   'audit.read',

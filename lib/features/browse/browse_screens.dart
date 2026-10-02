@@ -20,6 +20,9 @@ import 'package:oons/features/system/nearest_match.dart';
 import 'package:oons/features/system/uncovered_area.dart';
 import 'package:oons/features/system/progress.dart';
 import 'package:oons/features/reviews/reviews_screens.dart';
+import 'package:oons/features/subscribe/customer_copy.dart';
+import 'package:oons/features/subscribe/provider_plan_block.dart';
+import 'package:oons/features/subscribe/subscription_ui.dart';
 import 'package:oons/l10n/copy.dart';
 
 class BrowseScreen extends ConsumerStatefulWidget {
@@ -41,6 +44,7 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
   String sort = 'rating';
   int minYears = 0;
   String? categoryId;
+  bool plansOnly = false;
   List<Map<String, dynamic>> categories = [];
   bool catsLoaded = false;
   Future<List<ProviderP>>? _listFuture;
@@ -233,7 +237,10 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
                     ),
                   );
                 }
-                final list = _applyDate(snap.data ?? const []);
+                final dated = _applyDate(snap.data ?? const []);
+                final pilot = ref.watch(sessionProvider).subscriptionsPilot;
+                final list = pilot && plansOnly ? dated.where((p) => p.hasPlan).toList() : dated;
+                final planCount = pilot ? dated.where((p) => p.hasPlan).length : 0;
                 _trackList(list);
                 return Expanded(
                   child: ListView(
@@ -255,11 +262,17 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
                           ],
                         ),
                       ),
+                      if (pilot && (planCount > 0 || plansOnly))
+                        _PlansOnlyRow(
+                          on: plansOnly,
+                          countLabel: CC.subCount(planCount),
+                          onTap: () => setState(() => plansOnly = !plansOnly),
+                        ),
                       Padding(
                         padding: const EdgeInsets.fromLTRB(20, 12, 12, 8),
                         child: Row(
                           children: [
-                            Expanded(child: ClientKicker('${list.length} ${b['count']}')),
+                            Expanded(child: ClientKicker(pilot && lang == 'ar' ?CC.resultCount(list.length) : '${list.length} ${b['count']}')),
                             TextButton(
                               onPressed: _openAdvanced,
                               child: Text('${b['advanced']}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Client.plum)),
@@ -298,6 +311,7 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
                           bookLabel: '${b['quickBook']}',
                           fromLabel: '${b['from']}',
                           service: widget.service,
+                          showPlan: pilot,
                         ),
                       ),
                     ],
@@ -548,6 +562,51 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
   }
 }
 
+/// E1 «عندها باقة شهرية بس» filter row: checkbox with a visible check mark.
+class _PlansOnlyRow extends StatelessWidget {
+  const _PlansOnlyRow({required this.on, required this.countLabel, required this.onTap});
+  final bool on;
+  final String countLabel;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      container: true,
+      checked: on,
+      inMutuallyExclusiveGroup: false,
+      onTap: onTap,
+      label: CC.e1PlanFilter,
+      excludeSemantics: true,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 44),
+          decoration: BoxDecoration(
+            color: on ? Client.plumTint : Client.bg,
+            border: const Border(bottom: BorderSide(color: Client.line)),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
+          child: Row(
+            children: [
+              Container(
+                width: 18,
+                height: 18,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(border: Border.all(color: Client.ink), color: on ? Client.plum : Client.card),
+                child: on ? const OnsIcon('check', key: ValueKey('plan-check'), size: 12, color: Client.bg, strokeWidth: 3) : null,
+              ),
+              const SizedBox(width: 10),
+              const Expanded(child: Text(CC.e1PlanFilter, style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600))),
+              Text(countLabel, style: const TextStyle(fontSize: 11.5, color: Client.muted)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _ProviderRow extends StatelessWidget {
   const _ProviderRow({
     required this.p,
@@ -555,7 +614,9 @@ class _ProviderRow extends StatelessWidget {
     required this.bookLabel,
     required this.fromLabel,
     required this.service,
+    this.showPlan = false,
   });
+  final bool showPlan;
   final ProviderP p;
   final String? fallbackArea;
   final String bookLabel;
@@ -612,6 +673,15 @@ class _ProviderRow extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 10),
+            if (showPlan && p.hasPlan) ...[
+              PlanListingBadge(
+                count: p.planCount,
+                fromPiastres: p.planFromPiastres ?? 0,
+                savePct: p.planSavePct,
+                onTap: () => context.push('/book/${p.id}?mode=monthly'),
+              ),
+              const SizedBox(height: 12),
+            ],
             InkWell(
               onTap: () {
                 AppAnalytics.markBookingEntry('search');
@@ -674,6 +744,7 @@ class ProviderScreen extends ConsumerWidget {
           return OnsBusyPage(caption: '${ec['loadingProvider']}');
         }
         final p = snap.data!;
+        final showPlan = p.hasPlan && ref.watch(sessionProvider).subscriptionsPilot;
         return Scaffold(
           backgroundColor: Client.bg,
           body: SafeArea(
@@ -816,6 +887,10 @@ class ProviderScreen extends ConsumerWidget {
                                     ],
                                   ),
                                 )),
+                            if (showPlan) ...[
+                              const SizedBox(height: 16),
+                              ProviderPlanInfoBlock(providerId: p.id, count: p.planCount, fallbackPct: p.planSavePct),
+                            ],
                             const SizedBox(height: 96),
                           ],
                         ),
@@ -823,6 +898,70 @@ class ProviderScreen extends ConsumerWidget {
                     ],
                   ),
                 ),
+                if (showPlan)
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 22),
+                    decoration: const BoxDecoration(
+                      color: Client.bg,
+                      border: Border(top: BorderSide(color: Client.ink, width: Client.rule)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          CC.s1SaveLine(p.planSavePct),
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Client.oliveInk),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              flex: 17,
+                              child: InkWell(
+                                onTap: () => context.push('/book/${p.id}?mode=monthly'),
+                                child: Container(
+                                  height: 54,
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(color: Client.plum, border: Border.all(color: Client.ink)),
+                                  child: const Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Flexible(child: Text(CC.s1Subscribe, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Client.bg, fontSize: 16, fontWeight: FontWeight.w700))),
+                                      SizedBox(width: 9),
+                                      OnsIcon('advance', size: 19, color: Client.bg),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              flex: 10,
+                              child: InkWell(
+                                onTap: () {
+                                  AppAnalytics.markBookingEntry('profile');
+                                  unawaited(AppAnalytics.beginCheckout(
+                                    providerId: p.id,
+                                    entryPoint: 'profile',
+                                    providerName: p.name('en'),
+                                    serviceName: p.service,
+                                  ));
+                                  context.push('/book/${p.id}');
+                                },
+                                child: Container(
+                                  height: 54,
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(color: Client.bg, border: Border.all(color: Client.muted2)),
+                                  child: const Text(CC.s1Once, style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600, color: Client.body)),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  )
+                else
                 ClientStickyBar(
                   label: '${bar['from']}',
                   price: money(p.priceFrom, lang),

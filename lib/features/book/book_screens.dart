@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:oons/core/icons/ons_icons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -20,6 +21,11 @@ import 'package:oons/features/book/book_widgets.dart';
 import 'package:oons/features/client/client_chrome.dart';
 import 'package:oons/features/me/me_screens.dart';
 import 'package:oons/features/system/empty_states.dart';
+import 'package:oons/features/subscribe/customer_api.dart';
+import 'package:oons/features/subscribe/customer_copy.dart';
+import 'package:oons/features/subscribe/plan_card.dart';
+import 'package:oons/features/subscribe/plan_models.dart';
+import 'package:oons/features/subscribe/subscription_ui.dart';
 import 'package:oons/features/system/progress.dart';
 import 'package:oons/l10n/copy.dart';
 import 'package:oons/l10n/errors.dart';
@@ -27,9 +33,12 @@ import 'package:oons/l10n/errors.dart';
 export 'package:oons/features/book/book_checkout.dart';
 
 class BookScreen extends ConsumerStatefulWidget {
-  const BookScreen({super.key, required this.providerId, this.itemId});
+  const BookScreen({super.key, required this.providerId, this.itemId, this.initialMode});
   final String providerId;
   final String? itemId;
+
+  /// `monthly` when arriving from the E1 plan box or the S1 subscribe button.
+  final String? initialMode;
   @override
   ConsumerState<BookScreen> createState() => _BookScreenState();
 }
@@ -70,6 +79,9 @@ class _BookScreenState extends ConsumerState<BookScreen> {
   bool flowStarted = false;
   bool notesTracked = false;
   int screen = 1;
+  late bool _monthly = widget.initialMode == 'monthly';
+  List<PlanData> _plans = [];
+  int? _planIndex;
   int? lastDurationFetched;
   String? lastAreaFetched;
   Timer? persistWait;
@@ -301,6 +313,20 @@ class _BookScreenState extends ConsumerState<BookScreen> {
         if (notice == 'hold_expired') screen = 2;
       });
       if (screen == 2) unawaited(_refreshAvailability(force: true));
+      if (ref.read(sessionProvider).subscriptionsPilot && (vert ?? '').isEmpty == false && verts.contains('cleaning')) {
+        try {
+          final r = await ref.read(customerSubApiProvider).get('/providers/${widget.providerId}/plans');
+          final rows = PlanData.listFrom(r['plans']);
+          if (mounted && r['enabled'] == true) {
+            setState(() {
+              _plans = rows;
+              final rec = rows.indexWhere((e) => e.recommended);
+              _planIndex = rec >= 0 ? rec : null;
+              if (_monthly && rows.isNotEmpty && verts.contains('cleaning')) _activeVertical = 'cleaning';
+            });
+          }
+        } catch (_) {}
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() => loadError = e);
@@ -658,8 +684,11 @@ class _BookScreenState extends ConsumerState<BookScreen> {
         ),
       );
     }
-    final steps = [copy['step1'] ?? '', copy['step2'] ?? '', copy['step3'] ?? ''];
-    final empty = !cartReady;
+    final pilot = ref.watch(sessionProvider).subscriptionsPilot;
+    final monthlyOn = pilot && _monthly && activeVertical == 'cleaning' && _plans.isNotEmpty;
+    final picked = monthlyOn && _planIndex != null && _planIndex! < _plans.length ? _plans[_planIndex!] : null;
+    final steps = monthlyOn ? const [CC.stepPlan, CC.stepMonthDates, CC.stepPay] : [copy['step1'] ?? '', copy['step2'] ?? '', copy['step3'] ?? ''];
+    final empty = monthlyOn ? picked == null : !cartReady;
     return Scaffold(
       backgroundColor: Client.bg,
       body: SafeArea(
@@ -681,6 +710,10 @@ class _BookScreenState extends ConsumerState<BookScreen> {
               cartReady: cartReady,
               onSegmentTap: (n) {
                 if (n == 1) _touch(() => screen = 1);
+                if (monthlyOn) {
+                  if (n >= 2 && picked != null) _openSchedule(picked);
+                  return;
+                }
                 if (n == 2 && cartReady) unawaited(_goStep2());
                 if (n == 3 && cartReady) {
                   if (screen == 1) {
@@ -724,14 +757,22 @@ class _BookScreenState extends ConsumerState<BookScreen> {
               ),
             ),
             ClientStickyBar(
-              label: empty ? (copy['barEmpty'] ?? '') : (copy['barTotal'] ?? ''),
-              sub: empty ? copy['barEmptySub'] : copy['barFeesIn'],
-              price: empty ? '—' : money(inclusive, lang),
-              cta: screen == 1 ? (copy['ctaSlot'] ?? '') : (copy['ctaPay'] ?? ''),
+              label: monthlyOn
+                  ? (picked == null ? CC.e2BarNone : CC.e2BarMonthly)
+                  : (empty ? (copy['barEmpty'] ?? '') : (copy['barTotal'] ?? '')),
+              sub: monthlyOn
+                  ? (picked == null ? CC.e2BarNoneSub : '${picked.title} · شامل ١٠٪ رسوم')
+                  : (empty ? copy['barEmptySub'] : copy['barFeesIn']),
+              price: empty ? '—' : (monthlyOn ? egpUnit(picked!.totalPiastres) : money(inclusive, lang)),
+              cta: monthlyOn ? CC.e2CtaMonthly : (screen == 1 ? (copy['ctaSlot'] ?? '') : (copy['ctaPay'] ?? '')),
               busy: busy,
               busyLabel: copy['confirming'] ?? '',
               enabled: !busy && !empty && ref.watch(sessionProvider).online,
               onTap: () {
+                if (monthlyOn) {
+                  if (picked != null) _openSchedule(picked);
+                  return;
+                }
                 if (screen == 1) {
                   unawaited(_goStep2());
                 } else {
@@ -745,7 +786,13 @@ class _BookScreenState extends ConsumerState<BookScreen> {
     );
   }
 
+  void _openSchedule(PlanData plan) {
+    context.push('/plans/${plan.id}/schedule?providerId=${widget.providerId}');
+  }
+
   List<Widget> _step1(String lang, Map<String, String> copy) {
+    final pilot = ref.watch(sessionProvider).subscriptionsPilot;
+    final monthlyOn = pilot && _monthly && activeVertical == 'cleaning' && _plans.isNotEmpty;
     final counts = <String, int>{};
     for (final v in verticals) {
       counts[v] = p!.items.where((e) => e.active && (e.vertical ?? p!.service) == v).length;
@@ -764,6 +811,45 @@ class _BookScreenState extends ConsumerState<BookScreen> {
           },
         ),
       ),
+      if (pilot && activeVertical == 'cleaning' && _plans.isNotEmpty)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+          child: VisitModeSwitch(
+            monthly: _monthly,
+            savePct: maxSavePct(_plans),
+            onOnce: () => _touch(() => _monthly = false),
+            onMonthly: () => _touch(() => _monthly = true),
+          ),
+        ),
+      if (pilot && activeVertical != 'cleaning' && verticals.contains('cleaning') && _plans.isNotEmpty)
+        const Padding(
+          padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+          child: Text(CC.e2BeautyLine, style: TextStyle(fontSize: 11.5, color: Client.muted2)),
+        ),
+      if (monthlyOn)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Padding(
+                padding: EdgeInsets.only(bottom: 8),
+                child: Text(CC.e2Intro, style: TextStyle(fontSize: 12.5, height: 1.55, color: Client.body)),
+              ),
+              for (var i = 0; i < _plans.length; i++)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: PlanCard(
+                    plan: _plans[i],
+                    selected: _planIndex == i,
+                    buttonLabel: _planIndex == i ? CC.picked : CC.pickPlan,
+                    onTap: () => _touch(() => _planIndex = i),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      if (!monthlyOn)
       BookFieldFrame(
         key: servicesKey,
         invalid: errorField == BookField.services,
@@ -809,6 +895,29 @@ class _BookScreenState extends ConsumerState<BookScreen> {
               );
             }),
             if (!cartReady) OnsEmpty.nothingPicked(lang: lang, cleaning: verticals.contains('cleaning'), onBrowse: _browseServices),
+            if (pilot && activeVertical == 'cleaning' && _plans.isNotEmpty && maxSavePiastres(_plans) > 0)
+              InkWell(
+                onTap: () => _touch(() => _monthly = true),
+                child: Container(
+                  constraints: const BoxConstraints(minHeight: 44),
+                  margin: const EdgeInsets.fromLTRB(0, 14, 0, 8),
+                  child: DashedBox(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    child: Row(
+                      children: [
+                        const OnsIcon('retry', size: 18, color: Client.plum),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            CC.e2Nudge(egpText(maxSavePiastres(_plans))),
+                            style: const TextStyle(fontSize: 13, height: 1.5, fontWeight: FontWeight.w600, color: Client.plum),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),

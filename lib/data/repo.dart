@@ -72,6 +72,7 @@ class SessionState {
     this.feeWaived = false,
     this.trustFee = 0,
     this.clientServiceFeeBps = 1000,
+    this.subscriptionsPilot = false,
   });
   final String? token;
   final UserMe? user;
@@ -86,6 +87,8 @@ class SessionState {
   final int trustFee;
   /// Marketplace client service fee in bps of listed service (playbook v2, default 10%).
   final int clientServiceFeeBps;
+  /// True only when GET /me says this account is on the cleaning-subscription allowlist.
+  final bool subscriptionsPilot;
   bool get authed => token != null;
   bool get isProvider => role == 'provider';
 }
@@ -140,6 +143,7 @@ class Session extends StateNotifier<SessionState> {
       // is a landmine for a fee that no longer applies. Default to 0.
       trustFee: (me['trustFee'] as num?)?.toInt() ?? 0,
       clientServiceFeeBps: (me['clientServiceFeeBps'] as num?)?.toInt() ?? 1000,
+      subscriptionsPilot: me['subscriptionsPilot'] == true,
     );
   }
 
@@ -231,6 +235,7 @@ class Session extends StateNotifier<SessionState> {
     required String firstName,
     required String lastName,
     required String service,
+    List<String>? services,
     required List<String> areas,
     String? specialty,
     int? years,
@@ -248,6 +253,7 @@ class Session extends StateNotifier<SessionState> {
       'firstName': firstName,
       'lastName': lastName,
       'service': service,
+      if (services != null && services.isNotEmpty) 'services': services,
       'areas': areas,
       if (specialty != null) 'specialty': specialty,
       if (years != null) 'years': years,
@@ -348,6 +354,7 @@ class Session extends StateNotifier<SessionState> {
         feeWaived: state.feeWaived,
         trustFee: state.trustFee,
         clientServiceFeeBps: state.clientServiceFeeBps,
+        subscriptionsPilot: state.subscriptionsPilot,
       );
 
   void setProvider(ProviderP p) => state = SessionState(
@@ -359,6 +366,7 @@ class Session extends StateNotifier<SessionState> {
         feeWaived: state.feeWaived,
         trustFee: state.trustFee,
         clientServiceFeeBps: state.clientServiceFeeBps,
+        subscriptionsPilot: state.subscriptionsPilot,
       );
 
   void setOnline(bool v) => state = SessionState(
@@ -370,6 +378,7 @@ class Session extends StateNotifier<SessionState> {
         feeWaived: state.feeWaived,
         trustFee: state.trustFee,
         clientServiceFeeBps: state.clientServiceFeeBps,
+        subscriptionsPilot: state.subscriptionsPilot,
       );
 }
 

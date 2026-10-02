@@ -489,17 +489,145 @@ Future<bool> runOptimistic({
 }
 
 /// "اتزوّد · X   تراجع" — the add already happened; this only offers the undo.
+///
+/// A banner under the status bar, not a bottom snackbar: at the bottom it sat on
+/// top of the sticky action bar and hid the very button the person needs next.
+/// It goes away by itself, by tapping تراجع, or by swiping it away in any
+/// direction (up, down, left, right).
 void showUndoSnack(BuildContext context, {required String message, required String undoLabel, required VoidCallback onUndo}) {
-  final m = ScaffoldMessenger.of(context);
-  m.hideCurrentSnackBar();
-  m.showSnackBar(
-    SnackBar(
-      backgroundColor: Client.ink,
-      behavior: SnackBarBehavior.floating,
-      shape: const RoundedRectangleBorder(),
-      duration: const Duration(seconds: 6),
-      content: Text(message, style: const TextStyle(color: Client.bg, fontSize: 13.5)),
-      action: SnackBarAction(label: undoLabel, textColor: Client.bg, onPressed: onUndo),
-    ),
+  final overlay = Overlay.maybeOf(context, rootOverlay: true);
+  if (overlay == null) return;
+  _undoToast?.remove();
+  late final OverlayEntry entry;
+  void close() {
+    if (identical(_undoToast, entry)) _undoToast = null;
+    if (entry.mounted) entry.remove();
+  }
+
+  entry = OverlayEntry(
+    builder: (_) => _UndoToast(message: message, undoLabel: undoLabel, onUndo: onUndo, onClose: close),
   );
+  _undoToast = entry;
+  overlay.insert(entry);
+}
+
+OverlayEntry? _undoToast;
+
+class _UndoToast extends StatefulWidget {
+  const _UndoToast({required this.message, required this.undoLabel, required this.onUndo, required this.onClose});
+  final String message;
+  final String undoLabel;
+  final VoidCallback onUndo;
+  final VoidCallback onClose;
+  @override
+  State<_UndoToast> createState() => _UndoToastState();
+}
+
+class _UndoToastState extends State<_UndoToast> with TickerProviderStateMixin {
+  static const _lifetime = Duration(seconds: 5);
+  late final AnimationController _in = AnimationController(vsync: this, duration: const Duration(milliseconds: 180))..forward();
+  late final AnimationController _out = AnimationController(vsync: this, duration: const Duration(milliseconds: 160));
+  Timer? _timer;
+  Offset _drag = Offset.zero;
+  Offset _exit = const Offset(0, -1);
+  bool _closing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _arm();
+  }
+
+  void _arm() {
+    _timer?.cancel();
+    _timer = Timer(_lifetime, () => _dismiss(const Offset(0, -1)));
+  }
+
+  Future<void> _dismiss(Offset direction) async {
+    if (_closing || !mounted) return;
+    _closing = true;
+    _timer?.cancel();
+    _exit = direction;
+    try {
+      await _out.forward();
+    } catch (_) {}
+    widget.onClose();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _in.dispose();
+    _out.dispose();
+    super.dispose();
+  }
+
+  Offset _unit(Offset o) => o.distance == 0 ? const Offset(0, -1) : o / o.distance;
+
+  @override
+  Widget build(BuildContext context) {
+    final top = MediaQuery.paddingOf(context).top;
+    return Positioned(
+      top: top + 8,
+      left: 12,
+      right: 12,
+      child: AnimatedBuilder(
+        animation: Listenable.merge([_in, _out]),
+        builder: (context, child) {
+          final enter = Curves.easeOut.transform(_in.value);
+          final leave = Curves.easeIn.transform(_out.value);
+          final far = MediaQuery.sizeOf(context).shortestSide;
+          return Opacity(
+            opacity: (enter * (1 - leave)).clamp(0.0, 1.0),
+            child: Transform.translate(
+              offset: Offset(0, -24 * (1 - enter)) + _drag + _exit * (far * leave),
+              child: child,
+            ),
+          );
+        },
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onPanStart: (_) => _timer?.cancel(),
+          onPanUpdate: (d) => setState(() => _drag += d.delta),
+          onPanEnd: (d) {
+            final v = d.velocity.pixelsPerSecond;
+            if (_drag.distance > 48 || v.distance > 500) {
+              _dismiss(_unit(v.distance > 500 ? v : _drag));
+            } else {
+              setState(() => _drag = Offset.zero);
+              _arm();
+            }
+          },
+          child: Material(
+            color: Client.ink,
+            child: Semantics(
+              liveRegion: true,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsetsDirectional.fromSTEB(16, 12, 8, 12),
+                      child: Text(widget.message, style: const TextStyle(color: Client.bg, fontSize: 13.5, height: 1.35)),
+                    ),
+                  ),
+                  InkWell(
+                    onTap: () {
+                      widget.onUndo();
+                      _dismiss(const Offset(0, -1));
+                    },
+                    child: Container(
+                      constraints: const BoxConstraints(minHeight: 48, minWidth: 64),
+                      alignment: Alignment.center,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Text(widget.undoLabel, style: const TextStyle(color: Client.bg, fontSize: 13.5, fontWeight: FontWeight.w700)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

@@ -7,6 +7,7 @@ import 'package:oons/admin_v2/data/paths.dart';
 import 'package:oons/admin_v2/data/session.dart';
 import 'package:oons/admin_v2/features/analytics/analytics_screen.dart';
 import 'package:oons/admin_v2/features/app_update/app_update_screen.dart';
+import 'package:oons/admin_v2/features/blocked_phones/blocked_phones_screen.dart';
 import 'package:oons/admin_v2/features/push/push_screen.dart';
 import 'package:oons/admin_v2/features/areas/areas_screen.dart';
 import 'package:oons/admin_v2/features/audit/audit_screen.dart';
@@ -34,6 +35,7 @@ import 'package:oons/admin_v2/features/payouts/payouts_screen.dart';
 import 'package:oons/admin_v2/features/providers/provider_detail_screen.dart';
 import 'package:oons/admin_v2/features/providers/providers_screen.dart';
 import 'package:oons/admin_v2/features/refunds/refunds_screen.dart';
+import 'package:oons/admin_v2/features/subscriptions/subscribers_screen.dart';
 import 'package:oons/admin_v2/features/staff/matrix_screen.dart';
 import 'package:oons/admin_v2/features/staff/staff_screen.dart';
 import 'package:oons/admin_v2/features/vetting/vetting_screen.dart';
@@ -126,6 +128,7 @@ final v2RouterProvider = Provider<GoRouter>((ref) {
           GoRoute(path: V2Paths.payments, builder: (_, __) => const PaymentsScreen()),
           GoRoute(path: V2Paths.appUpdate, builder: (_, __) => const AppUpdateScreen()),
           GoRoute(path: V2Paths.push, builder: (_, __) => const PushCampaignsScreen()),
+          GoRoute(path: V2Paths.blockedPhones, builder: (_, __) => const BlockedPhonesScreen()),
           GoRoute(path: V2Paths.clientPayments, builder: (_, __) => const ClientPaymentsScreen()),
           GoRoute(path: V2Paths.corporate, builder: (_, __) => const CorporateScreen()),
           GoRoute(path: V2Paths.audit, builder: (_, __) => const AuditScreen()),
@@ -134,6 +137,7 @@ final v2RouterProvider = Provider<GoRouter>((ref) {
           GoRoute(path: V2Paths.vetting, builder: (_, __) => const VettingScreen()),
           GoRoute(path: V2Paths.workerVetting, builder: (_, __) => const WorkerVettingScreen()),
           GoRoute(path: V2Paths.refunds, builder: (_, __) => const RefundsScreen()),
+          GoRoute(path: V2Paths.subscribers, builder: (_, __) => const SubscribersScreen()),
           GoRoute(path: V2Paths.analytics, builder: (_, __) => const AnalyticsScreen()),
           GoRoute(
             path: '${V2Paths.impersonate}/:id',

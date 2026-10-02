@@ -80,6 +80,7 @@ String friendlyError(Object e, String lang) {
         'That photo is too large (8 MB max). Try a lower-resolution photo.':
             'الصورة كبيرة جدًا (٨ ميغابايت حدًا أقصى). حاولِي بصورة أصغر أو بجودة أقل.',
         'Need a photo.': 'اختاري صورة.',
+        'This number is blocked.': 'الرقم ده متوقف عن استخدام أُنس.',
       };
       final m = ar[msg];
       if (m != null) return m;

@@ -127,7 +127,7 @@ class _OonsAppState extends ConsumerState<OonsApp> {
                           child: Stack(
                             children: [
                               child ?? const SizedBox.shrink(),
-                              const _ToastLayer(),
+                              const AlertToastLayer(),
                               const ForceUpdateGate(),
                             ],
                           ),
@@ -148,15 +148,28 @@ class _OonsAppState extends ConsumerState<OonsApp> {
 }
 
 /// Full-screen only while an alert is showing so it cannot steal taps.
-class _ToastLayer extends ConsumerWidget {
-  const _ToastLayer();
+class AlertToastLayer extends ConsumerWidget {
+  const AlertToastLayer({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final toast = ref.watch(alertToastProvider);
     if (toast == null) return const SizedBox.shrink();
+    // This layer sits beside the Navigator, not inside its Overlay, so widgets
+    // that need an Overlay ancestor (IconButton tooltips) crash without one.
+    // Keyed per toast: OverlayEntry builders are only read on creation.
     return Positioned.fill(
-      child: AlertToastBanner(
+      child: Overlay(
+        key: ValueKey('toast-overlay-${toast.title}-${toast.body}'),
+        initialEntries: [
+          OverlayEntry(builder: (_) => _buildBanner(ref, toast)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBanner(WidgetRef ref, AlertToast toast) {
+    return AlertToastBanner(
         key: ValueKey('toast-${toast.title}-${toast.body}'),
         toast: toast,
         onDismiss: () => ref.read(alertToastProvider.notifier).state = null,
@@ -179,7 +192,6 @@ class _ToastLayer extends ConsumerWidget {
             ref.read(routerProvider).go(ref.read(sessionProvider).isProvider ? '/pro' : '/home');
           }
         },
-      ),
     );
   }
 }
