@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:oons/core/icons/ons_icons.dart';
 import 'package:oons/core/pro_format.dart';
 import 'package:oons/data/api.dart';
+import 'package:oons/data/models.dart';
 import 'package:oons/features/subscribe/ar_eg.dart';
 import 'package:oons/features/subscribe/draft_saver.dart';
 import 'package:oons/features/subscribe/prov_api.dart';
@@ -14,6 +15,21 @@ import 'package:oons/features/subscribe/wiz_widgets.dart';
 import 'package:oons/features/subscribe/wizard_logic.dart';
 
 export 'package:oons/features/subscribe/wizard_logic.dart' show PlanService, TeamMember;
+
+/// Opens باقاتي for the signed-in provider, using her live cleaning services.
+void openProviderPlans(BuildContext context, ProviderP me) {
+  final services = me.items.where((it) => it.active && (it.approvalState.isEmpty || it.approvalState == 'approved')).map((it) {
+    final name = it.name.of('ar');
+    return PlanService(
+      id: it.id,
+      catalogItemId: it.catalogItemId ?? '',
+      name: name,
+      regularEgp: it.price ~/ 100,
+      visitType: visitTypeForName(name, id: it.id),
+    );
+  }).toList();
+  Navigator.of(context).push(MaterialPageRoute(builder: (_) => PlanWizard(services: services, providerId: me.id)));
+}
 
 /// Date picker seam: tests inject a fake, the app uses [pickWizDate].
 typedef WizDatePicker = Future<DateTime?> Function(

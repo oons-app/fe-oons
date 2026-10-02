@@ -183,6 +183,9 @@ class ProviderP {
   final int planSavePct;
   bool get hasPlan => planCount > 0 && planFromPiastres != null;
 
+  /// Cleaning is the provider's vertical, or one of her services is a cleaning package.
+  bool get offersCleaning => service == 'cleaning' || items.any((it) => it.isCleaning || it.vertical == 'cleaning');
+
   String name(String lang) => '${firstName.of(lang)} ${lastName.of(lang)}';
 
   String? get liveCustomDomain {

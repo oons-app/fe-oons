@@ -27,6 +27,7 @@ import 'package:oons/data/service_catalog.dart';
 import 'package:oons/features/auth/auth_screens.dart' show clearPendingRegistration, pendingRegistration;
 import 'package:oons/features/legal/legal_widgets.dart';
 import 'package:oons/features/pro/pro_chrome.dart';
+import 'package:oons/features/subscribe/plan_wizard.dart';
 import 'package:oons/features/pro/pro_tour.dart';
 import 'package:oons/l10n/copy.dart';
 import 'package:oons/l10n/errors.dart';
@@ -1632,6 +1633,25 @@ class _ProAccountScreenState extends ConsumerState<ProAccountScreen> {
               ],
             ),
           ),
+          if (ref.watch(sessionProvider).subscriptionsPilot && (me?.offersCleaning ?? false)) ...[
+            const SizedBox(height: 12),
+            Material(
+              color: Pro.plumSoft,
+              child: InkWell(
+                onTap: () {
+                  final who = me;
+                  if (who == null) return;
+                  openProviderPlans(context, who);
+                },
+                child: Container(
+                  constraints: const BoxConstraints(minHeight: 52),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(border: Border.all(color: Pro.plum)),
+                  child: const Text('باقات شهرية', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Pro.plum)),
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 12),
           ProCard(
             child: Column(

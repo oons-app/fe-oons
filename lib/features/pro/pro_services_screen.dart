@@ -16,7 +16,6 @@ import 'package:oons/data/repo.dart';
 import 'package:oons/data/service_catalog.dart';
 import 'package:oons/features/pro/pro_chrome.dart';
 import 'package:oons/features/pro/pro_service_editor_sheet.dart';
-import 'package:oons/features/subscribe/ar_eg.dart' show visitTypeForName;
 import 'package:oons/features/subscribe/plan_wizard.dart';
 import 'package:oons/l10n/copy.dart';
 import 'package:oons/l10n/errors.dart';
@@ -712,26 +711,16 @@ class _ProServicesScreenState extends ConsumerState<ProServicesScreen> {
           Expanded(child: _statCard('${m['avgPrice']}', avg > 0 ? '$avg' : '—')),
         ],
       ),
-      if (ref.watch(sessionProvider).subscriptionsPilot && (me?.service == 'cleaning')) ...[
+      if (ref.watch(sessionProvider).subscriptionsPilot && (me?.offersCleaning ?? false)) ...[
         const SizedBox(height: 10),
         Material(
           color: Pro.plumSoft,
           child: InkWell(
             key: const Key('open-plans'),
             onTap: () {
-              // Services are keyed by the item's OWN id (what the server stores
-              // in plan lines); the catalogue id rides along for matching.
-              final services = (me?.items ?? const []).where((it) => it.active && (it.approvalState.isEmpty || it.approvalState == 'approved')).map((it) {
-                final name = it.name.of('ar');
-                return PlanService(
-                  id: it.id,
-                  catalogItemId: it.catalogItemId ?? '',
-                  name: name,
-                  regularEgp: it.price ~/ 100,
-                  visitType: visitTypeForName(name, id: it.id),
-                );
-              }).toList();
-              Navigator.of(context).push(MaterialPageRoute(builder: (_) => PlanWizard(services: services, providerId: me?.id ?? '')));
+              final who = me;
+              if (who == null) return;
+              openProviderPlans(context, who);
             },
             child: Container(
               constraints: const BoxConstraints(minHeight: 44),

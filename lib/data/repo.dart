@@ -143,7 +143,7 @@ class Session extends StateNotifier<SessionState> {
       // is a landmine for a fee that no longer applies. Default to 0.
       trustFee: (me['trustFee'] as num?)?.toInt() ?? 0,
       clientServiceFeeBps: (me['clientServiceFeeBps'] as num?)?.toInt() ?? 1000,
-      subscriptionsPilot: me['subscriptionsPilot'] == true,
+      subscriptionsPilot: me.containsKey('subscriptionsPilot') ? me['subscriptionsPilot'] == true : state.subscriptionsPilot,
     );
   }
 
