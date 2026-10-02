@@ -7,6 +7,8 @@
   if (typeof document === 'undefined') return;
 
   var STORAGE_KEY = 'oons_a2hs_dismissed_v1';
+  var STORE_KEY = 'oons_ios_store_dismissed_v1';
+  var STORE_DISMISS_DAYS = 30;
   var LOCALE_KEY = 'oons_locale';
   var DISMISS_DAYS = 21;
   var IOS_STORE = 'https://apps.apple.com/eg/app/oons-app/id6811881656';
@@ -31,6 +33,29 @@
   function dismiss() {
     try {
       localStorage.setItem(STORAGE_KEY, String(Date.now() + DISMISS_DAYS * 864e5));
+    } catch (_) {}
+  }
+
+  function storeDismissed() {
+    try {
+      var raw = localStorage.getItem(STORE_KEY);
+      return !!raw && parseInt(raw, 10) > Date.now();
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function dismissStore() {
+    try {
+      localStorage.setItem(STORE_KEY, String(Date.now() + STORE_DISMISS_DAYS * 864e5));
+    } catch (_) {}
+    var bar = document.getElementById('oons-ios-store');
+    if (bar) bar.remove();
+    var st = document.getElementById('oons-ios-store-style');
+    if (st) st.remove();
+    try { document.documentElement.classList.remove('oons-has-ios-store'); } catch (_) {}
+    try {
+      if (window.gtag) gtag('event', 'a2hs_prompt_dismissed', { surface: hostKind(), lang: lang(), browser_mode: 'ios_store_banner' });
     } catch (_) {}
   }
 
@@ -369,7 +394,7 @@
   function remountStoreBanner(force) {
     var el = document.getElementById('oons-ios-store');
     var L = lang();
-    var shouldShow = isIOS() && !isStandalone() && !inAppInfo() && !document.getElementById('splash');
+    var shouldShow = isIOS() && !isStandalone() && !inAppInfo() && !document.getElementById('splash') && !storeDismissed();
     if (!shouldShow) {
       if (el) el.remove();
       var st = document.getElementById('oons-ios-store-style');
@@ -388,6 +413,7 @@
   function mountStoreBanner() {
     if (document.getElementById('oons-ios-store')) return;
     if (!isIOS() || isStandalone() || inAppInfo()) return;
+    if (storeDismissed()) return;
     if (document.getElementById('splash')) return;
     if (!document.body) return;
 
@@ -396,14 +422,20 @@
     var style = document.createElement('style');
     style.id = 'oons-ios-store-style';
     style.textContent = [
-      '#oons-ios-store{position:fixed;inset-inline:0;top:0;z-index:40;',
-      'display:flex;align-items:center;justify-content:center;gap:10px;',
+      '#oons-ios-store{position:fixed;inset-inline:0;top:0;z-index:2147483100;',
+      'display:flex;align-items:center;justify-content:center;gap:10px;pointer-events:auto;',
       'min-height:46px;padding:8px 12px;padding-top:max(8px,env(safe-area-inset-top,0px));',
       'background:#3A2431;color:#F4EBE1;box-shadow:0 4px 16px rgba(0,0,0,.18);',
       'font:600 13px/1.3 system-ui,-apple-system,sans-serif}',
       '#oons-ios-store a{appearance:none;border:0;border-radius:999px;min-height:34px;',
       'padding:0 14px;font:600 13px/34px system-ui,sans-serif;cursor:pointer;',
-      'text-decoration:none;background:#C9B39B;color:#3A2431;white-space:nowrap}'
+      'text-decoration:none;background:#C9B39B;color:#3A2431;white-space:nowrap}',
+      // 44px tap target, pinned to the end edge so it never sits over the link.
+      '#oons-ios-store button{appearance:none;border:0;background:transparent;color:#F4EBE1;',
+      'position:absolute;inset-inline-end:0;top:0;bottom:0;width:48px;min-height:44px;z-index:2;',
+      'font:400 22px/1 system-ui,sans-serif;cursor:pointer;pointer-events:auto;',
+      'padding-top:env(safe-area-inset-top,0px)}',
+      '#oons-ios-store{padding-inline-end:52px}'
     ].join('');
     document.head.appendChild(style);
 
@@ -413,7 +445,18 @@
     bar.setAttribute('role', 'region');
     bar.setAttribute('aria-label', storeLabel(L));
     bar.dir = L === 'ar' ? 'rtl' : 'ltr';
-    bar.innerHTML = '<a href="' + IOS_STORE + '" target="_blank" rel="noopener">' + storeLabel(L) + '</a>';
+    bar.innerHTML = '<a href="' + IOS_STORE + '" target="_blank" rel="noopener">' + storeLabel(L) + '</a>' +
+      '<button type="button" data-store-close aria-label="' + (L === 'en' ? 'Close' : 'إغلاق') + '">\u2715</button>';
+    var closeBtn = bar.querySelector('[data-store-close]');
+    function onClose(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      dismissStore();
+    }
+    if (closeBtn) {
+      closeBtn.addEventListener('click', onClose);
+      closeBtn.addEventListener('pointerup', onClose);
+    }
     document.body.appendChild(bar);
     try { document.documentElement.classList.add('oons-has-ios-store'); } catch (_) {}
 

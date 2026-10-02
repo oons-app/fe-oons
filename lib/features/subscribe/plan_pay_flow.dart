@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,6 +12,7 @@ import 'package:oons/features/book/book_widgets.dart';
 import 'package:oons/features/client/client_chrome.dart';
 import 'package:oons/features/me/me_screens.dart';
 import 'package:oons/features/pay/pay_checkout_frame.dart';
+import 'package:oons/features/pay/pay_manual_panel.dart';
 import 'package:oons/features/subscribe/month_dates_copy.dart';
 import 'package:oons/features/subscribe/plan_calendar.dart';
 import 'package:oons/features/system/empty_states.dart';
@@ -98,6 +100,7 @@ Future<PlanPayResult> runPlanPay(BuildContext context, WidgetRef ref, PlanPayReq
       return const PlanPayLaunched();
     }
     final url = '${r['checkoutUrl'] ?? ''}'.trim();
+    final number = '${r['instapayNumber'] ?? ''}'.trim();
     await Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (_) => PlanPayingScreen(
         subscriptionId: id,
@@ -105,6 +108,7 @@ Future<PlanPayResult> runPlanPay(BuildContext context, WidgetRef ref, PlanPayReq
         totalPiastres: req.totalPiastres,
         checkoutUrl: url.isEmpty ? null : url,
         holdUntil: until,
+        instapayNumber: number.isEmpty ? '01117198333' : number,
       ),
     ));
     return const PlanPayLaunched();
@@ -204,6 +208,13 @@ class _PaySheetState extends ConsumerState<_PaySheet> {
                       note: '${co['instapayNote']}',
                       onTap: () => setState(() => method = 'instapay'),
                     ),
+                    BookPayMethodTile(
+                      selected: method == 'manual',
+                      kind: BookPayKind.transfer,
+                      title: '${co['instapayManual']}',
+                      note: '${co['instapayManualNote']}',
+                      onTap: () => setState(() => method = 'manual'),
+                    ),
                     const SizedBox(height: 12),
                     ClientPrimaryButton(
                       label: MD.cta(arFmt(widget.total / 100)),
@@ -220,7 +231,11 @@ class _PaySheetState extends ConsumerState<_PaySheet> {
 
 // ── Paying / recovery screen ───────────────────────────────────────────────
 
-String _methodLabel(String m) => m == 'instapay' ? 'محفظة الهاتف' : 'البطاقة';
+String _methodLabel(String m) {
+  if (m == 'instapay') return 'محفظة الهاتف';
+  if (m == 'manual') return 'إنستاباي';
+  return 'البطاقة';
+}
 
 /// Frame + polling while the gateway runs, and the recoverable error branch
 /// (nothing charged, slots still held with a countdown, retry / other
@@ -234,12 +249,14 @@ class PlanPayingScreen extends ConsumerStatefulWidget {
     this.checkoutUrl,
     this.holdUntil,
     this.startInError = false,
+    this.instapayNumber = '01117198333',
   });
   final String subscriptionId, method;
   final int totalPiastres;
   final String? checkoutUrl;
   final DateTime? holdUntil;
   final bool startInError;
+  final String instapayNumber;
 
   @override
   ConsumerState<PlanPayingScreen> createState() => _PlanPayingScreenState();
@@ -253,6 +270,9 @@ class _PlanPayingScreenState extends ConsumerState<PlanPayingScreen> with Widget
   bool failed = false;
   bool expired = false;
   bool done = false;
+  bool receiptSubmitted = false;
+  bool receiptBusy = false;
+  Uint8List? receiptBytes;
   Timer? _poll;
 
   @override
@@ -353,8 +373,32 @@ class _PlanPayingScreenState extends ConsumerState<PlanPayingScreen> with Widget
   }
 
   void _otherMethod() {
-    setState(() => method = method == 'card' ? 'instapay' : 'card');
+    setState(() => method = method == 'card' ? 'instapay' : method == 'instapay' ? 'manual' : 'card');
     unawaited(_start());
+  }
+
+  Future<void> _pickReceipt() async {
+    final f = await pickPayReceipt();
+    if (f == null) return;
+    final bytes = await f.readAsBytes();
+    if (mounted) setState(() => receiptBytes = Uint8List.fromList(bytes));
+  }
+
+  Future<void> _submitReceipt() async {
+    if (receiptBytes == null || receiptBusy) return;
+    setState(() => receiptBusy = true);
+    try {
+      final r = await subApi.upload('/subscriptions/${widget.subscriptionId}/pay/receipt', 'receipt', receiptBytes!, filename: 'instapay.jpg');
+      if (!mounted) return;
+      setState(() {
+        receiptBusy = false;
+        receiptSubmitted = r['receiptSubmitted'] == true;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => receiptBusy = false);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('الصورة ما اترفعتش. جرّبي تاني.')));
+    }
   }
 
   @override
@@ -394,6 +438,20 @@ class _PlanPayingScreenState extends ConsumerState<PlanPayingScreen> with Widget
   }
 
   Widget _payingBody() {
+    if (method == 'manual') {
+      final book = Map<String, String>.from(((Copy.of('ar')['book'] as Map?) ?? const {}).map((k, v) => MapEntry('$k', '$v')));
+      return PayManualPanel(
+        lang: 'ar',
+        bf: book,
+        amountPiastres: widget.totalPiastres,
+        number: widget.instapayNumber,
+        preview: receiptBytes,
+        busy: receiptBusy,
+        submitted: receiptSubmitted,
+        onPick: _pickReceipt,
+        onSubmit: _submitReceipt,
+      );
+    }
     if (starting || url == null) {
       return Center(
         child: Padding(
@@ -452,7 +510,7 @@ class _PlanPayingScreenState extends ConsumerState<PlanPayingScreen> with Widget
   }
 
   Widget _errorBody(bool holdGone) {
-    final other = method == 'card' ? 'محفظة الهاتف' : 'البطاقة';
+    final other = method == 'card' ? 'محفظة الهاتف' : method == 'instapay' ? 'إنستاباي' : 'البطاقة';
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(

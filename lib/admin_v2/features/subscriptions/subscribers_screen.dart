@@ -45,6 +45,7 @@ class SubRow {
     required this.status,
     required this.nextRenewal,
     required this.nextVisitId,
+    this.hasReceipt = false,
   });
   final String id;
   final String customer;
@@ -55,6 +56,7 @@ class SubRow {
   final String status;
   final String nextRenewal;
   final String nextVisitId;
+  final bool hasReceipt;
 
   static SubRow from(Map<String, dynamic> r) {
     final sub = asMap(r['subscription']) ?? r;
@@ -71,6 +73,7 @@ class SubRow {
       status: status,
       nextRenewal: '${r['nextRenewal'] ?? ''}',
       nextVisitId: nv != null ? idOf(nv) : '${r['nextVisitId'] ?? ''}',
+      hasReceipt: r['hasReceipt'] == true,
     );
   }
 }
@@ -170,6 +173,26 @@ class _SubscribersScreenState extends ConsumerState<SubscribersScreen> {
   String _err(Object e) => e is ApiException && e.message.isNotEmpty ? e.message : t(V2SubsCopy.failed, _lang);
 
   // --- actions ---------------------------------------------------------------
+
+  Future<void> _confirmPay(SubRow r) async {
+    final lang = _lang;
+    final ok = await v2Confirm(
+      context,
+      title: lang == 'ar' ? 'تأكيد تحويل إنستاباي؟' : 'Confirm this InstaPay transfer?',
+      body: lang == 'ar'
+          ? 'هتتفعّل الباقة بعد ما تتأكدي إن التحويل وصل.'
+          : 'The plan starts once you confirm the transfer arrived.',
+      confirmLabel: lang == 'ar' ? 'تأكيد' : 'Confirm',
+    );
+    if (!ok || !mounted) return;
+    try {
+      await client.post('/admin/subscriptions/${r.id}/confirm-payment');
+      _toast(lang == 'ar' ? 'اتأكد الدفع واتفعّلت الباقة.' : 'Payment confirmed. The plan is active.');
+      _load();
+    } catch (e) {
+      _toast(_err(e), error: true);
+    }
+  }
 
   Future<void> _pause(SubRow r) async {
     final lang = _lang;
@@ -466,6 +489,8 @@ class _SubscribersScreenState extends ConsumerState<SubscribersScreen> {
                   spacing: 6,
                   runSpacing: 4,
                   children: [
+              if (canWrite && r.status == 'pending_payment' && r.hasReceipt)
+                V2Btn(key: Key('confirm-${r.id}'), label: lang == 'ar' ? 'تأكيد إنستاباي' : 'Confirm InstaPay', onPressed: () => _confirmPay(r), size: V2BtnSize.row),
               if (canWrite && r.status == 'active')
                 V2Btn(key: Key('pause-${r.id}'), label: t(V2SubsCopy.pause, lang), onPressed: () => _pause(r), size: V2BtnSize.row),
               if (canWrite && (r.status == 'active' || r.status == 'paused' || r.status == 'at_risk'))
