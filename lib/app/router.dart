@@ -7,6 +7,7 @@ import 'package:oons/app/shell.dart';
 import 'package:oons/app/web_host.dart';
 import 'package:oons/core/analytics.dart';
 import 'package:oons/data/repo.dart';
+import 'package:oons/ds/gallery.dart';
 import 'package:oons/features/auth/auth_screens.dart';
 import 'package:oons/data/models.dart';
 import 'package:oons/features/book/book_screens.dart';
@@ -74,6 +75,8 @@ String? gateRedirect({
   }
   final seenOnboard = onboarded || authed;
   if (loc.startsWith('/p/') || loc.startsWith('/legal')) return null;
+  // The design-system gallery is a developer tool: reachable signed-out, never in release.
+  if (!kReleaseMode && loc == '/ds') return null;
   if (authed && isAuthGate(loc)) {
     final pending = Hive.box('prefs').get('pending_path');
     if (pending is String && pending.isNotEmpty) {
@@ -166,6 +169,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         ),
       ),
       GoRoute(path: '/provider/:id', builder: (c, s) => ProviderScreen(id: s.pathParameters['id']!)),
+      if (!kReleaseMode) GoRoute(path: '/ds', builder: (c, s) => const DsGalleryScreen()),
       GoRoute(path: '/plans/:id', builder: (c, s) => CleaningPlansScreen(providerId: s.pathParameters['id']!, providerName: s.uri.queryParameters['name'] ?? '')),
       GoRoute(
         path: '/plan/included',
