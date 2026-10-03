@@ -5,12 +5,15 @@ import 'package:oons/ds/tokens.dart';
 /// Toggle chip: ink border; on = plum / cream, off = white / ink.
 /// [mono] sets the label in IBM Plex Mono (hours, numbers).
 class DsChip extends StatelessWidget {
-  const DsChip({super.key, required this.label, required this.on, required this.onTap, this.mono = false, this.minWidth = 0});
+  const DsChip({super.key, required this.label, required this.on, required this.onTap, this.mono = false, this.minWidth = 0, this.compact = false});
   final String label;
   final bool on;
   final VoidCallback? onTap;
   final bool mono;
   final double minWidth;
+
+  /// Tighter side padding, for rows of chips that must share one line.
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -25,7 +28,7 @@ class DsChip extends StatelessWidget {
         child: Container(
           constraints: BoxConstraints(minHeight: Ds.minTarget, minWidth: minWidth),
           alignment: Alignment.center,
-          padding: const EdgeInsets.symmetric(horizontal: Ds.s3),
+          padding: EdgeInsets.symmetric(horizontal: compact ? 2 : Ds.s3),
           decoration: BoxDecoration(color: on ? Ds.plum : Ds.white, border: Border.all(color: Ds.ink, width: Ds.rule)),
           child: Text(
             label,

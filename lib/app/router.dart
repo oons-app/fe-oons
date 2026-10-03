@@ -8,6 +8,7 @@ import 'package:oons/app/web_host.dart';
 import 'package:oons/core/analytics.dart';
 import 'package:oons/data/repo.dart';
 import 'package:oons/ds/gallery.dart';
+import 'package:oons/features/pro/v2/specialty_page.dart';
 import 'package:oons/features/auth/auth_screens.dart';
 import 'package:oons/data/models.dart';
 import 'package:oons/features/book/book_screens.dart';
@@ -150,6 +151,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(path: '/register', builder: (c, s) => ClientRegisterScreen(phone: s.uri.queryParameters['phone'] ?? '', code: s.uri.queryParameters['code'] ?? '')),
       GoRoute(path: '/pro/register', builder: (c, s) => ProRegisterScreen(phone: s.uri.queryParameters['phone'] ?? '', code: s.uri.queryParameters['code'] ?? '')),
+      GoRoute(path: '/pro/specialty/:id', builder: (c, s) => ProSpecialtyScreen(categoryId: s.pathParameters['id']!)),
       GoRoute(path: '/pro/team', builder: (c, s) => const ProTeamScreen()),
       GoRoute(path: '/pro/coupons', builder: (c, s) => const ProCouponsScreen()),
       GoRoute(path: '/pro/job/:id', builder: (c, s) => ProJobScreen(id: s.pathParameters['id']!)),

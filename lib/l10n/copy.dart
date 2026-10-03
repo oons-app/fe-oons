@@ -1,3 +1,5 @@
+import 'package:oons/l10n/pro_v2_copy.dart';
+
 class Copy {
   Copy._();
 
@@ -534,6 +536,7 @@ class Copy {
     },
     'tabs': ['Home', 'Bookings', 'Profile'],
     'proTabs': ['Visits', 'Services', 'Earnings', 'Account'],
+    'pv2': ProV2Copy.en,
     'empty': {
       'nothingPickedTitle': 'You haven\'t picked a service yet',
       'nothingPickedBody': 'Add a service with the plus above. Once you choose, we only ask what that service needs.',
@@ -1875,6 +1878,7 @@ class Copy {
     },
     'tabs': ['الرئيسية', 'حجوزاتي', 'حسابي'],
     'proTabs': ['الزيارات', 'خدماتي', 'الأرباح', 'حسابي'],
+    'pv2': ProV2Copy.ar,
     'empty': {
       'nothingPickedTitle': 'لم تختاري أي خدمة بعد',
       'nothingPickedBody': 'أضيفي خدمة بعلامة الزائد في الأعلى. وبمجرد اختيارها نسألك عمّا تحتاجه هذه الخدمة فقط.',

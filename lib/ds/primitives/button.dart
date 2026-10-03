@@ -25,7 +25,7 @@ class DsButton extends StatelessWidget {
   final VoidCallback? onTap;
   final DsButtonKind kind;
 
-  /// Trailing icon (an Ons icon name). Primary defaults to `advance`.
+  /// Trailing icon (an Ons icon name). Primary defaults to `advance`; pass `''` for none.
   final String? icon;
   final bool compact;
   final bool busy;
@@ -51,7 +51,8 @@ class DsButton extends StatelessWidget {
                 ? Ds.terracottaText
                 : Ds.ink;
     final border = primary ? null : Border.all(color: danger ? Ds.terracotta : Ds.ink, width: Ds.rule);
-    final trailing = busy ? null : (icon ?? (primary ? 'advance' : null));
+    // icon == '' means "no icon" (a primary button otherwise shows `advance`).
+    final trailing = busy ? null : (icon == null ? (primary ? 'advance' : null) : (icon!.isEmpty ? null : icon));
     return Semantics(
       button: true,
       enabled: _enabled,

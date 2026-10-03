@@ -1,43 +1,42 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:oons/core/tokens.dart';
+import 'package:oons/ds/ds.dart';
 
-/// Soft, rounded chrome for the provider app — matches the Service Provider
-/// App HTML design (rounded cards, plum pills, white surfaces).
+/// Provider-app chrome. Since design system v2 every widget here is a thin
+/// adapter over `lib/ds` (square, ink-bordered, plum): the names stay so older
+/// screens keep compiling, but there is exactly one look. New code should use
+/// the `Ds*` components directly.
 class Pro {
-  static const bg = Color(0xFFF7F3EE);
-  static const card = Color(0xFFFFFFFF);
-  static const ink = Color(0xFF241820);
-  static const muted = Color(0xFF8A7C84);
-  static const soft = Color(0xFF6C5F66);
-  static const plum = Color(0xFF4A2740);
-  static const plumSoft = Color(0xFFEDE4EA);
-  static const plumPale = Color(0xFFD9C6D2);
-  static const sand = Color(0xFFEDE7E0);
-  static const chip = Color(0xFFF2ECE6);
-  static const line = Color(0xFFE4DBD3);
-  static const lineSoft = Color(0xFFE9E1DA);
-  static const tip = Color(0xFFF0E8EE);
-  static const warnBg = Color(0xFFFBF6F0);
-  static const warnLine = Color(0xFFEADFD2);
-  static const danger = Color(0xFF9B3B3B);
-  static const dangerLine = Color(0xFFE4CFCF);
-  static const pendingBg = Color(0xFFFBF1E2);
-  static const pendingLine = Color(0xFFE3C89A);
-  static const pendingInk = Color(0xFF8A6420);
-  static const navMuted = Color(0xFFA99DA4);
+  static const bg = Ds.cream;
+  static const card = Ds.white;
+  static const ink = Ds.ink;
+  static const muted = Ds.textMuted;
+  static const soft = Ds.textBody;
+  static const plum = Ds.plum;
+  static const plumSoft = Ds.plumLight;
+  static const plumPale = Ds.plumLight;
+  static const sand = Ds.neutral;
+  static const chip = Ds.surface;
+  static const line = Ds.divider;
+  static const lineSoft = Ds.divider;
+  static const tip = Ds.plumLight;
+  static const warnBg = Ds.terracottaBg;
+  static const warnLine = Ds.terracotta;
+  static const danger = Ds.terracottaText;
+  static const dangerLine = Ds.terracotta;
+  static const pendingBg = Ds.terracottaBg;
+  static const pendingLine = Ds.terracotta;
+  static const pendingInk = Ds.terracottaText;
+  static const navMuted = Ds.textMuted;
 
-  static const rCard = 18.0;
-  static const rMd = 14.0;
-  static const rSm = 12.0;
-  static const rPill = 999.0;
+  /// Everything is square.
+  static const rCard = 0.0;
+  static const rMd = 0.0;
+  static const rSm = 0.0;
+  static const rPill = 0.0;
 
-  static BoxDecoration cardDec({Color? color, Color? border, double radius = rCard}) => BoxDecoration(
-        color: color ?? card,
-        borderRadius: BorderRadius.circular(radius),
-        border: Border.all(color: border ?? line),
-        boxShadow: const [BoxShadow(color: Color(0x0A241820), blurRadius: 2, offset: Offset(0, 1))],
-      );
+  static BoxDecoration cardDec({Color? color, Color? border, double radius = 0}) => Ds.card(color: color, border: border);
 }
 
 class ProPageTitle extends StatelessWidget {
@@ -49,7 +48,7 @@ class ProPageTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 6, 20, 12),
+      padding: const EdgeInsets.fromLTRB(Ds.gutter, 6, Ds.gutter, 12),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -57,11 +56,8 @@ class ProPageTitle extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: Pro.ink, height: 1.2)),
-                if (subtitle != null) ...[
-                  const SizedBox(height: 2),
-                  Text(subtitle!, style: const TextStyle(fontSize: 12, color: Pro.muted, height: 1.4)),
-                ],
+                Text(title, style: DsText.subTitle),
+                if (subtitle != null) ...[const SizedBox(height: 2), Text(subtitle!, style: DsText.meta)],
               ],
             ),
           ),
@@ -81,10 +77,7 @@ class ProSectionLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Text(
-          label,
-          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.8, color: Pro.muted),
-        ),
+        Text(label, style: DsText.section.copyWith(fontSize: 15)),
         if (trailing != null) ...[const SizedBox(width: 8), trailing!],
       ],
     );
@@ -99,22 +92,7 @@ class ProCard extends StatelessWidget {
   final VoidCallback? onTap;
 
   @override
-  Widget build(BuildContext context) {
-    final body = Container(
-      padding: padding,
-      decoration: Pro.cardDec(color: color),
-      child: child,
-    );
-    if (onTap == null) return body;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(Pro.rCard),
-        child: body,
-      ),
-    );
-  }
+  Widget build(BuildContext context) => DsCard(padding: padding, color: color, onTap: onTap, child: child);
 }
 
 class ProSegment extends StatelessWidget {
@@ -124,42 +102,7 @@ class ProSegment extends StatelessWidget {
   final ValueChanged<int> onChanged;
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(color: Pro.sand, borderRadius: BorderRadius.circular(Pro.rPill)),
-      child: Row(
-        children: List.generate(labels.length, (i) {
-          final on = index == i;
-          return Expanded(
-            child: GestureDetector(
-              onTap: () => onChanged(i),
-              child: AnimatedContainer(
-                duration: T.dState,
-                padding: const EdgeInsets.symmetric(vertical: 9),
-                decoration: BoxDecoration(
-                  color: on ? Pro.card : Colors.transparent,
-                  borderRadius: BorderRadius.circular(Pro.rPill),
-                  boxShadow: on
-                      ? const [BoxShadow(color: Color(0x14241820), blurRadius: 3, offset: Offset(0, 1))]
-                      : null,
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  labels[i],
-                  style: TextStyle(
-                    fontSize: labels.length > 2 ? 12 : 13,
-                    fontWeight: on ? FontWeight.w700 : FontWeight.w600,
-                    color: on ? Pro.ink : Pro.muted,
-                  ),
-                ),
-              ),
-            ),
-          );
-        }),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => DsSegmented(labels: labels, index: index, onChanged: onChanged);
 }
 
 class ProPill extends StatelessWidget {
@@ -170,21 +113,8 @@ class ProPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: hot ? Pro.plum : (soft ? Pro.sand : Pro.plumSoft),
-        borderRadius: BorderRadius.circular(Pro.rPill),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          color: hot ? Colors.white : (soft ? Pro.soft : Pro.plum),
-        ),
-      ),
-    );
+    if (!hot && !soft) return DsTag(label);
+    return DsStatusBadge(label, tone: hot ? DsTone.olive : DsTone.neutral);
   }
 }
 
@@ -199,14 +129,8 @@ class ProAvatar extends StatelessWidget {
       width: size,
       height: size,
       alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: Pro.plumSoft,
-        borderRadius: BorderRadius.circular(size * 0.32),
-      ),
-      child: Text(
-        _initialOf(initial),
-        style: TextStyle(fontSize: size * 0.4, fontWeight: FontWeight.w700, color: Pro.plum),
-      ),
+      color: Ds.surface,
+      child: Text(_initialOf(initial), style: TextStyle(fontSize: size * 0.4, fontWeight: FontWeight.w700, color: Ds.plum)),
     );
   }
 }
@@ -218,25 +142,7 @@ class ProPrimaryButton extends StatelessWidget {
   final bool enabled;
 
   @override
-  Widget build(BuildContext context) {
-    return Opacity(
-      opacity: enabled ? 1 : 0.45,
-      child: Material(
-        color: Pro.plum,
-        borderRadius: BorderRadius.circular(16),
-        child: InkWell(
-          onTap: enabled ? onTap : null,
-          borderRadius: BorderRadius.circular(16),
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 15),
-            alignment: Alignment.center,
-            child: Text(label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white)),
-          ),
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => DsButton(label: label, onTap: enabled ? onTap : null);
 }
 
 class ProSoftButton extends StatelessWidget {
@@ -246,28 +152,8 @@ class ProSoftButton extends StatelessWidget {
   final bool danger;
 
   @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(Pro.rSm),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(vertical: 11),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(Pro.rSm),
-            border: Border.all(color: danger ? Pro.dangerLine : const Color(0xFFDCD2CB)),
-          ),
-          child: Text(
-            label,
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: danger ? Pro.danger : Pro.ink),
-          ),
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) =>
+      DsButton(label: label, onTap: onTap, kind: danger ? DsButtonKind.danger : DsButtonKind.secondary, compact: true);
 }
 
 class ProChip extends StatelessWidget {
@@ -287,32 +173,15 @@ class ProChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Color bg = Pro.chip;
-    Color fg = Pro.soft;
-    Border? border;
-    if (pending) {
-      bg = Pro.pendingBg;
-      fg = Pro.pendingInk;
-      border = Border.all(color: Pro.pendingLine);
-    } else if (on) {
-      bg = Pro.plum;
-      fg = Colors.white;
-    }
+    if (!pending) return DsChip(label: label, on: on, onTap: onTap, mono: mono);
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(Pro.rPill),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-        decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(Pro.rPill), border: border),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: fg,
-            fontFamily: mono ? T.mono : null,
-          ),
-        ),
+        constraints: const BoxConstraints(minHeight: Ds.minTarget),
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(horizontal: Ds.s3),
+        decoration: BoxDecoration(color: Ds.terracottaBg, border: Border.all(color: Ds.terracotta, width: Ds.rule)),
+        child: Text(label, style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: Ds.terracottaText, fontFamily: mono ? T.mono : null)),
       ),
     );
   }
@@ -328,34 +197,16 @@ class ProStatTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: accent ? Pro.plum : Pro.card,
-        borderRadius: BorderRadius.circular(Pro.rMd),
-        border: Border.all(color: accent ? Pro.plum : Pro.line),
-      ),
+      decoration: Ds.card(color: accent ? Ds.plumLight : Ds.white),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontSize: 11, color: accent ? Pro.plumPale : Pro.muted),
-          ),
+          Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: DsText.meta.copyWith(fontSize: 11)),
           const SizedBox(height: 2),
           FittedBox(
             fit: BoxFit.scaleDown,
             alignment: AlignmentDirectional.centerStart,
-            child: Text(
-              value,
-              maxLines: 1,
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: accent ? Colors.white : Pro.ink,
-                fontFamily: T.mono,
-              ),
-            ),
+            child: Text(value, maxLines: 1, style: DsText.num(size: 18, weight: FontWeight.w600)),
           ),
         ],
       ),
@@ -382,11 +233,7 @@ class ProField extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 4),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFBF8F5),
-        borderRadius: BorderRadius.circular(Pro.rSm),
-        border: Border.all(color: const Color(0xFFE0D6CE)),
-      ),
+      decoration: Ds.card(),
       child: TextField(
         controller: controller,
         keyboardType: keyboard,
@@ -395,14 +242,11 @@ class ProField extends StatelessWidget {
             ? [_ProAsciiDigitFormatter()]
             : null,
         onChanged: onChanged,
-        style: TextStyle(
-          fontFamily: mono ? T.mono : null,
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-          color: Pro.ink,
-        ),
+        cursorColor: Ds.plum,
+        style: TextStyle(fontFamily: mono ? T.mono : null, fontSize: 15, fontWeight: FontWeight.w600, color: Ds.ink),
         decoration: InputDecoration(
           hintText: hint,
+          hintStyle: const TextStyle(fontSize: 14, color: Ds.textFaint),
           border: InputBorder.none,
           isDense: true,
           contentPadding: const EdgeInsets.symmetric(vertical: 10),
@@ -448,15 +292,23 @@ class ProTip extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
-      decoration: BoxDecoration(color: Pro.ink, borderRadius: BorderRadius.circular(Pro.rSm)),
-      child: Text(text, style: const TextStyle(fontSize: 12, height: 1.6, color: const Color(0xFFF0E8EE))),
+      color: Ds.ink,
+      child: Text(text, style: const TextStyle(fontSize: 12.5, height: 1.6, color: Ds.cream)),
     );
   }
 }
 
-/// Inline «؟» that toggles a dark tip bubble (prototype behavior).
+Widget _helpDot(bool open, double size) => Container(
+      width: size,
+      height: size,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(border: Border.all(color: Ds.ink, width: Ds.rule), color: open ? Ds.plumLight : Colors.transparent),
+      child: Text('؟', style: TextStyle(fontSize: size * 0.55, fontWeight: FontWeight.w700, color: open ? Ds.plum : Ds.textMuted, height: 1)),
+    );
+
+/// Inline «؟» that toggles a dark tip bubble.
 class ProHelpMark extends StatefulWidget {
-  const ProHelpMark(this.text, {super.key, this.size = 18});
+  const ProHelpMark(this.text, {super.key, this.size = 22});
   final String text;
   final double size;
 
@@ -474,29 +326,9 @@ class _ProHelpMarkState extends State<ProHelpMark> {
       children: [
         Align(
           alignment: AlignmentDirectional.centerStart,
-          child: InkWell(
-            onTap: () => setState(() => open = !open),
-            borderRadius: BorderRadius.circular(999),
-            child: Container(
-              width: widget.size,
-              height: widget.size,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: const Color(0xFFC9BCC4)),
-                color: open ? Pro.plumSoft : Colors.transparent,
-              ),
-              child: Text(
-                '؟',
-                style: TextStyle(fontSize: widget.size * 0.55, fontWeight: FontWeight.w700, color: open ? Pro.plum : Pro.muted, height: 1),
-              ),
-            ),
-          ),
+          child: InkWell(onTap: () => setState(() => open = !open), child: _helpDot(open, widget.size)),
         ),
-        if (open) ...[
-          const SizedBox(height: 8),
-          ProTip(widget.text),
-        ],
+        if (open) ...[const SizedBox(height: 8), ProTip(widget.text)],
       ],
     );
   }
@@ -524,35 +356,12 @@ class _ProSectionWithHelpState extends State<ProSectionWithHelp> {
       children: [
         Row(
           children: [
-            Expanded(
-              child: Text(widget.label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.2, color: Pro.muted)),
-            ),
-            if (help.isNotEmpty)
-              InkWell(
-                onTap: () => setState(() => open = !open),
-                borderRadius: BorderRadius.circular(999),
-                child: Container(
-                  width: 18,
-                  height: 18,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: const Color(0xFFC9BCC4)),
-                    color: open ? Pro.plumSoft : Colors.transparent,
-                  ),
-                  child: Text('؟', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: open ? Pro.plum : Pro.muted, height: 1)),
-                ),
-              ),
-            if (widget.trailing != null) ...[
-              const SizedBox(width: 8),
-              widget.trailing!,
-            ],
+            Expanded(child: Text(widget.label, style: DsText.section.copyWith(fontSize: 15))),
+            if (help.isNotEmpty) InkWell(onTap: () => setState(() => open = !open), child: _helpDot(open, 22)),
+            if (widget.trailing != null) ...[const SizedBox(width: 8), widget.trailing!],
           ],
         ),
-        if (open && help.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          ProTip(help),
-        ],
+        if (open && help.isNotEmpty) ...[const SizedBox(height: 8), ProTip(help)],
       ],
     );
   }
@@ -568,11 +377,10 @@ class ProHintBanner extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: dashed ? const Color(0xFFFBF8F5) : Pro.warnBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: dashed ? const Color(0xFFD6C9D1) : Pro.warnLine),
+        color: dashed ? Ds.surface : Ds.terracottaBg,
+        border: Border.all(color: dashed ? Ds.divider : Ds.terracotta, width: Ds.rule),
       ),
-      child: Text(text, style: const TextStyle(fontSize: 12, height: 1.7, color: Pro.soft)),
+      child: Text(text, style: DsText.body.copyWith(fontSize: 12.5, height: 1.7)),
     );
   }
 }

@@ -144,6 +144,10 @@ class ProviderP {
     this.planFromPiastres,
     this.planCount = 0,
     this.planSavePct = 0,
+    this.bookingsPaused = false,
+    this.linkClosed = false,
+    this.idDocStatus = '',
+    this.fishDocStatus = '',
   });
   final String id;
   final Loc firstName;
@@ -181,6 +185,18 @@ class ProviderP {
   final int? planFromPiastres;
   final int planCount;
   final int planSavePct;
+
+  /// She switched "available for booking" off (hidden from search, no new bookings).
+  final bool bookingsPaused;
+
+  /// Her public booking link is closed.
+  final bool linkClosed;
+  bool get available => !bookingsPaused;
+  bool get linkOpen => !linkClosed;
+
+  /// Staff decision on her uploaded papers: pending | accepted | rejected | ''.
+  final String idDocStatus;
+  final String fishDocStatus;
   bool get hasPlan => planCount > 0 && planFromPiastres != null;
 
   /// Cleaning is the provider's vertical, or one of her services is a cleaning package.
@@ -236,6 +252,10 @@ class ProviderP {
         planFromPiastres: j['planBadge'] is Map ? (j['planBadge']['fromPiastres'] as num?)?.toInt() : null,
         planCount: j['planBadge'] is Map ? (j['planBadge']['count'] as num?)?.toInt() ?? 0 : 0,
         planSavePct: j['planBadge'] is Map ? (j['planBadge']['savePct'] as num?)?.toInt() ?? 0 : 0,
+        bookingsPaused: j['bookingsPaused'] == true,
+        linkClosed: j['linkClosed'] == true,
+        idDocStatus: '${j['idDocStatus'] ?? ''}',
+        fishDocStatus: '${j['fishDocStatus'] ?? ''}',
       );
 }
 
@@ -318,6 +338,28 @@ class ServiceItem {
 
   bool get isCleaning => kind == 'cleaning';
   bool get isPendingApproval => approvalState == 'pending';
+
+  /// Same service with a changed visibility / price (used for optimistic UI).
+  ServiceItem copyWith({bool? active, int? price}) => ServiceItem(
+        id: id,
+        name: name,
+        duration: duration,
+        price: price ?? this.price,
+        categoryId: categoryId,
+        catalogItemId: catalogItemId,
+        kind: kind,
+        active: active ?? this.active,
+        travelFee: travelFee,
+        sizeFromSqm: sizeFromSqm,
+        sizeToSqm: sizeToSqm,
+        workerCount: workerCount,
+        excludedTaskIds: excludedTaskIds,
+        approvalState: approvalState,
+        benefits: benefits,
+        vertical: vertical,
+        needsHairLength: needsHairLength,
+        hairSurcharge: hairSurcharge,
+      );
 
   factory ServiceItem.fromJson(Map j) {
     // bookBootstrap wraps each item as {item, vertical} so the booking

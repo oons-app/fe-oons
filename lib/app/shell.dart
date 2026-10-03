@@ -12,7 +12,10 @@ import 'package:oons/features/bookings/bookings_screens.dart';
 import 'package:oons/features/client/client_chrome.dart';
 import 'package:oons/features/client/client_tour.dart';
 import 'package:oons/features/home/home_screen.dart';
-import 'package:oons/features/pro/pro_services_screen.dart';
+import 'package:oons/ds/ds.dart';
+import 'package:oons/features/pro/v2/pro_nav.dart';
+import 'package:oons/features/pro/v2/services_tab.dart';
+import 'package:oons/features/pro/v2/t.dart';
 import 'package:oons/features/pro/pro_screens.dart';
 import 'package:oons/features/pro/pro_tour.dart';
 import 'package:oons/features/profile/profile_screen.dart';
@@ -62,12 +65,23 @@ class AppShell extends ConsumerWidget {
     return Scaffold(
       backgroundColor: provider ? T.bg : Client.bg,
       body: child,
-      bottomNavigationBar: OonsTabBar(
-        index: index.clamp(0, tabs.length - 1),
-        labels: tabs,
-        provider: provider,
-        onTap: (i) => onTab != null ? onTab!(i) : null,
-      ),
+      bottomNavigationBar: provider
+          ? DsBottomNav(
+              items: [
+                DsNavItem(label: pv2(ref)('tabVisits'), icon: 'calendar'),
+                DsNavItem(label: pv2(ref)('tabServices'), icon: 'list'),
+                DsNavItem(label: pv2(ref)('tabEarnings'), icon: 'wallet'),
+                DsNavItem(label: pv2(ref)('tabAccount'), icon: 'user'),
+              ],
+              index: index.clamp(0, 3),
+              onTap: (i) => onTab != null ? onTab!(i) : null,
+            )
+          : OonsTabBar(
+              index: index.clamp(0, tabs.length - 1),
+              labels: tabs,
+              provider: provider,
+              onTap: (i) => onTab != null ? onTab!(i) : null,
+            ),
     );
   }
 }
@@ -147,12 +161,29 @@ class _ProShellState extends ConsumerState<ProShell> {
   void initState() {
     super.initState();
     index = AppShell.indexFor(widget.initialPath, provider: true);
+    ProNav.tab.value = index;
+    ProNav.tab.addListener(_onNavTab);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _trackTab(index);
       if (!proTourDone() && mounted) {
         unawaited(showProTour(context, lang: langOf(ref)));
       }
     });
+  }
+
+  @override
+  void dispose() {
+    ProNav.tab.removeListener(_onNavTab);
+    super.dispose();
+  }
+
+  /// «زوّدي مناطق» on الزيارات, «طلب تخصص» from حسابي… switch the tab from outside.
+  void _onNavTab() {
+    final next = ProNav.tab.value.clamp(0, AppShell.proPaths.length - 1);
+    if (next != index && mounted) {
+      setState(() => index = next);
+      _trackTab(next);
+    }
   }
 
   void _trackTab(int i) {
@@ -166,6 +197,7 @@ class _ProShellState extends ConsumerState<ProShell> {
       location: AppShell.proPaths[index],
       tabIndex: index,
       onTab: (i) {
+        ProNav.tab.value = i;
         setState(() => index = i);
         _trackTab(i);
       },
@@ -173,7 +205,7 @@ class _ProShellState extends ConsumerState<ProShell> {
         index: index,
         children: [
           const ProJobsScreen(),
-          ProServicesScreen(openSpecialtyPicker: widget.openSpecialtyPicker),
+          ProServicesTab(openSpecialtyPicker: widget.openSpecialtyPicker),
           const ProEarningsScreen(),
           const ProAccountScreen(),
         ],

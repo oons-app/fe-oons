@@ -84,6 +84,9 @@ String friendlyError(Object e, String lang) {
       };
       final m = ar[msg];
       if (m != null) return m;
+      // The server already wrote this one in Arabic for the person (provider and
+      // subscription errors do): say exactly that, not a generic line.
+      if (_hasArabic(msg) && !_technical(low)) return msg;
       // Client-side validation errors: tell them to check inputs, not "server busy".
       if (e.status >= 400 && e.status < 500) {
         return 'هناك بيانات غير صحيحة في النموذج. راجعيها وحاولي مرة أخرى.';
@@ -96,6 +99,8 @@ String friendlyError(Object e, String lang) {
   if (_network('$e'.toLowerCase())) return '${t['offline']}';
   return '${t['generic']}';
 }
+
+bool _hasArabic(String s) => RegExp(r'[\u0600-\u06FF]').hasMatch(s);
 
 bool _network(String low) =>
     low.contains('offline') ||
