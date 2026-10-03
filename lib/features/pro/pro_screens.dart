@@ -1725,7 +1725,7 @@ class _ProAccountScreenState extends ConsumerState<ProAccountScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(lang == 'ar' ? 'تخصصك المعتمد' : 'Approved specialty', style: const TextStyle(fontSize: 11, color: Pro.muted)),
+                Text(lang == 'ar' ? 'تخصصاتك' : 'Your specialties', style: const TextStyle(fontSize: 11, color: Pro.muted)),
                 const SizedBox(height: 6),
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -1743,9 +1743,9 @@ class _ProAccountScreenState extends ConsumerState<ProAccountScreen> {
                         ),
                       ),
                       InkWell(
-                        onTap: () => context.go('/pro/services'),
+                        onTap: () => context.go('/pro/services?pick=1'),
                         child: Text(
-                          lang == 'ar' ? 'عدّلي من خدماتي' : 'Edit in Services',
+                          lang == 'ar' ? 'ضيفي تخصصات' : 'Add specialties',
                           style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Pro.plum),
                         ),
                       ),

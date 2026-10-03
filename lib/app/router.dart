@@ -121,7 +121,13 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/bookings', builder: (c, s) => const ClientShell(initialPath: '/bookings')),
       GoRoute(path: '/profile', builder: (c, s) => const ClientShell(initialPath: '/profile')),
       GoRoute(path: '/pro/jobs', builder: (c, s) => const ProShell(initialPath: '/pro/jobs')),
-      GoRoute(path: '/pro/services', builder: (c, s) => const ProShell(initialPath: '/pro/services')),
+      GoRoute(
+        path: '/pro/services',
+        builder: (c, s) => ProShell(
+          initialPath: '/pro/services',
+          openSpecialtyPicker: s.uri.queryParameters['pick'] == '1',
+        ),
+      ),
       GoRoute(path: '/pro/earnings', builder: (c, s) => const ProShell(initialPath: '/pro/earnings')),
       GoRoute(path: '/pro/account', builder: (c, s) => const ProShell(initialPath: '/pro/account')),
       GoRoute(path: '/onboard/:i', builder: (c, s) => OnboardScreen(index: int.tryParse(s.pathParameters['i'] ?? '0') ?? 0)),

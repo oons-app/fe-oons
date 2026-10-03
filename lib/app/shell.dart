@@ -132,8 +132,9 @@ class _ClientShellState extends ConsumerState<ClientShell> {
 }
 
 class ProShell extends ConsumerStatefulWidget {
-  const ProShell({super.key, this.initialPath = '/pro/jobs'});
+  const ProShell({super.key, this.initialPath = '/pro/jobs', this.openSpecialtyPicker = false});
   final String initialPath;
+  final bool openSpecialtyPicker;
 
   @override
   ConsumerState<ProShell> createState() => _ProShellState();
@@ -170,7 +171,12 @@ class _ProShellState extends ConsumerState<ProShell> {
       },
       child: IndexedStack(
         index: index,
-        children: const [ProJobsScreen(), ProServicesScreen(), ProEarningsScreen(), ProAccountScreen()],
+        children: [
+          const ProJobsScreen(),
+          ProServicesScreen(openSpecialtyPicker: widget.openSpecialtyPicker),
+          const ProEarningsScreen(),
+          const ProAccountScreen(),
+        ],
       ),
     );
   }

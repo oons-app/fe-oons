@@ -22,7 +22,10 @@ import 'package:oons/l10n/errors.dart';
 import 'package:uuid/uuid.dart';
 
 class ProServicesScreen extends ConsumerStatefulWidget {
-  const ProServicesScreen({super.key});
+  const ProServicesScreen({super.key, this.openSpecialtyPicker = false});
+
+  /// Opened from حسابي so she can add more than one specialty in one go.
+  final bool openSpecialtyPicker;
 
   @override
   ConsumerState<ProServicesScreen> createState() => _ProServicesScreenState();
@@ -64,6 +67,7 @@ class _ProServicesScreenState extends ConsumerState<ProServicesScreen> {
       unawaited(refreshServiceCities(activeOnly: true, force: true).then((_) {
         if (mounted) setState(() {});
       }));
+      if (widget.openSpecialtyPicker) unawaited(_requestCategorySheet());
     });
   }
 
@@ -126,7 +130,7 @@ class _ProServicesScreenState extends ConsumerState<ProServicesScreen> {
       );
       return;
     }
-    final picked = await showModalBottomSheet<Map<String, dynamic>>(
+    final picked = await showModalBottomSheet<List<Map<String, dynamic>>>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Pro.bg,
@@ -134,11 +138,14 @@ class _ProServicesScreenState extends ConsumerState<ProServicesScreen> {
       builder: (ctx) => _RequestCategorySheet(
         available: available,
         lang: lang,
-        onRequest: (cat) => Navigator.pop(ctx, cat),
+        onConfirm: (cats) => Navigator.pop(ctx, cats),
       ),
     );
-    if (picked == null || !mounted) return;
-    await _openCategoryServicesSheet(picked);
+    if (picked == null || picked.isEmpty || !mounted) return;
+    for (final cat in picked) {
+      if (!mounted) return;
+      await _openCategoryServicesSheet(cat);
+    }
   }
 
   Repo get repo => ref.read(repoProvider);
@@ -1922,22 +1929,34 @@ String _verticalLabel(String key, String lang) {
   return (lang == 'ar' ? ar : en)[key] ?? '';
 }
 
-class _RequestCategorySheet extends StatelessWidget {
+class _RequestCategorySheet extends StatefulWidget {
   const _RequestCategorySheet({
     required this.available,
     required this.lang,
-    required this.onRequest,
+    required this.onConfirm,
   });
   final List<Map<String, dynamic>> available;
   final String lang;
-  final void Function(Map<String, dynamic> category) onRequest;
+  final void Function(List<Map<String, dynamic>> categories) onConfirm;
+
+  @override
+  State<_RequestCategorySheet> createState() => _RequestCategorySheetState();
+}
+
+class _RequestCategorySheetState extends State<_RequestCategorySheet> {
+  final picked = <String>{};
+
+  String _id(Map<String, dynamic> c) => '${c['id'] ?? c['_id'] ?? ''}';
 
   @override
   Widget build(BuildContext context) {
+    final lang = widget.lang;
+    final ar = lang == 'ar';
+    final chosen = widget.available.where((c) => picked.contains(_id(c))).toList();
     return DraggableScrollableSheet(
       expand: false,
-      initialChildSize: 0.5,
-      maxChildSize: 0.85,
+      initialChildSize: 0.72,
+      maxChildSize: 0.92,
       builder: (_, ctrl) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1945,7 +1964,7 @@ class _RequestCategorySheet extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Text(
-              lang == 'ar' ? 'اطلبي إضافة تخصص' : 'Request a new specialty',
+              ar ? 'اطلبي إضافة تخصصات' : 'Request specialties',
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Pro.ink),
             ),
           ),
@@ -1953,35 +1972,48 @@ class _RequestCategorySheet extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Text(
-              lang == 'ar' ? 'اختاري التخصص اللي عايزاه وهنراجع الطلب.' : 'Pick the specialty you want — we\'ll review your request.',
+              ar ? 'اختاري تخصص أو أكتر. بعد كده نكمّل خدمات كل تخصص لوحده.' : 'Pick one or more. Next you’ll add the services for each specialty.',
               style: const TextStyle(fontSize: 13, color: Pro.muted, height: 1.45),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           Expanded(
             child: ListView.builder(
               controller: ctrl,
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-              itemCount: available.length,
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+              itemCount: widget.available.length,
               itemBuilder: (_, i) {
-                final c = available[i];
+                final c = widget.available[i];
+                final id = _id(c);
+                final on = picked.contains(id);
                 final n = c['name'];
                 final label = n is Map ? Loc.fromJson(n).of(lang) : '${n ?? c['slug']}';
                 final verticalLabel = _verticalLabel('${c['vertical'] ?? ''}', lang);
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: InkWell(
-                    onTap: () => onRequest(c),
+                    onTap: id.isEmpty
+                        ? null
+                        : () => setState(() {
+                              if (on) {
+                                picked.remove(id);
+                              } else {
+                                picked.add(id);
+                              }
+                            }),
                     borderRadius: BorderRadius.circular(12),
                     child: Container(
+                      constraints: const BoxConstraints(minHeight: 52),
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: Pro.card,
+                        color: on ? Pro.plumSoft : Pro.card,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Pro.line),
+                        border: Border.all(color: on ? Pro.plum : Pro.line, width: on ? 2 : 1),
                       ),
                       child: Row(
                         children: [
+                          Icon(on ? Icons.check_box : Icons.check_box_outline_blank, color: on ? Pro.plum : Pro.muted, size: 22),
+                          const SizedBox(width: 10),
                           Expanded(child: Text(label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Pro.ink))),
                           if (verticalLabel.isNotEmpty)
                             Container(
@@ -1995,6 +2027,16 @@ class _RequestCategorySheet extends StatelessWidget {
                   ),
                 );
               },
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+            child: ProPrimaryButton(
+              label: chosen.isEmpty
+                  ? (ar ? 'اختاري تخصص أو أكتر' : 'Pick one or more')
+                  : (ar ? 'كمّلي · ${chosen.length}' : 'Continue · ${chosen.length}'),
+              enabled: chosen.isNotEmpty,
+              onTap: () => widget.onConfirm(chosen),
             ),
           ),
         ],
