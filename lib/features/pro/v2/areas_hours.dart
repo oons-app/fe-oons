@@ -7,6 +7,7 @@ import 'package:oons/data/repo.dart';
 import 'package:oons/data/service_catalog.dart';
 import 'package:oons/ds/ds.dart';
 import 'package:oons/features/pro/v2/autosave.dart';
+import 'package:oons/features/pro/v2/date_labels.dart';
 import 'package:oons/features/pro/v2/t.dart';
 
 /// المناطق — one card per city. Every tap saves by itself («اتحفظ»); a refused
@@ -139,9 +140,7 @@ class ProHoursView extends ConsumerStatefulWidget {
 }
 
 /// Sat-first, like the Egyptian week; the number is the server's (1 = Mon … 7 = Sun).
-const proWorkDayOrder = [6, 7, 1, 2, 3, 4, 5];
-const _dayShortAr = {6: 'سبت', 7: 'حد', 1: 'اتنين', 2: 'تلات', 3: 'أربع', 4: 'خميس', 5: 'جمعة'};
-const _dayShortEn = {6: 'Sat', 7: 'Sun', 1: 'Mon', 2: 'Tue', 3: 'Wed', 4: 'Thu', 5: 'Fri'};
+const proWorkDayOrder = weekOrderSatFirst;
 
 class _ProHoursViewState extends ConsumerState<ProHoursView> {
   final days = <int>{};
@@ -223,7 +222,7 @@ class _ProHoursViewState extends ConsumerState<ProHoursView> {
                   Expanded(
                     child: DsChip(
                       compact: true,
-                      label: (ar ? _dayShortAr : _dayShortEn)[proWorkDayOrder[i]]!,
+                      label: dayShort(proWorkDayOrder[i], ar: ar),
                       on: days.contains(proWorkDayOrder[i]),
                       onTap: () {
                         final d = proWorkDayOrder[i];

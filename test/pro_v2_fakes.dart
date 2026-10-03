@@ -94,6 +94,33 @@ class FakeProRepo extends Repo {
   final calls = <String>[];
   final bodies = <String, Object?>{};
   Object? failNext;
+  List<BookingBundle> upcomingJobs = [];
+  List<BookingBundle> pastJobs = [];
+  bool jobsFail = false;
+  Map<String, dynamic> earningsData = {};
+  bool earningsFail = false;
+
+  @override
+  Future<Map<String, dynamic>> earningsSummary() async {
+    calls.add('earnings');
+    if (earningsFail) throw apiError('offline', 0);
+    return earningsData;
+  }
+
+  @override
+  Future<Map<String, dynamic>> setSettlementCadence(String cadence) async {
+    calls.add('cadence $cadence');
+    _maybeFail();
+    earningsData = {...earningsData, 'pendingCadence': cadence == earningsData['cadence'] ? null : cadence};
+    return {'ok': true};
+  }
+
+  @override
+  Future<({List<BookingBundle> upcoming, List<BookingBundle> past})> proJobs({int skip = 0, int limit = 50}) async {
+    calls.add('jobs');
+    if (jobsFail) throw apiError('offline', 0);
+    return (upcoming: upcomingJobs, past: pastJobs);
+  }
 
   Map<String, dynamic> _answer() => {'provider': profile};
 
@@ -202,3 +229,29 @@ void phone(WidgetTester t, {double height = 1800}) {
 }
 
 ApiException apiError(String msg, [int status = 409]) => ApiException(status, msg);
+
+
+/// One job as GET /pro/jobs returns it. [slot] is local (no zone), earning in piastres.
+BookingBundle jobBundle(String id, String slot, {String client = 'منى', String area = 'madinaty', String service = 'تنظيف مميز', int minutes = 360, int earning = 120000, String status = 'paid', String? planTag, String? subscriptionVisitId}) {
+  return BookingBundle.fromJson({
+    'booking': {
+      'id': id,
+      'ref': 'OO-$id',
+      'status': status,
+      'slotStart': slot,
+      'total': earning,
+      'escrow': 'held',
+      'serviceName': {'ar': service, 'en': service},
+      'lineItems': [],
+      'timeline': [],
+      'durationMin': minutes,
+      'pricingEra': 'v2',
+      'clientServiceFeeAmount': 0,
+      'introFeeAmount': 0,
+      if (subscriptionVisitId != null) 'subscriptionVisitId': subscriptionVisitId,
+    },
+    'client': {'firstName': {'ar': client, 'en': client}, 'area': area},
+    if (planTag != null) 'planTag': planTag,
+    'cancelPreview': {},
+  });
+}

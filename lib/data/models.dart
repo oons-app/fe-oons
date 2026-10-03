@@ -629,6 +629,7 @@ class Booking {
     this.clientServiceFeeAmount = 0,
     this.introFeeAmount = 0,
     this.wholesaleRateAmount = 0,
+    this.subscriptionVisitId,
   });
   final String id;
   final String ref;
@@ -675,6 +676,10 @@ class Booking {
   final int clientServiceFeeAmount;
   final int introFeeAmount;
   final int wholesaleRateAmount;
+
+  /// Set when this booking is one visit of a monthly plan.
+  final String? subscriptionVisitId;
+  bool get isPlanVisit => (subscriptionVisitId ?? '').isNotEmpty;
 
   int amountDue({int processingFee = 0}) {
     if (chargedAmount > 0) return chargedAmount;
@@ -768,6 +773,7 @@ class Booking {
         clientServiceFeeAmount: (j['clientServiceFeeAmount'] as num?)?.toInt() ?? 0,
         introFeeAmount: (j['introFeeAmount'] as num?)?.toInt() ?? 0,
         wholesaleRateAmount: (j['wholesaleRateAmount'] as num?)?.toInt() ?? 0,
+        subscriptionVisitId: j['subscriptionVisitId'] == null || '${j['subscriptionVisitId']}'.isEmpty ? null : '${j['subscriptionVisitId']}',
       );
 
   Booking withLocation(double lat, double lng) => Booking(
@@ -814,6 +820,7 @@ class Booking {
         clientServiceFeeAmount: clientServiceFeeAmount,
         introFeeAmount: introFeeAmount,
         wholesaleRateAmount: wholesaleRateAmount,
+        subscriptionVisitId: subscriptionVisitId,
       );
 }
 

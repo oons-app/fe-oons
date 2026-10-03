@@ -13,9 +13,11 @@ import 'package:oons/features/client/client_chrome.dart';
 import 'package:oons/features/client/client_tour.dart';
 import 'package:oons/features/home/home_screen.dart';
 import 'package:oons/ds/ds.dart';
+import 'package:oons/features/pro/v2/earnings_tab.dart';
 import 'package:oons/features/pro/v2/pro_nav.dart';
 import 'package:oons/features/pro/v2/services_tab.dart';
 import 'package:oons/features/pro/v2/t.dart';
+import 'package:oons/features/pro/v2/visits_tab.dart';
 import 'package:oons/features/pro/pro_screens.dart';
 import 'package:oons/features/pro/pro_tour.dart';
 import 'package:oons/features/profile/profile_screen.dart';
@@ -204,9 +206,9 @@ class _ProShellState extends ConsumerState<ProShell> {
       child: IndexedStack(
         index: index,
         children: [
-          const ProJobsScreen(),
+          const ProVisitsTab(),
           ProServicesTab(openSpecialtyPicker: widget.openSpecialtyPicker),
-          const ProEarningsScreen(),
+          const ProEarningsTab(),
           const ProAccountScreen(),
         ],
       ),
