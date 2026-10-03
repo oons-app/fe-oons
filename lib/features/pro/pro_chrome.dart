@@ -176,12 +176,18 @@ class ProChip extends StatelessWidget {
     if (!pending) return DsChip(label: label, on: on, onTap: onTap, mono: mono);
     return InkWell(
       onTap: onTap,
-      child: Container(
-        constraints: const BoxConstraints(minHeight: Ds.minTarget),
-        alignment: Alignment.center,
-        padding: const EdgeInsets.symmetric(horizontal: Ds.s3),
+      child: DecoratedBox(
         decoration: BoxDecoration(color: Ds.terracottaBg, border: Border.all(color: Ds.terracotta, width: Ds.rule)),
-        child: Text(label, style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: Ds.terracottaText, fontFamily: mono ? T.mono : null)),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: Ds.minTarget),
+          child: Center(
+            widthFactor: 1,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: Ds.s3),
+              child: Text(label, style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: Ds.terracottaText, fontFamily: mono ? T.mono : null)),
+            ),
+          ),
+        ),
       ),
     );
   }

@@ -15,6 +15,10 @@ class DsChip extends StatelessWidget {
   /// Tighter side padding, for rows of chips that must share one line.
   final bool compact;
 
+  TextStyle _labelStyle(Color fg) => mono
+      ? TextStyle(fontFamily: T.mono, fontSize: 13, fontWeight: FontWeight.w600, color: fg)
+      : TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: fg);
+
   @override
   Widget build(BuildContext context) {
     final fg = on ? Ds.cream : Ds.ink;
@@ -25,18 +29,22 @@ class DsChip extends StatelessWidget {
       excludeSemantics: true,
       child: InkWell(
         onTap: onTap,
-        child: Container(
-          constraints: BoxConstraints(minHeight: Ds.minTarget, minWidth: minWidth),
-          alignment: Alignment.center,
-          padding: EdgeInsets.symmetric(horizontal: compact ? 2 : Ds.s3),
+        // DecoratedBox + Center(widthFactor: 1): the chip is as wide as its label.
+        // (A Container with `alignment` would stretch to the whole row inside a Wrap.)
+        child: DecoratedBox(
           decoration: BoxDecoration(color: on ? Ds.plum : Ds.white, border: Border.all(color: Ds.ink, width: Ds.rule)),
-          child: Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: mono
-                ? TextStyle(fontFamily: T.mono, fontSize: 13, fontWeight: FontWeight.w600, color: fg)
-                : TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: fg),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: Ds.minTarget, minWidth: minWidth),
+            child: Center(
+              widthFactor: 1,
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: compact ? 2 : Ds.s3),
+                child: compact
+                    // In a tight row the label shrinks to fit rather than being cut («خميـ…»).
+                    ? FittedBox(fit: BoxFit.scaleDown, child: Text(label, maxLines: 1, style: _labelStyle(fg)))
+                    : Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: _labelStyle(fg)),
+              ),
+            ),
           ),
         ),
       ),

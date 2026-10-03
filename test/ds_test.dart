@@ -141,6 +141,39 @@ void main() {
       expect(on, isTrue);
     });
 
+    testWidgets('chips hug their label: side by side in a Wrap, never one per row', (t) async {
+      await t.pumpWidget(host(Wrap(spacing: 8, children: [
+        DsChip(label: 'الكل ٢', on: true, onTap: () {}),
+        DsChip(label: 'ظاهرة ١', on: false, onTap: () {}),
+        DsChip(label: 'مخفية ١', on: false, onTap: () {}),
+      ])));
+      final rects = t.widgetList(find.byType(DsChip)).map((w) => t.getRect(find.byWidget(w))).toList();
+      expect(rects.map((r) => r.top).toSet().length, 1, reason: 'all three on the same row');
+      expect(rects.every((r) => r.width < 150), isTrue);
+      expect(rects.every((r) => r.height >= 44), isTrue);
+    });
+
+    testWidgets('seven compact day chips share one narrow row without cutting their labels', (t) async {
+      t.view.physicalSize = const Size(350, 400);
+      t.view.devicePixelRatio = 1;
+      addTearDown(t.view.reset);
+      const days = ['سبت', 'حد', 'اتنين', 'تلات', 'أربع', 'خميس', 'جمعة'];
+      await t.pumpWidget(host(Padding(
+        padding: const EdgeInsets.all(20),
+        child: Row(children: [
+          for (var i = 0; i < 7; i++) ...[
+            if (i > 0) const SizedBox(width: 4),
+            Expanded(child: DsChip(compact: true, label: days[i], on: i.isEven, onTap: () {})),
+          ],
+        ]),
+      )));
+      expect(t.takeException(), isNull);
+      for (final d in days) {
+        expect(find.text(d), findsOneWidget);
+      }
+      expect(find.byType(FittedBox), findsNWidgets(7), reason: 'long labels scale down instead of ending in …');
+    });
+
     testWidgets('list row: tappable rows expose a button; danger row uses the attention colour', (t) async {
       var tapped = false;
       await t.pumpWidget(host(DsListRow(label: 'احذفي حسابي', danger: true, onTap: () => tapped = true)));
