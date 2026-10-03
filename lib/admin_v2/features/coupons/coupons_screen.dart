@@ -7,6 +7,7 @@ import 'package:oons/admin_v2/data/permissions.dart';
 import 'package:oons/admin_v2/data/session.dart';
 import 'package:oons/admin_v2/data/staff_client.dart';
 import 'package:oons/admin_v2/data/ui_state.dart';
+import 'package:oons/admin_v2/features/coupons/referral_settings.dart';
 import 'package:oons/admin_v2/l10n/copy.dart';
 import 'package:oons/admin_v2/theme/tokens.dart';
 import 'package:oons/admin_v2/ui/atoms.dart';
@@ -102,6 +103,12 @@ class _CouponsScreenState extends ConsumerState<CouponsScreen> {
 
   Future<void> _edit(Map? c) async {
     final lang = ref.read(localeCodeProvider);
+    if ('${c?['kind']}' == 'referral') {
+      // Referral rewards are issued and owned by a customer; the programme's
+      // numbers live in the card above the table.
+      v2Toast(context, lang == 'ar' ? 'مكافآت الدعوة تصدر تلقائيا. عدّلي الإعدادات من البطاقة أعلى الجدول.' : 'Referral rewards are issued automatically. Change the programme in the card above the table.');
+      return;
+    }
     final code = TextEditingController(text: '${c?['code'] ?? ''}');
     var type = _isPercent(c ?? {}) || c == null ? 'percent' : 'fixed';
     var kind = '${c?['kind'] ?? c?['scope'] ?? 'platform'}'.toLowerCase();
@@ -439,6 +446,7 @@ class _CouponsScreenState extends ConsumerState<CouponsScreen> {
       loading: loading,
       error: error,
       onRetry: _load,
+      strip: V2ReferralSettings(lang: lang, canWrite: canWrite, onChanged: _load),
       resultLabel: '${_rows.length} ${lang == 'ar' ? 'نتيجة' : 'results'}',
       emptyText: lang == 'ar' ? 'لا كوبونات' : 'Nothing here yet',
       actionsWidth: canWrite ? 120 : 8,

@@ -23,10 +23,28 @@ void persistBroughtFromUri([Uri? uri]) {
   if (r.isNotEmpty) {
     Hive.box('prefs').put('broughtToken', r);
   }
+  // A friend's invite link: lady.oons.app/?ref=CODE. Applied right after sign-up.
+  final ref = (q['ref'] ?? '').trim().toUpperCase();
+  if (ref.isNotEmpty) {
+    Hive.box('prefs').put('inviteRef', ref);
+  }
   final promo = (q['promo'] ?? q['c'] ?? '').trim();
   if (promo.isNotEmpty) {
     Hive.box('prefs').put('signupPromo', promo);
   }
+}
+
+/// A new customer who arrived through a friend's invite link enters that code
+/// for her once, right after she signs up. Never blocks sign-up: the server may
+/// refuse (paused, already used…) and she can still add a code by hand later.
+Future<void> applyPendingInvite() async {
+  final box = Hive.box('prefs');
+  final code = (box.get('inviteRef') as String?)?.trim() ?? '';
+  if (code.isEmpty) return;
+  try {
+    await api.post('/referrals/redeem', data: {'code': code});
+  } catch (_) {}
+  await box.delete('inviteRef');
 }
 
 class PayLaunch {
@@ -218,6 +236,7 @@ class Session extends StateNotifier<SessionState> {
     await api.storage.write(key: 'access', value: token);
     await Hive.box('prefs').put('onboarded', true);
     await _applyMe(token, r);
+    await applyPendingInvite();
     final uid = state.user?.id;
     await AppAnalytics.signUp(role: 'client', eventId: uid != null ? '$uid:sign_up' : null);
     await AppAnalytics.clientRegistrationCompleted(
@@ -554,6 +573,13 @@ class Repo {
     });
     return Map<String, dynamic>.from(r);
   }
+
+  /// Her invite code, progress and earned coupons.
+  Future<Map<String, dynamic>> referralInfo() async => Map<String, dynamic>.from(await api.get('/me/referral'));
+
+  /// A new customer enters the code she was given.
+  Future<Map<String, dynamic>> redeemReferral(String code) async =>
+      Map<String, dynamic>.from(await api.post('/referrals/redeem', data: {'code': code.trim()}));
 
   Future<List<Map<String, dynamic>>> categories({
     String? vertical,

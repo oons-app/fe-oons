@@ -68,7 +68,7 @@ const v2Nav = [
   ]),
   NavGroup('People', 'الأشخاص', [
     NavItem('customers', V2Paths.customers, 'Customers', 'العميلات'),
-    NavItem('providers', V2Paths.providers, 'Providers', 'المهنيات'),
+    NavItem('providers', V2Paths.providers, 'Providers', 'المتخصصات'),
     NavItem('categoryRequests', V2Paths.categoryRequests, 'Category requests', 'طلبات التخصص'),
     NavItem('serviceRequests', V2Paths.serviceRequests, 'Service requests', 'خدمات قيد الموافقة'),
   ]),

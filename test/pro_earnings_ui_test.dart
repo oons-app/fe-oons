@@ -49,7 +49,7 @@ void main() {
     expect(find.text('ج.م'), findsWidgets);
     expect(find.text('التسوية الجاية'), findsOneWidget);
     expect(find.text('الثلاثاء ٦ أكتوبر'), findsOneWidget);
-    expect(find.text('فلوس كل زيارة بتتحوّل لرصيدك أول ما تخلص.'), findsOneWidget);
+    expect(find.text('يتحول مبلغ كل زيارة إلى رصيدك فور انتهائها.'), findsOneWidget);
   });
 
   testWidgets('payout: her InstaPay number in mono Arabic digits; edit goes to بياناتي', (t) async {
@@ -64,13 +64,13 @@ void main() {
   testWidgets('cycle: current one is selected; picking another saves by itself with the right note', (t) async {
     final r = await open(t);
     expect(t.widget<DsSegmented>(find.byType(DsSegmented)).index, 1);
-    expect(find.text('التغيير بيبدأ من الدورة الجاية.'), findsOneWidget);
+    expect(find.text('يبدأ التغيير من الدورة القادمة.'), findsOneWidget);
     await t.tap(find.text('شهري'));
     await t.pump();
     expect(t.widget<DsSegmented>(find.byType(DsSegmented)).index, 2, reason: 'instant');
     await t.pump(const Duration(milliseconds: 300));
     expect(r.calls, contains('cadence monthly'));
-    expect(find.text('هيتطبّق من الدورة الجاية'), findsOneWidget);
+    expect(find.text('يُطبّق من الدورة القادمة'), findsOneWidget);
     await t.pump(const Duration(seconds: 2));
   });
 
@@ -94,7 +94,7 @@ void main() {
 
   testWidgets('by specialty: amounts with plum bars sized by share', (t) async {
     await open(t);
-    expect(find.text('حسب التخصص'), findsOneWidget);
+    expect(find.text('حسب الفئة'), findsOneWidget);
     expect(find.text('التنظيف المنزلي'), findsOneWidget);
     final meters = t.widgetList<DsMeter>(find.byType(DsMeter)).toList();
     expect(meters.map((m) => m.value), [0.75, 0.25]);
@@ -102,15 +102,15 @@ void main() {
 
   testWidgets('no movements → an empty state, not a blank card', (t) async {
     await open(t, data: {...summary(), 'cycleLines': [], 'categories': []});
-    expect(find.text('مفيش حركة في الدورة دي'), findsOneWidget);
-    expect(find.text('حسب التخصص'), findsNothing);
+    expect(find.text('لا حركة في هذه الدورة'), findsOneWidget);
+    expect(find.text('حسب الفئة'), findsNothing);
   });
 
   testWidgets('load failure → retry', (t) async {
     final r = await open(t, fail: true);
-    expect(find.text('مقدرناش نحمّل الصفحة'), findsOneWidget);
+    expect(find.text('تعذر تحميل الصفحة'), findsOneWidget);
     r.earningsFail = false;
-    await t.tap(find.text('حاولي تاني'));
+    await t.tap(find.text('حاولي مرة أخرى'));
     await t.pump();
     await t.pump(const Duration(milliseconds: 50));
     expect(find.text('متاح للسحب'), findsOneWidget);

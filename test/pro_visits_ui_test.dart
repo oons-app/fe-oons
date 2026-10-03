@@ -44,9 +44,9 @@ void main() {
 
   testWidgets('three stats: today, this week, expected (what she earns, in pounds)', (t) async {
     await open(t, repo());
-    expect(find.text('النهارده'), findsOneWidget);
-    expect(find.text('الأسبوع ده'), findsOneWidget);
-    expect(find.text('متوقّع · ج.م'), findsOneWidget);
+    expect(find.text('اليوم'), findsOneWidget);
+    expect(find.text('هذا الأسبوع'), findsOneWidget);
+    expect(find.text('المتوقع · ج.م'), findsOneWidget);
     Finder inStrip(String s) => find.descendant(of: find.byType(DsStatStrip), matching: find.text(s));
     expect(inStrip('٢'), findsOneWidget, reason: 'two visits today');
     expect(inStrip('٣'), findsOneWidget, reason: 'three this week');
@@ -74,6 +74,22 @@ void main() {
     expect(find.text('١,٣٠٠ ج.م'), findsOneWidget);
   });
 
+  testWidgets('with nothing today, the strip opens on the nearest day that has a visit', (t) async {
+    final r = repo();
+    r.upcomingJobs = [
+      jobBundle('c', '2026-10-06T11:00:00', client: 'ريم', service: 'إزالة شعر', minutes: 60, earning: 120000),
+      jobBundle('d', '2026-10-08T10:00:00', client: 'هدى', service: 'تنظيف عادي', minutes: 60, earning: 90000),
+    ];
+    await open(t, r);
+    expect(find.text('الثلاثاء ٦ أكتوبر'), findsOneWidget, reason: 'Tuesday is the nearest day with a booking, not empty Saturday');
+    expect(find.text('ريم'), findsOneWidget);
+    // her own choice then sticks
+    await t.tap(find.text('خميس'));
+    await t.pump();
+    expect(find.text('الخميس ٨ أكتوبر'), findsOneWidget);
+    expect(find.text('هدى'), findsOneWidget);
+  });
+
   testWidgets('another day shows its own visits', (t) async {
     await open(t, repo());
     await t.tap(find.text('تلات'));
@@ -87,31 +103,31 @@ void main() {
     await open(t, repo());
     await t.tap(find.text('حد'));
     await t.pump();
-    expect(find.text('مفيش زيارات في اليوم ده'), findsOneWidget);
-    expect(find.text('الحجوزات الجديدة هتظهر هنا أول ما تتأكد.'), findsOneWidget);
+    expect(find.text('لا زيارات في هذا اليوم'), findsOneWidget);
+    expect(find.text('تظهر الحجوزات الجديدة هنا فور تأكيدها.'), findsOneWidget);
     await t.tap(find.text('جمعة'));
     await t.pump();
-    expect(find.text('اليوم ده إجازة'), findsOneWidget);
-    expect(find.text('الجمعة مقفولة في مواعيدك.'), findsOneWidget);
+    expect(find.text('هذا اليوم إجازة'), findsOneWidget);
+    expect(find.text('الجمعة مغلق في مواعيدك.'), findsOneWidget);
   });
 
   testWidgets('a whole empty week offers areas first, hours second', (t) async {
     await open(t, repo(empty: true));
-    expect(find.text('مفيش زيارات الأسبوع ده'), findsOneWidget);
-    await t.tap(find.text('زوّدي مناطق'));
+    expect(find.text('لا زيارات هذا الأسبوع'), findsOneWidget);
+    await t.tap(find.text('أضيفي مناطق'));
     await t.pump();
     expect((ProNav.tab.value, ProNav.servicesSeg.value), (1, ProNav.segAreas));
-    await t.tap(find.text('أو زوّدي ساعات'));
+    await t.tap(find.text('أو أضيفي ساعات'));
     await t.pump();
     expect(ProNav.servicesSeg.value, ProNav.segHours);
   });
 
   testWidgets('past: done in olive, cancelled in grey with a struck, faint price', (t) async {
     await open(t, repo());
-    await t.tap(find.text('اللي فاتت'));
+    await t.tap(find.text('السابقة'));
     await t.pump();
-    expect(find.text('خلصت'), findsOneWidget);
-    expect(find.text('اتلغت'), findsOneWidget);
+    expect(find.text('اكتملت'), findsOneWidget);
+    expect(find.text('أُلغيت'), findsOneWidget);
     final cancelled = t.widget<Text>(find.text('٦٠٠ ج.م'));
     expect(cancelled.style!.decoration, TextDecoration.lineThrough);
     expect(cancelled.style!.color, Ds.textFaint);
@@ -123,9 +139,9 @@ void main() {
   testWidgets('past is empty → an empty state', (t) async {
     final r = repo()..pastJobs = [];
     await open(t, r);
-    await t.tap(find.text('اللي فاتت'));
+    await t.tap(find.text('السابقة'));
     await t.pump();
-    expect(find.text('لسه مفيش زيارات فاتت'), findsOneWidget);
+    expect(find.text('لا زيارات سابقة بعد'), findsOneWidget);
   });
 
   testWidgets('tapping a visit opens its job', (t) async {
@@ -138,12 +154,12 @@ void main() {
   testWidgets('first load fails → retry state, not a spinner; retry loads', (t) async {
     final r = repo()..jobsFail = true;
     await open(t, r);
-    expect(find.text('مقدرناش نحمّل الصفحة'), findsOneWidget);
+    expect(find.text('تعذر تحميل الصفحة'), findsOneWidget);
     r.jobsFail = false;
-    await t.tap(find.text('حاولي تاني'));
+    await t.tap(find.text('حاولي مرة أخرى'));
     await t.pump();
     await t.pump(const Duration(milliseconds: 50));
-    expect(find.text('النهارده'), findsOneWidget);
-    expect(find.text('مقدرناش نحمّل الصفحة'), findsNothing);
+    expect(find.text('اليوم'), findsOneWidget);
+    expect(find.text('تعذر تحميل الصفحة'), findsNothing);
   });
 }

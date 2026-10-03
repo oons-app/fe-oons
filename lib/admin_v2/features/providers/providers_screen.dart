@@ -261,9 +261,9 @@ class _ProvidersScreenState extends ConsumerState<ProvidersScreen> {
             V2GridTable(
               loading: loading,
               actionsWidth: canImpersonate || canVet ? 170 : 70,
-              emptyText: lang == 'ar' ? 'لا مهنيات مطابقة' : 'No matching professionals',
+              emptyText: lang == 'ar' ? 'لا متخصصات مطابقة' : 'No matching professionals',
               columns: [
-                V2Col(lang == 'ar' ? 'المهنية' : 'Professional', flex: 1.05),
+                V2Col(lang == 'ar' ? 'المتخصصة' : 'Professional', flex: 1.05),
                 V2Col(lang == 'ar' ? 'الهاتف' : 'Phone', fixed: 130),
                 V2Col(lang == 'ar' ? 'الفئة' : 'Category', fixed: 100),
                 V2Col(lang == 'ar' ? 'التقييم' : 'Rating', fixed: 78),

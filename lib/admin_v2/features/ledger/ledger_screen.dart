@@ -90,7 +90,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
         V2Btn.ghost(t(V2Copy.exportCsv, lang), onPressed: _exportCsv, size: V2BtnSize.sm, icon: Icons.download),
       ],
       columns: [
-        V2Col(lang == 'ar' ? 'المهنية' : 'Professional', flex: 1),
+        V2Col(lang == 'ar' ? 'المتخصصة' : 'Professional', flex: 1),
         V2Col(lang == 'ar' ? 'متاح' : 'Available', fixed: 130),
         V2Col(lang == 'ar' ? 'محجوز' : 'Held', fixed: 130),
         V2Col(lang == 'ar' ? 'مدى الحياة' : 'Lifetime', fixed: 140),

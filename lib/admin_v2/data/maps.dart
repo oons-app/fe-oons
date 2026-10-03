@@ -333,7 +333,7 @@ String statusLabel(String? status, String lang) {
     case 'cancelled_client':
       return lang == 'ar' ? 'ملغاة' : 'Cancelled by client';
     case 'cancelled_provider':
-      return lang == 'ar' ? 'ألغتها المهنية' : 'Cancelled by provider';
+      return lang == 'ar' ? 'ألغتها المتخصصة' : 'Cancelled by provider';
     case 'disputed':
       return lang == 'ar' ? 'محل نزاع' : 'Disputed';
     case 'refunded':

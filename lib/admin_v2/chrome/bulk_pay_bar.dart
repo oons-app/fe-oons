@@ -43,7 +43,7 @@ class V2BulkPayBar extends StatelessWidget {
                   children: [
                     Text('$count ${ar ? 'زيارة محددة' : 'visits selected'}',
                         style: const TextStyle(color: Ops.plumTextSoft, fontWeight: FontWeight.w600, fontSize: 13.5)),
-                    Text('${ar ? 'صافي المهنية' : 'Provider gross'} ${money(providerGrossPiastres, lang)}',
+                    Text('${ar ? 'صافي المتخصصة' : 'Provider gross'} ${money(providerGrossPiastres, lang)}',
                         style: const TextStyle(color: Ops.plumMuted, fontFamily: Ops.mono, fontSize: 13)),
                     Text(
                         trustFeeExcludedPiastres > 0

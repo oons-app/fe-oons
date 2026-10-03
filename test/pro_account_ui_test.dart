@@ -74,7 +74,7 @@ void main() {
 
     testWidgets('a closed link and an incomplete file say so', (t) async {
       await open(t, repo: FakeProRepo(profile: richProfile(linkClosed: true, complete: false)));
-      expect(find.text('مقفول'), findsOneWidget);
+      expect(find.text('مغلق'), findsOneWidget);
       expect(find.text('ناقصة'), findsOneWidget);
     });
 
@@ -94,8 +94,8 @@ void main() {
       expect(find.text('متاحة للحجز'), findsOneWidget);
       await t.tap(find.byWidgetPredicate((w) => w is DsSwitch && w.label == 'متاحة للحجز'));
       await t.pump();
-      expect(find.text('مش متاحة دلوقتي'), findsOneWidget, reason: 'instant');
-      expect(find.text('مش هتظهري في البحث'), findsOneWidget);
+      expect(find.text('غير متاحة الآن'), findsOneWidget, reason: 'instant');
+      expect(find.text('لن تظهرين في البحث'), findsOneWidget);
       await t.pump(const Duration(milliseconds: 300));
       expect(repo.calls, ['patch available']);
       expect((repo.bodies['patch'] as Map)['available'], false);
@@ -112,12 +112,12 @@ void main() {
       await t.pump(const Duration(seconds: 2));
     });
 
-    testWidgets('plans row only for cleaning providers on the pilot', (t) async {
+    testWidgets('plans row shows for every provider on the pilot', (t) async {
       phone(t, height: 2400);
       final r = FakeProRepo(profile: providerJson(items: [svcJson('1', 'قص', cat: 'b-hair')])..['service'] = 'beauty');
       await t.pumpWidget(proHost(Scaffold(body: ProAccountTab(plansApi: plansApi(1))), repo: r));
       await t.pump();
-      expect(find.text('الباقات الشهرية'), findsNothing);
+      expect(find.text('الباقات الشهرية'), findsOneWidget);
     });
 
     testWidgets('sign out and delete are footer buttons; delete asks first', (t) async {
@@ -125,8 +125,8 @@ void main() {
       expect(find.text('تسجيل خروج'), findsOneWidget);
       await t.tap(find.text('احذفي حسابي'));
       await t.pumpAndSettle();
-      expect(find.text('تحذفي حسابك؟'), findsOneWidget);
-      await t.tap(find.text('لأ').first);
+      expect(find.text('تحذفين حسابك؟'), findsOneWidget);
+      await t.tap(find.text('لا').first);
       await t.pumpAndSettle();
       expect(session.deletes, 0);
       await t.tap(find.text('احذفي حسابي'));
@@ -153,7 +153,7 @@ void main() {
       expect(find.text('الرابط مفتوح'), findsOneWidget);
       await t.tap(find.byWidgetPredicate((w) => w is DsSwitch && w.label == 'الرابط مفتوح'));
       await t.pump();
-      expect(find.text('الرابط مقفول'), findsOneWidget);
+      expect(find.text('الرابط مغلق'), findsOneWidget);
       await t.pump(const Duration(milliseconds: 300));
       expect(r.calls, ['patch linkOpen']);
       expect((r.bodies['patch'] as Map)['linkOpen'], false);
@@ -168,19 +168,19 @@ void main() {
       });
       addTearDown(() => t.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, null));
       await open(t);
-      expect(find.text('دعوة عميلات'), findsOneWidget);
+      expect(find.text('ادعي عميلات'), findsOneWidget);
       expect(find.textContaining('nada'), findsWidgets);
-      expect(find.text('ابعتيه واتساب'), findsOneWidget);
+      expect(find.text('أرسليه عبر واتساب'), findsOneWidget);
       await t.tap(find.text('انسخي الرابط'));
       await t.pump();
       expect(copied, contains('nada'));
-      expect(find.text('الرابط اتنسخ'), findsOneWidget);
+      expect(find.text('نُسخ الرابط'), findsOneWidget);
       await t.pump(const Duration(seconds: 2));
     });
 
     testWidgets('no link yet → an empty state instead of a blank box', (t) async {
       await open(t, repo: FakeProRepo(profile: providerJson(extra: {'slug': ''})));
-      expect(find.text('لسه مفيش رابط'), findsOneWidget);
+      expect(find.text('لا رابط بعد'), findsOneWidget);
       expect(find.text('انسخي الرابط'), findsNothing);
     });
 
@@ -244,20 +244,20 @@ void main() {
       expect(find.text('الرقم القومي'), findsOneWidget);
       expect(find.text('صورة البطاقة'), findsOneWidget);
       expect(find.text('الفيش والتشبيه'), findsOneWidget);
-      expect(find.text('مرفوض — ارفعيه تاني'), findsWidgets);
-      expect(find.text('اتأكد'), findsWidgets);
-      expect(find.text('اتراجعت كلها'), findsNothing, reason: 'one paper is not confirmed');
+      expect(find.text('مرفوض. ارفعيه مرة أخرى'), findsWidgets);
+      expect(find.text('مؤكد'), findsWidgets);
+      expect(find.text('رُوجعت كلها'), findsNothing, reason: 'one paper is not confirmed');
     });
 
-    testWidgets('all confirmed → «اتراجعت كلها»', (t) async {
+    testWidgets('all confirmed → «رُوجعت كلها»', (t) async {
       await open(t);
-      expect(find.text('اتراجعت كلها'), findsOneWidget);
+      expect(find.text('رُوجعت كلها'), findsOneWidget);
     });
 
     testWidgets('portfolio: an add tile with the camera', (t) async {
       await open(t);
-      expect(find.text('صور من شغلك'), findsOneWidget);
-      expect(find.text('زوّدي صور'), findsOneWidget);
+      expect(find.text('صور من عملك'), findsOneWidget);
+      expect(find.text('أضيفي صورا'), findsOneWidget);
     });
   });
 

@@ -13,6 +13,7 @@ import 'package:oons/features/client/client_chrome.dart';
 import 'package:oons/features/client/client_tour.dart';
 import 'package:oons/features/legal/legal_widgets.dart';
 import 'package:oons/l10n/copy.dart';
+import 'package:oons/l10n/invite_copy.dart';
 import 'package:oons/l10n/errors.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -73,6 +74,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final menu = <({String icon, String label, String meta, VoidCallback onTap, bool danger})>[
       if (ref.watch(sessionProvider).subscriptionsPilot)
         (icon: '↻', label: 'باقتي', meta: lang == 'ar' ? 'تنظيف شهري' : 'Monthly cleaning', onTap: () => context.push('/me/plan'), danger: false),
+      (icon: '✦', label: InviteCopy.of(lang)['menu']!, meta: InviteCopy.of(lang)['menuMeta']!, onTap: () => context.push('/invite'), danger: false),
       (icon: '▣', label: '${p['identity']}', meta: user?.identityComplete == true ? (lang == 'ar' ? 'مكتمل' : 'Done') : (lang == 'ar' ? 'مطلوب' : 'Needed'), onTap: () => context.push('/me/identity'), danger: false),
       (icon: '★', label: '${p['reviews']}', meta: lang == 'ar' ? 'اقري التقييمات' : 'Read them', onTap: () => context.push('/reviews'), danger: false),
       (icon: '◉', label: '${p['addresses']}', meta: '${user?.addresses.length ?? 0}', onTap: () => context.push('/me/addresses'), danger: false),

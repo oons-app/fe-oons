@@ -123,7 +123,7 @@ class _PayoutsScreenState extends ConsumerState<PayoutsScreen> {
       ],
       columns: [
         V2Col(lang == 'ar' ? 'السحب' : 'Payout', fixed: 110),
-        V2Col(lang == 'ar' ? 'المهنية' : 'Professional', flex: 1),
+        V2Col(lang == 'ar' ? 'المتخصصة' : 'Professional', flex: 1),
         V2Col(lang == 'ar' ? 'الطريقة' : 'Method', fixed: 100),
         V2Col(lang == 'ar' ? 'الحساب' : 'Account', fixed: 130),
         V2Col(lang == 'ar' ? 'المبلغ' : 'Amount', fixed: 108),

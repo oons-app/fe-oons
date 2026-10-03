@@ -265,7 +265,7 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen> {
                 _fact(lang == 'ar' ? 'الفئة' : 'Category',
                     verticalLabel(b['service'] ?? b['vertical'] ?? b['categoryName'] ?? b['category'], lang)),
                 _fact(lang == 'ar' ? 'المنطقة' : 'Area', area),
-                _fact(lang == 'ar' ? 'الدفع للمهنية' : 'Payout', b['opsPaid'] == true ? (lang == 'ar' ? 'مسوّاة' : 'Settled') : (lang == 'ar' ? 'معلقة' : 'Pending')),
+                _fact(lang == 'ar' ? 'الدفع للمتخصصة' : 'Payout', b['opsPaid'] == true ? (lang == 'ar' ? 'مسوّاة' : 'Settled') : (lang == 'ar' ? 'معلقة' : 'Pending')),
               ],
             ),
             const SizedBox(height: 13),
@@ -303,7 +303,7 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen> {
           children: [
             _priceRow(serviceLabel(b, lang), money(serviceAmt, lang)),
             if (travel > 0) _priceRow('${lang == 'ar' ? 'الانتقال إلى' : 'Travel to'} $area', money(travel, lang)),
-            _priceRow(lang == 'ar' ? 'رسوم الأمان (لا تُدفع للمهنية)' : 'Trust fee (not paid out)', money(trust, lang)),
+            _priceRow(lang == 'ar' ? 'رسوم الأمان (لا تُدفع للمتخصصة)' : 'Trust fee (not paid out)', money(trust, lang)),
             Container(
               margin: const EdgeInsets.only(top: 4),
               padding: const EdgeInsets.only(top: 10),
@@ -323,7 +323,7 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen> {
               alignment: AlignmentDirectional.centerStart,
               child: Text(
                 lang == 'ar'
-                    ? 'صافي المهنية لا يشمل رسوم الأمان — هذا السطر لا يُدفع أبداً.'
+                    ? 'صافي المتخصصة لا يشمل رسوم الأمان — هذا السطر لا يُدفع أبداً.'
                     : 'Provider gross excludes the trust fee — that line is never paid out.',
                 style: const TextStyle(fontSize: 11.5, color: Ops.mutedSoft),
               ),
@@ -524,19 +524,19 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen> {
                     'refund',
                     '${lang == 'ar' ? 'حل النزاع' : 'Resolve dispute'} — ${lang == 'ar' ? 'استرداد' : 'Refund'}',
                     lang == 'ar'
-                        ? 'استرداد كامل للعميلة، ولا تُدفع المهنية.'
+                        ? 'استرداد كامل للعميلة، ولا تُدفع المتخصصة.'
                         : 'Full refund to the client, provider not paid.',
                     danger: true),
               ),
               const SizedBox(height: 7),
               V2Btn(
-                label: lang == 'ar' ? 'إطلاق للمهنية' : 'Release to pro',
+                label: lang == 'ar' ? 'إطلاق للمتخصصة' : 'Release to pro',
                 kind: V2BtnKind.primary,
                 expand: true,
                 onPressed: () => _resolveDispute(
                     'release',
                     '${lang == 'ar' ? 'حل النزاع' : 'Resolve dispute'} — ${lang == 'ar' ? 'إطلاق' : 'Release'}',
-                    lang == 'ar' ? 'تُطلق المبالغ للمهنية بالكامل.' : 'Funds released to the provider in full.'),
+                    lang == 'ar' ? 'تُطلق المبالغ للمتخصصة بالكامل.' : 'Funds released to the provider in full.'),
               ),
               const SizedBox(height: 7),
               V2Btn(
@@ -546,7 +546,7 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen> {
                 onPressed: () => _resolveDispute(
                     'split',
                     '${lang == 'ar' ? 'حل النزاع' : 'Resolve dispute'} — ${lang == 'ar' ? 'تقسيم' : 'Split'}',
-                    lang == 'ar' ? 'تقسيم ٥٠/٥٠ بين العميلة والمهنية.' : '50/50 split between client and provider.'),
+                    lang == 'ar' ? 'تقسيم ٥٠/٥٠ بين العميلة والمتخصصة.' : '50/50 split between client and provider.'),
               ),
             ],
           ),
@@ -566,7 +566,7 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen> {
             ),
             const SizedBox(height: 10),
             _party(
-              role: lang == 'ar' ? 'المهنية' : 'Professional',
+              role: lang == 'ar' ? 'المتخصصة' : 'Professional',
               name: providerName,
               phone: '${provider?['phone'] ?? ''}',
               canOpen: providerId.isNotEmpty && staffCan(role, 'providers.read'),

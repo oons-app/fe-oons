@@ -115,7 +115,7 @@ class _CategoryRequestsScreenState extends ConsumerState<CategoryRequestsScreen>
         confirmLabel: lang == 'ar' ? 'رفض' : 'Reject',
         danger: true,
         bodyBuilder: (ctx, _) => V2FormField(
-          label: lang == 'ar' ? 'السبب (هتشوفه المهنية)' : 'Reason (the provider will see this)',
+          label: lang == 'ar' ? 'السبب (هتشوفه المتخصصة)' : 'Reason (the provider will see this)',
           child: TextField(onChanged: (v) => note = v, maxLines: 2, autofocus: true),
         ),
         onValidate: () {
@@ -163,7 +163,7 @@ class _CategoryRequestsScreenState extends ConsumerState<CategoryRequestsScreen>
       ],
       columns: [
         V2Col(lang == 'ar' ? 'الخدمة المطلوبة' : 'Requested service', flex: 1),
-        V2Col(lang == 'ar' ? 'المهنية' : 'Requested by', flex: 1),
+        V2Col(lang == 'ar' ? 'المتخصصة' : 'Requested by', flex: 1),
         V2Col(lang == 'ar' ? 'المجال' : 'Vertical', fixed: 120),
         V2Col(lang == 'ar' ? 'التاريخ' : 'Date', fixed: 108),
         V2Col(lang == 'ar' ? 'الحالة' : 'Status', fixed: 118),

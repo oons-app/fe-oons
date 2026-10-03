@@ -81,7 +81,7 @@ class _ImpersonateScreenState extends ConsumerState<ImpersonateScreen> {
     }
     final s = subject ?? {};
     final name = personName(s, lang, fallbackId: widget.id);
-    final roleWord = _isCustomer ? (lang == 'ar' ? 'عميلة' : 'Client') : (lang == 'ar' ? 'مهنية' : 'Professional');
+    final roleWord = _isCustomer ? (lang == 'ar' ? 'عميلة' : 'Client') : (lang == 'ar' ? 'متخصصة' : 'Professional');
 
     final stats = _isCustomer
         ? [

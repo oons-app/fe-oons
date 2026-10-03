@@ -1,5 +1,15 @@
 import 'package:oons/l10n/pro_v2_copy.dart';
 
+/// Arabic glossary. One name per concept, plain feminine MSA, no dialect.
+/// Other copy files follow this. Do not introduce a second word.
+///
+/// - متخصصة: the woman who does the work. Do not use مهنية.
+/// - متخصصة موثّقة: trust lines only.
+/// - فئة: a top-level vertical (تنظيف، تجميل).
+/// - تخصص: a specialty inside a category. Never a فئة or a باقة.
+/// - خدمة: one bookable service, including a size-priced cleaning tier.
+/// - باقة: a monthly subscription only.
+/// - حجز: the booking. Not طلب.
 class Copy {
   Copy._();
 
@@ -1552,9 +1562,9 @@ class Copy {
       'homeSize': 'مساحة الوحدة (م²)',
       'homeSizeHint': 'مثال: ١٤٠',
       'homeSizeTip': 'باقات التنظيف حسب مساحة المنزل. أدخِلي المساحة لتحديد الشريحة الصحيحة.',
-      'homeSizeMatch': 'الباقة المناسبة',
-      'homeSizeNoMatch': 'لا توجد باقة لهذه المساحة — اختاري خدمة أخرى أو تواصلي مع المتخصصة.',
-      'packageIncludes': 'الباقة تشمل',
+      'homeSizeMatch': 'الخدمة المناسبة',
+      'homeSizeNoMatch': 'لا توجد خدمة لهذه المساحة. اختاري خدمة أخرى أو تواصلي مع المتخصصة.',
+      'packageIncludes': 'الخدمة تشمل',
     },
     'bookFlow': {
       'title1': 'حجزك',
@@ -1604,8 +1614,8 @@ class Copy {
       'needService': 'اختاري خدمة بالـ+.',
       'needSlot': 'اختاري يومًا وموعدًا.',
       'needAddress': 'اختاري أو أضيفي عنوانًا قبل المتابعة.',
-      'needArea': 'أدخِلي مساحة المنزل لتحديد الباقة الصحيحة.',
-      'needAreaMatch': 'لا توجد باقة لهذه المساحة — اختاري خدمة أخرى أو تواصلي مع المتخصصة.',
+      'needArea': 'أدخلي مساحة المنزل لتحديد الخدمة المناسبة.',
+      'needAreaMatch': 'لا توجد خدمة لهذه المساحة. اختاري خدمة أخرى أو تواصلي مع المتخصصة.',
       'when': 'متى',
       'where': 'أين',
       'notes': 'ما ينبغي أن تعرفه المتخصصة',
@@ -2084,9 +2094,9 @@ class Copy {
       'cTax': 'الضرائب مسؤوليتي أمام مصلحة الضرائب.',
       'needConsents': 'علّمي على جميع الخانات للمتابعة.',
       'viewConsents': 'معنى كل موافقة',
-      'categories': 'فئاتي',
-      'categoriesSub': 'اطلبي فئات تحت تخصصكِ. نوافق قبل أن تراها العميلات.',
-      'addCategory': 'اطلبي فئة',
+      'categories': 'تخصصاتي',
+      'categoriesSub': 'اطلبي تخصصات تحت فئتك. نوافق قبل أن تراها العميلات.',
+      'addCategory': 'اطلبي تخصص',
       'catPending': 'قيد الانتظار',
       'catActive': 'فعّالة',
       'catRemoved': 'أُزيلت',
@@ -2182,8 +2192,8 @@ class Copy {
       'emptyFilterPendingHint': 'الخدمات الجديدة وطلبات التخصصات تظهر هنا حتى يراجعها فريق أُنس.',
       'tierTableTitle': 'أسعار التنظيف بالمساحة',
       'tierAdd': '+ شريحة',
-      'tierApplyToAll': 'طبّقي باقة أول شريحة على الكل',
-      'tierPackageLine': 'الباقة تشمل',
+      'tierApplyToAll': 'طبّقي مهام أول شريحة على الكل',
+      'tierPackageLine': 'الخدمة تشمل',
       'tierFrom': 'من (م²)',
       'tierTo': 'إلى (م²) — فارغ = أكبر من',
       'tierOverlap': 'هذه الشريحة تتعارض مع شريحة أخرى لنفس عدد العاملات',
@@ -2226,7 +2236,7 @@ class Copy {
       'requestNameSent': 'أُرسل الطلب إلى فريق أُنس',
       'stepSize': '٣ · مساحة الوحدة وعدد العاملات',
       'stepTierPrice': '٥ · سعر الشريحة',
-      'stepTasks': '٦ · ما تشمله الباقة',
+      'stepTasks': '٦ · ما تشمله الخدمة',
       'suggestedDur': 'مقترح',
       'bulkConfirmTitle': 'تأكيد تعديل الأسعار',
       'bulkConfirm': 'طبّقي',
@@ -2344,8 +2354,8 @@ class Copy {
       'confirmReleaseBody': 'هنحرر الدفعة للمتخصصة.',
       'confirmHoldTitle': 'تعليق الدفعة؟',
       'confirmHoldBody': 'هنتعلق الدفعة لحد المراجعة.',
-      'confirmApproveRequest': 'نوافق على طلب الفئة؟',
-      'confirmRejectRequest': 'نرفض طلب الفئة؟',
+      'confirmApproveRequest': 'نوافق على طلب التخصص؟',
+      'confirmRejectRequest': 'نرفض طلب التخصص؟',
       'impersonatingAs': 'متقمصة كـ',
       'bulkBarClear': 'مسح',
       'settleSend': 'تسوية وإرسال',
@@ -2621,15 +2631,15 @@ class Copy {
       'st_paid_out': 'اتصرف',
       'sexMarkerConfirm': 'علامة الجنس على البطاقة = أنثى — مؤكَّدة',
       'categories': 'الفئات',
-      'categoriesSub': 'افتحي التخصصات وأديري ظهور الفئات الفرعية للعميلات',
+      'categoriesSub': 'افتحي الفئات وأديري ظهور التخصصات للعميلات',
       'areasSub': 'فعّلي الأحياء اللي المتخصصات تقدر تغطيها. الإطلاق في القاهرة الجديدة لحد ما تفتحي مناطق تانية.',
       'unlockCity': 'افتحي المدينة',
       'unlockCityHint': 'بيفعّل كل الأحياء المقفولة في المدينة دي للمتخصصات والعميلات.',
       'unlockCityConfirm': 'نفتح كل الأحياء المقفولة في المدينة دي؟',
       'areaCity': 'المدينة',
       'areaName': 'الحي',
-      'categoryRequests': 'طلبات الفئات',
-      'categoryRequestsSub': 'قائمة موافقة فئات المتخصصات',
+      'categoryRequests': 'طلبات التخصصات',
+      'categoryRequestsSub': 'قائمة موافقة تخصصات المتخصصات',
       'claims': 'المطالبات',
       'claimsSub': 'مطالبات ضرر وسرقة بعد نافذة النزاع',
       'coupons': 'كوبونات',
@@ -2646,9 +2656,9 @@ class Copy {
       'vettingSub': 'قائمة الانتظار وأوقات الانتظار',
       'matrix': 'مصفوفة الأدوار',
       'matrixSub': 'صلاحيات كل دور — نفس staffCan',
-      'unlockVertical': 'افتحي التخصص',
-      'unlockHint': 'يحوّل كل الفئات المقفولة في هذا التخصص إلى نشطة ليتمكّن العميلات من الحجز.',
-      'unlockConfirm': 'نفتح كل الفئات المقفولة في التخصص ده؟',
+      'unlockVertical': 'افتحي الفئة',
+      'unlockHint': 'يحوّل كل التخصصات المقفولة في هذه الفئة إلى نشطة ليتمكن العميلات من الحجز.',
+      'unlockConfirm': 'نفتح كل التخصصات المقفولة في هذه الفئة؟',
       'catActive': 'نشطة',
       'catLocked': 'مقفولة (معاينة)',
       'catLock': 'اقفلي',
@@ -2662,7 +2672,7 @@ class Copy {
       'createCategory': 'أضيفي فئة',
       'approve': 'وافقي',
       'resolve': 'احسمي',
-      'vertical': 'التخصص',
+      'vertical': 'الفئة',
       'catSlug': 'المعرّف',
       'status': 'الحالة',
       'enName': 'الاسم (إنجليزي)',

@@ -162,7 +162,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     }
 
     final attention = <(String key, String label, int count, String unit, String hint, String route)>[
-      ('providers', lang == 'ar' ? 'مهنيات بانتظار المراجعة' : 'Providers awaiting review', asInt(home['pendingProviders']),
+      ('providers', lang == 'ar' ? 'متخصصات بانتظار المراجعة' : 'Providers awaiting review', asInt(home['pendingProviders']),
           lang == 'ar' ? 'ملف' : 'profiles', lang == 'ar' ? 'افتح طابور المراجعة' : 'Open the review queue', '${V2Paths.providers}?status=pending'),
       ('payouts', lang == 'ar' ? 'سحوبات بانتظار الموافقة' : 'Withdrawals awaiting approval', asInt(home['pendingPayouts']),
           lang == 'ar' ? 'طلب' : 'requests', lang == 'ar' ? 'راجع السحوبات' : 'Review withdrawals', V2Paths.payouts),
@@ -182,7 +182,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
       (lang == 'ar' ? 'حجوزات اليوم' : 'Bookings today', '${asInt(home['bookingsToday'])}', lang == 'ar' ? 'محجوزة لليوم' : 'booked for today'),
       (lang == 'ar' ? 'مباشر الآن' : 'Live now', '${live.isNotEmpty ? live.length : asInt(home['liveVisits'])}', lang == 'ar' ? 'زيارات نشطة' : 'active visits'),
       (lang == 'ar' ? 'العميلات' : 'Clients', '${asInt(home['totalUsers'])}', lang == 'ar' ? 'مسجّلة' : 'registered'),
-      (lang == 'ar' ? 'مهنيات موثّقات' : 'Vetted pros', '${asInt(home['vettedProviders'])}', '${lang == 'ar' ? 'من' : 'of'} ${asInt(home['totalProviders'])}'),
+      (lang == 'ar' ? 'متخصصات موثّقات' : 'Vetted pros', '${asInt(home['vettedProviders'])}', '${lang == 'ar' ? 'من' : 'of'} ${asInt(home['totalProviders'])}'),
       (lang == 'ar' ? 'سحوبات معلقة' : 'Pending payouts', '${asInt(home['pendingPayouts'])}', lang == 'ar' ? 'بانتظار الموافقة' : 'awaiting approval'),
       (lang == 'ar' ? 'كل الحجوزات' : 'All bookings', '${asInt(home['totalBookings'])}', lang == 'ar' ? 'مدى الحياة' : 'lifetime'),
     ];
@@ -351,7 +351,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
             ),
             right: V2SectionCard(
               title: lang == 'ar' ? 'العرض مقابل الطلب' : 'Supply vs demand',
-              subtitle: lang == 'ar' ? 'المهنيات النشطات مقابل الطلب المفتوح، حسب المنطقة' : 'Live pros against open demand, by area',
+              subtitle: lang == 'ar' ? 'المتخصصات النشطات مقابل الطلب المفتوح، حسب المنطقة' : 'Live pros against open demand, by area',
               trailing: [
                 V2Btn.ghost(lang == 'ar' ? 'الخريطة الكاملة' : 'Full heatmap',
                     onPressed: () => context.go(V2Paths.heatmap), size: V2BtnSize.sm),

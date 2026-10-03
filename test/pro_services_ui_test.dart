@@ -64,34 +64,34 @@ void main() {
       expect(find.text('خدمتين · ١ ظاهرة'), findsOneWidget);
       expect(find.text('خدمة واحدة · ١ ظاهرة'), findsNWidgets(2));
       expect(find.text('قيد المراجعة'), findsOneWidget);
-      expect(find.text('هيظهر بعد المراجعة'), findsOneWidget);
-      expect(find.text('اطلبي تخصص جديد'), findsOneWidget);
-      expect(find.text('أي تخصص جديد بيتراجع قبل ما يظهر للعميلات'), findsOneWidget);
+      expect(find.text('تظهر بعد المراجعة'), findsOneWidget);
+      expect(find.text('اطلبي تخصصا جديدا'), findsOneWidget);
+      expect(find.text('أي تخصص جديد يُراجع قبل أن يظهر للعميلات'), findsOneWidget);
       expect(find.textContaining('احفظي التغييرات'), findsNothing, reason: 'no global save button any more');
     });
 
     testWidgets('the booking-link pill reflects the link and opens its page', (t) async {
       await openTab(t, repoWith(profile: providerJson(linkClosed: true)));
-      expect(find.text('رابط الحجز مقفول'), findsOneWidget);
-      await t.tap(find.text('رابط الحجز مقفول'));
+      expect(find.text('رابط الحجز مغلق'), findsOneWidget);
+      await t.tap(find.text('رابط الحجز مغلق'));
       await t.pumpAndSettle();
       expect(find.text('LINK PAGE'), findsOneWidget);
     });
 
     testWidgets('no specialties yet → an empty state with the one action', (t) async {
       await openTab(t, repoWith(items: const [], rows: const []));
-      expect(find.text('لسه مفيش خدمات'), findsOneWidget);
-      expect(find.text('اطلبي تخصص جديد'), findsWidgets);
+      expect(find.text('لا خدمات بعد'), findsOneWidget);
+      expect(find.text('اطلبي تخصصا جديدا'), findsWidgets);
     });
 
     testWidgets('segments switch to areas and hours', (t) async {
       await openTab(t, repoWith());
       await t.tap(find.text('المناطق'));
       await t.pump();
-      expect(find.text('العميلات في المناطق دي بس هيقدروا يحجزوكي.'), findsOneWidget);
+      expect(find.text('تحجزك العميلات في هذه المناطق فقط.'), findsOneWidget);
       await t.tap(find.text('المواعيد'));
       await t.pump();
-      expect(find.text('أيام الشغل'), findsOneWidget);
+      expect(find.text('أيام العمل'), findsOneWidget);
       expect(find.text('ساعات الحجز'), findsOneWidget);
     });
   });
@@ -104,9 +104,9 @@ void main() {
       expect(find.text('ظاهرة ١'), findsOneWidget);
       expect(find.text('مخفية ١'), findsOneWidget);
       expect(find.text('١,٢٠٠ ج.م'), findsOneWidget);
-      expect(find.text('العميلة بتدفع ١,٣٢٠'), findsOneWidget, reason: '1200 plus the 10% fee on top');
+      expect(find.text('تدفع العميلة ١,٣٢٠'), findsOneWidget, reason: '1200 plus the 10% fee on top');
       expect(find.text('٦ ساعات · ٢ بنود'), findsOneWidget);
-      expect(find.text('خدمة جديدة في تنظيف عادي'), findsOneWidget);
+      expect(find.text('أضيفي خدمة في تنظيف عادي'), findsOneWidget);
     });
 
     testWidgets('filter chips narrow the list', (t) async {
@@ -128,7 +128,7 @@ void main() {
       expect(t.widget<DsSwitch>(switchOf('تنظيف مميز')).on, isFalse, reason: 'instant, before the server answers');
       await t.pump(const Duration(milliseconds: 300));
       expect(repo.calls, contains('active 1 false'));
-      expect(find.text('الخدمة اتخفت'), findsOneWidget);
+      expect(find.text('أُخفيت الخدمة'), findsOneWidget);
       await t.pump(const Duration(seconds: 2));
     });
 
@@ -138,7 +138,7 @@ void main() {
       await t.tap(switchOf('تنظيف مميز'));
       await t.pump(const Duration(milliseconds: 300));
       expect(t.widget<DsSwitch>(switchOf('تنظيف مميز')).on, isTrue, reason: 'put back');
-      expect(find.text('الخدمة اتخفت'), findsNothing);
+      expect(find.text('أُخفيت الخدمة'), findsNothing);
       expect(find.text('مقدرناش نحفظ الخدمة دي'), findsOneWidget);
       await t.pump(const Duration(seconds: 2));
     });
@@ -171,15 +171,15 @@ void main() {
       await openSpecialty(t, repo, 'تنظيف عادي');
       await t.tap(find.text('تنظيف مميز'));
       await t.pumpAndSettle();
-      expect(find.text('العميلة بتدفع'), findsOneWidget);
+      expect(find.text('تدفع العميلة'), findsOneWidget);
       expect(find.text('سعرك'), findsOneWidget);
       expect(find.text('المدة'), findsOneWidget);
-      expect(find.text('الخدمة بتشمل'), findsOneWidget);
+      expect(find.text('تشمل الخدمة'), findsOneWidget);
       expect(find.text('نفس المنظّفة'), findsOneWidget);
       expect(find.text('عدّلي الخدمة'), findsOneWidget);
       expect(find.text('أخفيها'), findsOneWidget);
       expect(find.text('نسخة'), findsOneWidget);
-      expect(find.text('حذف'), findsOneWidget);
+      expect(find.text('احذفي'), findsOneWidget);
     });
 
     testWidgets('sheet · copy creates a hidden copy that goes back to review', (t) async {
@@ -191,7 +191,7 @@ void main() {
       await t.pumpAndSettle();
       expect(repo.calls, contains('create'));
       expect((repo.bodies['create'] as Map)['active'], isFalse, reason: 'a copy starts hidden');
-      expect(find.text('اتعملت نسخة — هتتراجع قبل ما تظهر'), findsOneWidget);
+      expect(find.text('أُنشئت نسخة. تُراجع قبل أن تظهر'), findsOneWidget);
       await t.pump(const Duration(seconds: 2));
     });
 
@@ -200,11 +200,11 @@ void main() {
       await openSpecialty(t, repo, 'تنظيف عادي');
       await t.tap(find.text('تنظيف مميز'));
       await t.pumpAndSettle();
-      await t.tap(find.text('حذف'));
+      await t.tap(find.text('احذفي'));
       await t.pumpAndSettle();
-      expect(find.text('تحذفي الخدمة دي؟'), findsOneWidget);
+      expect(find.text('تحذفين هذه الخدمة؟'), findsOneWidget);
       expect(repo.calls.where((c) => c.startsWith('delete')), isEmpty, reason: 'nothing deleted before she confirms');
-      await t.tap(find.text('حذف').last);
+      await t.tap(find.text('احذفي').last);
       await t.pumpAndSettle();
       expect(repo.calls, contains('delete 1'));
       await t.pump(const Duration(seconds: 2));
@@ -220,7 +220,7 @@ void main() {
       expect(repo.calls.where((c) => c.startsWith('update')).toSet(), {'update 1', 'update 2'}, reason: 'the other specialties are untouched');
       expect((repo.bodies['update 1'] as Map)['price'], 132000);
       expect((repo.bodies['update 2'] as Map)['price'], 176000);
-      expect(find.text('الأسعار زادت ١٠٪'), findsOneWidget);
+      expect(find.text('زادت الأسعار ١٠٪'), findsOneWidget);
       await t.pump(const Duration(seconds: 2));
     });
 
@@ -238,10 +238,10 @@ void main() {
 
     testWidgets('a pending specialty can already be filled; the add form opens with it selected', (t) async {
       await openSpecialty(t, repoWith(), 'أظافر');
-      expect(find.text('التخصص ده قيد المراجعة. جهّزي خدماتك، وهتظهر أول ما يتوافق عليه.'), findsWidgets);
+      expect(find.text('هذا التخصص قيد المراجعة. جهّزي خدماتك، وتظهر بعد الموافقة.'), findsWidgets);
       expect(find.text('تعديل كل الأسعار'), findsNothing);
-      expect(find.text('خدمة جديدة في أظافر'), findsOneWidget);
-      await t.tap(find.text('خدمة جديدة في أظافر'));
+      expect(find.text('أضيفي خدمة في أظافر'), findsOneWidget);
+      await t.tap(find.text('أضيفي خدمة في أظافر'));
       await t.pumpAndSettle();
       expect(find.text('أظافر ✓'), findsOneWidget, reason: 'the only specialty is already chosen');
       expect(find.text('اختاري تخصص الأول'), findsNothing);
@@ -250,7 +250,7 @@ void main() {
     testWidgets('adding a service from a specialty page sends it and closes the form cleanly', (t) async {
       final repo = repoWith();
       await openSpecialty(t, repo, 'تنظيف عادي');
-      await t.tap(find.text('خدمة جديدة في تنظيف عادي'));
+      await t.tap(find.text('أضيفي خدمة في تنظيف عادي'));
       await t.pumpAndSettle();
       expect(find.text('تنظيف عادي ✓'), findsOneWidget, reason: 'the specialty is preselected');
       await t.enterText(find.byWidgetPredicate((w) => w is TextField && w.decoration?.hintText == '800'), '800');
@@ -268,8 +268,8 @@ void main() {
     testWidgets('a specialty with no services yet shows the empty state and its action', (t) async {
       final repo = repoWith(rows: [catRow('c-reg', 'تنظيف عادي', 'cleaning', 'active')], items: const []);
       await openSpecialty(t, repo, 'تنظيف عادي');
-      expect(find.text('لسه مفيش خدمات في تنظيف عادي'), findsOneWidget);
-      expect(find.text('خدمة جديدة في تنظيف عادي'), findsOneWidget);
+      expect(find.text('لا خدمات في تنظيف عادي بعد'), findsOneWidget);
+      expect(find.text('أضيفي خدمة في تنظيف عادي'), findsOneWidget);
     });
   });
 
@@ -290,7 +290,7 @@ void main() {
       expect(find.text('١٨١–٢٥٠ م²'), findsOneWidget);
       expect(find.text('مساعدتين'), findsOneWidget);
       expect(find.text('٨٠٠ ج.م'), findsNWidgets(2));
-      expect(find.text('العميلة بتدفع ٨٨٠'), findsNWidgets(2));
+      expect(find.text('تدفع العميلة ٨٨٠'), findsNWidgets(2));
       expect(find.text('تعديل'), findsOneWidget);
     });
 
@@ -336,7 +336,7 @@ void main() {
       await t.tap(find.text('مدينتي'));
       await t.pump(const Duration(milliseconds: 100));
       expect(repo.calls, isEmpty);
-      expect(find.text('لازم تفضلي في منطقة واحدة على الأقل.'), findsOneWidget);
+      expect(find.text('أبقي منطقة واحدة على الأقل.'), findsOneWidget);
       await t.pump(const Duration(seconds: 2));
     });
 
@@ -370,7 +370,7 @@ void main() {
       await t.pump(const Duration(milliseconds: 300));
       expect(repo.calls, ['patch slotHours']);
       expect(((repo.bodies['patch'] as Map)['slotHours'] as List).length, 12, reason: 'one fewer than the 13 default hours');
-      expect(find.textContaining('١٢ متاحة في كل يوم شغل'), findsOneWidget);
+      expect(find.textContaining('١٢ متاحة في كل يوم عمل'), findsOneWidget);
       await t.pump(const Duration(seconds: 2));
     });
 
@@ -380,7 +380,7 @@ void main() {
       await t.tap(find.widgetWithText(DsChip, 'سبت'));
       await t.pump(const Duration(milliseconds: 100));
       expect(repo.calls, isEmpty);
-      expect(find.text('لازم يفضل يوم شغل واحد على الأقل.'), findsOneWidget);
+      expect(find.text('أبقي يوم عمل واحدا على الأقل.'), findsOneWidget);
       await t.pump(const Duration(seconds: 2));
     });
   });

@@ -72,7 +72,7 @@ class _HeatmapScreenState extends ConsumerState<HeatmapScreen> {
             V2SectionCard(
               title: lang == 'ar' ? 'العرض والطلب حسب المنطقة' : 'Supply & demand by area',
               subtitle: lang == 'ar'
-                  ? 'المهنيات النشطات مقابل الطلبات المفتوحة في آخر ٧ أيام'
+                  ? 'المتخصصات النشطات مقابل الطلبات المفتوحة في آخر ٧ أيام'
                   : 'Active pros against open requests in the last 7 days',
               child: LayoutBuilder(builder: (context, box) {
                 final cols = (box.maxWidth / 210).floor().clamp(1, 4);
@@ -121,7 +121,7 @@ class _HeatmapScreenState extends ConsumerState<HeatmapScreen> {
                                 const SizedBox(height: 11),
                                 Row(
                                   children: [
-                                    _stat(lang == 'ar' ? 'مهنيات' : 'Pros', '$supply'),
+                                    _stat(lang == 'ar' ? 'متخصصات' : 'Pros', '$supply'),
                                     const SizedBox(width: 16),
                                     _stat(lang == 'ar' ? 'طلب' : 'Demand', '$demand'),
                                     const SizedBox(width: 16),

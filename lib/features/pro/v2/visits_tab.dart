@@ -29,7 +29,8 @@ class ProVisitsTab extends ConsumerStatefulWidget {
 
 class _ProVisitsTabState extends ConsumerState<ProVisitsTab> {
   int seg = 0; // 0 upcoming, 1 past
-  int day = 0;
+  /// The day she tapped; null until she does.
+  int? pickedDay;
   List<BookingBundle>? up;
   List<BookingBundle>? past;
   bool failed = false;
@@ -63,6 +64,17 @@ class _ProVisitsTabState extends ConsumerState<ProVisitsTab> {
       // Keep the last list when a refresh fails; only a first load shows the error.
       if (mounted && up == null) setState(() => failed = true);
     }
+  }
+
+  /// Until she picks a day, the strip opens on the nearest day that has a visit
+  /// (today first), not on an empty today. With nothing this week it stays on today.
+  int get day {
+    if (pickedDay != null) return pickedDay!;
+    final week = _week;
+    for (var i = 0; i < week.length; i++) {
+      if (_on(week[i]).isNotEmpty) return i;
+    }
+    return 0;
   }
 
   List<DateTime> get _week => [for (var i = 0; i < 7; i++) _today.add(Duration(days: i))];
@@ -182,7 +194,7 @@ class _ProVisitsTabState extends ConsumerState<ProVisitsTab> {
                   hasVisits: _on(week[i]).isNotEmpty,
                   closed: me != null && me.workDays.isNotEmpty && !me.workDays.contains(week[i].weekday),
                   first: i == 0,
-                  onTap: () => setState(() => day = i),
+                  onTap: () => setState(() => pickedDay = i),
                 ),
               ),
           ]),

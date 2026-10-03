@@ -42,7 +42,7 @@ abstract final class V2Copy {
   static const password = {'en': 'Password', 'ar': 'كلمة المرور'};
   static const saved = {'en': 'Saved', 'ar': 'تم الحفظ'};
   static const all = {'en': 'All', 'ar': 'الكل'};
-  static const providerGross = {'en': 'Provider gross', 'ar': 'صافي المهنية'};
+  static const providerGross = {'en': 'Provider gross', 'ar': 'صافي المتخصصة'};
   static const selected = {'en': 'selected', 'ar': 'محدد'};
 }
 

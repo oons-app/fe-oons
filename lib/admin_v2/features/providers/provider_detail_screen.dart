@@ -248,7 +248,7 @@ class _ProviderDetailScreenState extends ConsumerState<ProviderDetailScreen> {
     var reason = '';
     final ok = await v2Form(
       context,
-      title: lang == 'ar' ? 'إيقاف المهنية' : 'Suspend provider',
+      title: lang == 'ar' ? 'إيقاف المتخصصة' : 'Suspend provider',
       confirmLabel: lang == 'ar' ? 'إيقاف' : 'Suspend',
       danger: true,
       bodyBuilder: (ctx, _) => V2FormField(
@@ -307,7 +307,7 @@ class _ProviderDetailScreenState extends ConsumerState<ProviderDetailScreen> {
             runSpacing: 8,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              V2Btn(label: lang == 'ar' ? '→ المهنيات' : '← Providers', onPressed: () => context.go(V2Paths.providers)),
+              V2Btn(label: lang == 'ar' ? '→ المتخصصات' : '← Providers', onPressed: () => context.go(V2Paths.providers)),
               V2StatusPill(label: vetting, tone: vettingTone(prov), large: true),
               V2StatusPill(label: state, tone: providerStateTone(prov), large: true),
               Text('${prov['phone'] ?? ''}', style: const TextStyle(fontSize: 13, color: Ops.muted, fontFamily: Ops.mono)),
@@ -362,7 +362,7 @@ class _ProviderDetailScreenState extends ConsumerState<ProviderDetailScreen> {
                         size: V2BtnSize.sm,
                         onPressed: () => _confirmThen(
                           lang == 'ar' ? 'رفض $name؟' : 'Reject $name?',
-                          lang == 'ar' ? 'تُبلَّغ المهنية ولا تستطيع أخذ حجوزات.' : 'The pro is notified and cannot take bookings.',
+                          lang == 'ar' ? 'تُبلَّغ المتخصصة ولا تستطيع أخذ حجوزات.' : 'The pro is notified and cannot take bookings.',
                           lang == 'ar' ? 'رفض' : 'Reject',
                           () => _post('/admin/providers/${widget.providerId}/reject',
                               okMsg: lang == 'ar' ? 'تم الرفض' : '$name rejected'),
@@ -402,7 +402,7 @@ class _ProviderDetailScreenState extends ConsumerState<ProviderDetailScreen> {
                         label: lang == 'ar' ? 'طلب مستند' : 'Request document',
                         kind: V2BtnKind.ghost,
                         size: V2BtnSize.sm,
-                        onPressed: () => _appendNote(lang == 'ar' ? 'طُلب رفع مستند من المهنية' : 'Document re-upload requested'),
+                        onPressed: () => _appendNote(lang == 'ar' ? 'طُلب رفع مستند من المتخصصة' : 'Document re-upload requested'),
                       ),
                     ],
                   ),
@@ -627,7 +627,7 @@ class _ProviderDetailScreenState extends ConsumerState<ProviderDetailScreen> {
       confirmLabel: lang == 'ar' ? 'رفض' : 'Reject',
       danger: true,
       bodyBuilder: (ctx, _) => V2FormField(
-        label: lang == 'ar' ? 'السبب (هتشوفه المهنية)' : 'Reason (the provider will see this)',
+        label: lang == 'ar' ? 'السبب (هتشوفه المتخصصة)' : 'Reason (the provider will see this)',
         child: TextField(onChanged: (v) => note = v, maxLines: 2, autofocus: true),
       ),
       // The backend now requires this note on reject too — validate here
@@ -913,7 +913,7 @@ class _ProviderDetailScreenState extends ConsumerState<ProviderDetailScreen> {
             children: [
               _serviceStatePill(state, lang),
               if (paused) V2StatusPill(label: ar ? 'موقوفة' : 'Paused', tone: V2Tone.neutral),
-              if (cleaning) V2StatusPill(label: ar ? 'باقة تنظيف' : 'Cleaning package', tone: V2Tone.info),
+              if (cleaning) V2StatusPill(label: ar ? 'خدمة تنظيف' : 'Cleaning package', tone: V2Tone.info),
               if (travel > 0)
                 V2StatusPill(label: '${ar ? 'انتقال' : 'Travel'} ${money(travel, lang)}', tone: V2Tone.neutral),
               if (benefits.isNotEmpty)
@@ -1083,7 +1083,7 @@ class _ProviderDetailScreenState extends ConsumerState<ProviderDetailScreen> {
                   isExpanded: true,
                   items: [
                     DropdownMenuItem(value: 'standard', child: Text(ar ? 'خدمة عادية' : 'Standard service')),
-                    DropdownMenuItem(value: 'cleaning', child: Text(ar ? 'باقة تنظيف (بالمساحة)' : 'Cleaning package (by size)')),
+                    DropdownMenuItem(value: 'cleaning', child: Text(ar ? 'خدمة تنظيف (بالمساحة)' : 'Cleaning package (by size)')),
                   ],
                   onChanged: (v) => sb(() => kind = v ?? 'standard'),
                 ),
@@ -1208,7 +1208,7 @@ class _ProviderDetailScreenState extends ConsumerState<ProviderDetailScreen> {
               if (state == 'rejected' || state == 'changes_requested') ...[
                 const SizedBox(height: 10),
                 V2FormField(
-                  label: ar ? 'السبب (هتشوفه المهنية)' : 'Reason (the provider sees this)',
+                  label: ar ? 'السبب (هتشوفه المتخصصة)' : 'Reason (the provider sees this)',
                   child: TextField(controller: note, maxLines: 2),
                 ),
               ],
@@ -1377,7 +1377,7 @@ class _ProviderDetailScreenState extends ConsumerState<ProviderDetailScreen> {
     final port = asDynList(prov['portfolio']).map((e) => '$e').toList();
     return V2SectionCard(
       title: lang == 'ar' ? 'المعرض' : 'Portfolio',
-      subtitle: lang == 'ar' ? 'يظهر في ملف المهنية العام' : "Shown on the provider's public profile",
+      subtitle: lang == 'ar' ? 'يظهر في ملف المتخصصة العام' : "Shown on the provider's public profile",
       trailing: [
         if (canVet)
           V2Btn.ghost(lang == 'ar' ? 'طلب صور' : 'Request photos',

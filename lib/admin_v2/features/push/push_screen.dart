@@ -213,7 +213,7 @@ class _PushCampaignsScreenState extends ConsumerState<PushCampaignsScreen> {
               const SizedBox(height: 10),
               _chips(ar ? 'الجمهور' : 'Audience', [
                 ('clients', ar ? 'عميلات' : 'Clients'),
-                ('providers', ar ? 'مهنيات' : 'Providers'),
+                ('providers', ar ? 'متخصصات' : 'Providers'),
                 ('all', ar ? 'الجميع' : 'Everyone'),
               ], audience, (v) {
                 setState(() => audience = v);
@@ -269,7 +269,7 @@ class _PushCampaignsScreenState extends ConsumerState<PushCampaignsScreen> {
               const SizedBox(height: 8),
               Text(
                 ar
-                    ? 'الجمهور: ${preview['clients'] ?? '—'} عميلة · ${preview['providers'] ?? '—'} مهنية · ${preview['iosDevices'] ?? '—'} جهاز iOS · ${preview['androidDevices'] ?? '—'} أندرويد'
+                    ? 'الجمهور: ${preview['clients'] ?? '—'} عميلة · ${preview['providers'] ?? '—'} متخصصة · ${preview['iosDevices'] ?? '—'} جهاز iOS · ${preview['androidDevices'] ?? '—'} أندرويد'
                     : 'Audience: ${preview['clients'] ?? '—'} clients · ${preview['providers'] ?? '—'} providers · ${preview['iosDevices'] ?? '—'} iOS · ${preview['androidDevices'] ?? '—'} Android',
                 style: const TextStyle(fontSize: 12, color: Ops.mutedSoft, fontFamily: Ops.mono),
               ),

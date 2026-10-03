@@ -153,7 +153,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
       return;
     }
     if (providers.isEmpty) {
-      if (mounted) v2Toast(context, lang == 'ar' ? 'لا مهنيات موثّقات' : 'No vetted professionals', error: true);
+      if (mounted) v2Toast(context, lang == 'ar' ? 'لا متخصصات موثّقات' : 'No vetted professionals', error: true);
       return;
     }
 
@@ -172,7 +172,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           V2FormField(
-            label: lang == 'ar' ? 'المهنية' : 'Professional',
+            label: lang == 'ar' ? 'المتخصصة' : 'Professional',
             child: Autocomplete<Map<String, dynamic>>(
               displayStringForOption: (p) => personName(p, lang, fallbackId: idOf(p)),
               optionsBuilder: (t) {
@@ -527,7 +527,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
       ),
       V2SectionCard(
         title: lang == 'ar' ? 'التعليمات المحفوظة' : 'Saved instructions',
-        subtitle: lang == 'ar' ? 'تُعرض للمهنية قبل كل زيارة' : 'Shown to the pro before every visit',
+        subtitle: lang == 'ar' ? 'تُعرض للمتخصصة قبل كل زيارة' : 'Shown to the pro before every visit',
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

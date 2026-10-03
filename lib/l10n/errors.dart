@@ -79,6 +79,13 @@ String friendlyError(Object e, String lang) {
         'Need your legal name.': 'اكتبي الاسم القانوني الكامل.',
         'One or more services use a category you are not approved for.': 'التخصص ده مش متاح ليكي دلوقتي. لو اتراجع واتطلب منك تعديل، عدّليه وابعتيه تاني.',
         'Pick a category for every service.': 'اختاري التخصص للخدمة.',
+        'Enter an invite code.': 'اكتبي كود الدعوة.',
+        'Invites are paused right now.': 'الدعوات متوقفة حاليا.',
+        'That invite code is not valid.': 'كود الدعوة غير صحيح.',
+        'You cannot use your own invite code.': 'لا يمكن استخدام كود الدعوة الخاص بحسابك.',
+        'Invite codes are for new customers, before a first booking.': 'كود الدعوة لعميلة جديدة، قبل أول حجز.',
+        'You already used an invite code.': 'تمت إضافة كود دعوة من قبل.',
+        'This coupon belongs to another customer.': 'هذا الكوبون لعميلة أخرى.',
         'Every service needs a price.': 'لازم تكتبي سعر للخدمة.',
         'Service duration must be 15–480 minutes.': 'مدة الخدمة لازم تكون من ١٥ دقيقة لـ ٨ ساعات.',
         'That photo is too large (8 MB max). Try a lower-resolution photo.':

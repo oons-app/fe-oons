@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:oons/app/shell.dart';
+import 'package:oons/features/invite/invite_screen.dart';
 import 'package:oons/app/web_host.dart';
 import 'package:oons/core/analytics.dart';
 import 'package:oons/data/repo.dart';
@@ -243,6 +244,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/me/saved', builder: (c, s) => const SavedScreen()),
       GoRoute(path: '/me/help', builder: (c, s) => const ProfileCopyScreen(titleKey: 'help', bodyKey: 'helpBody')),
       GoRoute(path: '/me/notif', builder: (c, s) => const AlertsScreen()),
+      GoRoute(path: '/invite', builder: (c, s) => const InviteScreen()),
       GoRoute(path: '/me/pay', builder: (c, s) => const ProfileCopyScreen(titleKey: 'pay', bodyKey: 'payBody')),
       GoRoute(path: '/reviews', builder: (c, s) => const ReviewsScreen()),
       GoRoute(path: '/reviews/:id', builder: (c, s) => ReviewsScreen(providerId: s.pathParameters['id'])),

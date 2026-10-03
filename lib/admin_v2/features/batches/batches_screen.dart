@@ -87,9 +87,9 @@ class _BatchesScreenState extends ConsumerState<BatchesScreen> {
       actionsWidth: 210,
       columns: [
         V2Col(lang == 'ar' ? 'الدفعة' : 'Batch', fixed: 120),
-        V2Col(lang == 'ar' ? 'المهنية' : 'Professional', flex: 1),
+        V2Col(lang == 'ar' ? 'المتخصصة' : 'Professional', flex: 1),
         V2Col(lang == 'ar' ? 'الزيارات' : 'Visits', fixed: 80),
-        V2Col(lang == 'ar' ? 'صافي المهنية' : 'Provider gross', fixed: 130),
+        V2Col(lang == 'ar' ? 'صافي المتخصصة' : 'Provider gross', fixed: 130),
         V2Col(lang == 'ar' ? 'سُوّيت' : 'Settled', fixed: 132),
       ],
       rows: [

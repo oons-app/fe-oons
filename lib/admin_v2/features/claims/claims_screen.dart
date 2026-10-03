@@ -146,7 +146,7 @@ class _ClaimsScreenState extends ConsumerState<ClaimsScreen> {
         V2Col(lang == 'ar' ? 'المطالبة' : 'Claim', fixed: 110),
         V2Col(lang == 'ar' ? 'الحجز' : 'Booking', fixed: 120),
         V2Col(lang == 'ar' ? 'العميلة' : 'Customer', flex: 1),
-        V2Col(lang == 'ar' ? 'المهنية' : 'Professional', flex: 1),
+        V2Col(lang == 'ar' ? 'المتخصصة' : 'Professional', flex: 1),
         V2Col(lang == 'ar' ? 'النوع' : 'Type', fixed: 100),
         V2Col(lang == 'ar' ? 'فُتحت' : 'Opened', fixed: 108),
         V2Col(lang == 'ar' ? 'الحالة' : 'Status', fixed: 110),

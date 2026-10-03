@@ -222,7 +222,7 @@ Future<void> showCleaningTaskChecklistSheet({
             children: [
               Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: Pro.lineSoft, borderRadius: BorderRadius.zero))),
               const SizedBox(height: 12),
-              Text(ar ? 'الشغل اللي الباقة شاملته' : 'Package tasks', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Pro.ink)),
+              Text(ar ? 'ما تشمله الخدمة' : 'Package tasks', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Pro.ink)),
               const SizedBox(height: 4),
               Text(pluralTasks(included, ar: ar), style: const TextStyle(fontSize: 13, color: Pro.muted)),
               if (tiers.length > 1) ...[
@@ -904,7 +904,7 @@ class _ProServiceEditorSheetState extends State<_ProServiceEditorSheet> {
             if (draft.isCleaning) ...[
               const SizedBox(height: 18),
               _stepLabel(
-                '${m['stepTasks'] ?? (ar ? '٦ · الشغل اللي الباقة شاملته' : '6 · Package tasks')} · ${pluralTasks(included, ar: ar)}',
+                '${m['stepTasks'] ?? (ar ? '٦ · ما تشمله الخدمة' : '6 · Package tasks')} · ${pluralTasks(included, ar: ar)}',
               ),
               ...cleaningTaskChecklist(
                 rooms: cleaningRooms,

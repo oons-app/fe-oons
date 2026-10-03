@@ -112,7 +112,7 @@ class _ServiceRequestsScreenState extends ConsumerState<ServiceRequestsScreen> {
         confirmLabel: status == 'reject' ? (lang == 'ar' ? 'رفض' : 'Reject') : (lang == 'ar' ? 'ابعتي' : 'Send'),
         danger: status == 'reject',
         bodyBuilder: (ctx, _) => V2FormField(
-          label: lang == 'ar' ? 'السبب (هتشوفه المهنية)' : 'Reason (the provider will see this)',
+          label: lang == 'ar' ? 'السبب (هتشوفه المتخصصة)' : 'Reason (the provider will see this)',
           child: TextField(onChanged: (v) => note = v, maxLines: 3, autofocus: true),
         ),
         onValidate: () {
@@ -217,7 +217,7 @@ class _ServiceRequestsScreenState extends ConsumerState<ServiceRequestsScreen> {
                       const SizedBox(height: 4),
                       Text(
                         lang == 'ar'
-                            ? 'المهنية طلبت اسمًا غير موجود في الكتالوج. الموافقة تضيفه لكل المهنيات.'
+                            ? 'المتخصصة طلبت اسمًا غير موجود في الكتالوج. الموافقة تضيفه لكل المتخصصات.'
                             : 'The pro asked for a name that is not in the catalog. Approve adds it for every pro.',
                         style: const TextStyle(fontSize: 12.5, color: Ops.muted, height: 1.35),
                       ),
@@ -262,7 +262,7 @@ class _ServiceRequestsScreenState extends ConsumerState<ServiceRequestsScreen> {
         confirmLabel: lang == 'ar' ? 'رفض' : 'Reject',
         danger: true,
         bodyBuilder: (ctx, _) => V2FormField(
-          label: lang == 'ar' ? 'السبب (هتشوفه المهنية)' : 'Reason (the provider will see this)',
+          label: lang == 'ar' ? 'السبب (هتشوفه المتخصصة)' : 'Reason (the provider will see this)',
           child: TextField(onChanged: (v) => note = v, maxLines: 3, autofocus: true),
         ),
         onValidate: () {

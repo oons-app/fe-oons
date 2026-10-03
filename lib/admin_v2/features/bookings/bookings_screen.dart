@@ -401,7 +401,7 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> with WidgetsBin
       providerOptions[pid] = providerNameOf(b, lang);
     }
     if (providerOptions.isEmpty) {
-      v2Toast(context, lang == 'ar' ? 'لا مهنية مرتبطة' : 'No professional on selected visits', error: true);
+      v2Toast(context, lang == 'ar' ? 'لا متخصصة مرتبطة' : 'No professional on selected visits', error: true);
       return;
     }
 
@@ -420,7 +420,7 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> with WidgetsBin
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             V2FormField(
-              label: lang == 'ar' ? 'المهنية (بالاسم)' : 'Provider',
+              label: lang == 'ar' ? 'المتخصصة (بالاسم)' : 'Provider',
               child: Autocomplete<String>(
                 initialValue: TextEditingValue(text: providerQuery),
                 optionsBuilder: (text) {
@@ -477,7 +477,7 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> with WidgetsBin
                   _sumRow(lang == 'ar' ? 'زيارات' : 'Visits', '${selected.length}'),
                   _sumRow(lang == 'ar' ? 'إجمالي العميلة' : 'Client total', money(clientTotal, lang)),
                   _sumRow(lang == 'ar' ? 'رسوم الأمان مستبعدة' : 'Trust fee excluded', money(clientTotal - gross, lang)),
-                  _sumRow(lang == 'ar' ? 'صافي المهنية' : 'Provider gross', money(gross, lang), strong: true),
+                  _sumRow(lang == 'ar' ? 'صافي المتخصصة' : 'Provider gross', money(gross, lang), strong: true),
                 ],
               ),
             ),
@@ -499,7 +499,7 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> with WidgetsBin
       onValidate: () {
         final match = providerOptions.entries.where((e) => e.value.toLowerCase() == providerQuery.trim().toLowerCase());
         if (match.isEmpty && !providerOptions.containsKey(providerId)) {
-          v2Toast(context, lang == 'ar' ? 'اختاري مهنية بالاسم' : 'Pick a professional by name', error: true);
+          v2Toast(context, lang == 'ar' ? 'اختاري متخصصة بالاسم' : 'Pick a professional by name', error: true);
           return false;
         }
         if (match.isNotEmpty) providerId = match.first.key;
@@ -775,7 +775,7 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> with WidgetsBin
                   columns: [
                     V2Col(lang == 'ar' ? 'المرجع' : 'Ref', fixed: 150, sortKey: 'ref'),
                     V2Col(lang == 'ar' ? 'العميلة' : 'Customer', flex: 1.05, sortKey: 'customer'),
-                    V2Col(lang == 'ar' ? 'المهنية' : 'Professional', flex: 0.95, sortKey: 'professional'),
+                    V2Col(lang == 'ar' ? 'المتخصصة' : 'Professional', flex: 0.95, sortKey: 'professional'),
                     V2Col(lang == 'ar' ? 'التاريخ' : 'Date', fixed: 110, sortKey: 'slotStart'),
                     V2Col(lang == 'ar' ? 'الحالة' : 'Status', fixed: 132, sortKey: 'status'),
                     V2Col(lang == 'ar' ? 'الإجمالي' : 'Total', fixed: 100, sortKey: 'total'),
