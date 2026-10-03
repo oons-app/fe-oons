@@ -52,9 +52,14 @@ int compareBookingRows(Map<String, dynamic> a, Map<String, dynamic> b, String ke
       vb = providerNameOf(b, lang).toLowerCase();
       break;
     case 'status':
-      va = statusLabel('${a['status']}', lang).toLowerCase();
-      vb = statusLabel('${b['status']}', lang).toLowerCase();
-      break;
+      final byStatus = compareSortValues(bookingStatusRank('${a['status']}'), bookingStatusRank('${b['status']}'), asc: asc);
+      if (byStatus != 0) return byStatus;
+      // Same status: newest visit first.
+      return compareSortValues(
+        parseTime(a['slotStart']) ?? parseTime(a['createdAt']),
+        parseTime(b['slotStart']) ?? parseTime(b['createdAt']),
+        asc: false,
+      );
     case 'total':
       va = asInt(a['total']);
       vb = asInt(b['total']);
@@ -64,6 +69,44 @@ int compareBookingRows(Map<String, dynamic> a, Map<String, dynamic> b, String ke
       vb = parseTime(b['slotStart']) ?? parseTime(b['createdAt']);
   }
   return compareSortValues(va, vb, asc: asc);
+}
+
+/// Ops list order: Confirmed, in progress, completed, pending payment,
+/// cancelled, then the remaining statuses. Matches the filter chips.
+@visibleForTesting
+int bookingStatusRank(String status) {
+  switch (status.toLowerCase()) {
+    case 'paid':
+    case 'confirmed':
+    case 'on_the_way':
+    case 'ontheway':
+      return 1;
+    case 'in_progress':
+    case 'inprogress':
+      return 2;
+    case 'completed':
+    case 'released':
+      return 3;
+    case 'pending':
+    case 'pending_payment':
+    case 'pendingpayment':
+      return 4;
+    case 'cancelled':
+    case 'canceled':
+    case 'cancelled_client':
+    case 'cancelled_provider':
+      return 5;
+    case 'disputed':
+      return 6;
+    case 'refunded':
+      return 7;
+    case 'rescheduled':
+      return 8;
+    case 'no_show_client':
+      return 9;
+    default:
+      return 50;
+  }
 }
 
 class BookingsScreen extends ConsumerStatefulWidget {
@@ -93,8 +136,8 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> with WidgetsBin
   Timer? _refreshTimer;
   Timer? _debounce;
   bool _appInBackground = false;
-  String sortKey = 'slotStart';
-  bool sortAsc = false;
+  String sortKey = 'status';
+  bool sortAsc = true;
 
   @override
   void initState() {
@@ -184,6 +227,10 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> with WidgetsBin
         if (queryFilter.isNotEmpty) 'q': queryFilter,
         if (unpaidOps) 'unpaidOps': '1',
         if (receiptPending) 'receiptPending': '1',
+        if (sortKey == 'status') 'sort': 'status',
+        if (sortKey == 'status') 'dir': sortAsc ? 'asc' : 'desc',
+        if (sortKey == 'slotStart') 'sort': 'slotStart',
+        if (sortKey == 'slotStart') 'dir': sortAsc ? 'asc' : 'desc',
       };
       final data = await staffClient.get('/admin/bookings', query: query);
       final rows = asMapList(data['bookings']);
@@ -234,8 +281,12 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> with WidgetsBin
         sortKey = key;
         sortAsc = key == 'ref' || key == 'customer' || key == 'professional' || key == 'status';
       }
-      _applySort();
     });
+    if (key == 'status' || key == 'slotStart') {
+      _load();
+      return;
+    }
+    setState(_applySort);
   }
 
   /// `total` is the server count for the *active* query (drives paging + the

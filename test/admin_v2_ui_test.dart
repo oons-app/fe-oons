@@ -184,6 +184,17 @@ void main() {
     expect(rows[2]['ref'], 'ONS-3');
   });
 
+  test('compareBookingRows groups Confirmed, then completed, then the rest', () {
+    final rows = [
+      {'ref': 'done', 'status': 'completed', 'slotStart': '2026-10-01T10:00:00Z'},
+      {'ref': 'wait', 'status': 'pending_payment', 'slotStart': '2026-10-03T10:00:00Z'},
+      {'ref': 'old', 'status': 'paid', 'slotStart': '2026-09-01T10:00:00Z'},
+      {'ref': 'new', 'status': 'on_the_way', 'slotStart': '2026-10-02T10:00:00Z'},
+      {'ref': 'gone', 'status': 'cancelled_client', 'slotStart': '2026-10-04T10:00:00Z'},
+    ]..sort((a, b) => compareBookingRows(a, b, 'status', true, 'en'));
+    expect(rows.map((r) => r['ref']).toList(), ['new', 'old', 'done', 'wait', 'gone']);
+  });
+
   test('compareBookingRows sorts total and ref', () {
     final a = {'ref': 'ONS-9', 'total': 100};
     final b = {'ref': 'ONS-1', 'total': 900};
