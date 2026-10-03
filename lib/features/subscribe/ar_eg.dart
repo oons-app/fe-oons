@@ -180,8 +180,9 @@ int savingPct(int ref, int price) => ref == 0 ? 0 : ((ref - price) * 100 / ref).
 /// Per-visit average (`يعني للزيارة`). `null` when nothing is picked.
 int? perVisitEgp(int price, int visits) => visits == 0 ? null : (price / visits).round();
 
-/// What lands with the provider after the 10% commission (`بيوصلك بعد العمولة`).
-int netEgp(int price) => (price * 0.9).round();
+/// What the client pays for a plan priced at [price]: Oons' 10% is added on top,
+/// never taken from the provider (`العميلة بتدفع`).
+int clientPaysEgp(int price) => (price * 1.1).round();
 
 String priceNote(int regular, int sub) {
   if (sub <= 0) return 'اكتبي السعر';

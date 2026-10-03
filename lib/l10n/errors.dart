@@ -77,6 +77,10 @@ String friendlyError(Object e, String lang) {
         'National ID must be 14 digits.': 'يلزم أن يكون الرقم القومي ١٤ رقمًا بالضبط.',
         'Need every legal consent to continue.': 'يلزم الموافقة على كل البنود للمتابعة.',
         'Need your legal name.': 'اكتبي الاسم القانوني الكامل.',
+        'One or more services use a category you are not approved for.': 'التخصص ده مش متاح ليكي دلوقتي. لو اتراجع واتطلب منك تعديل، عدّليه وابعتيه تاني.',
+        'Pick a category for every service.': 'اختاري التخصص للخدمة.',
+        'Every service needs a price.': 'لازم تكتبي سعر للخدمة.',
+        'Service duration must be 15–480 minutes.': 'مدة الخدمة لازم تكون من ١٥ دقيقة لـ ٨ ساعات.',
         'That photo is too large (8 MB max). Try a lower-resolution photo.':
             'الصورة كبيرة جدًا (٨ ميغابايت حدًا أقصى). حاولِي بصورة أصغر أو بجودة أقل.',
         'Need a photo.': 'اختاري صورة.',

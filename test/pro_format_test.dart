@@ -60,9 +60,16 @@ void main() {
     expect(pluralTiers(11, ar: true), '١١ شريحة');
   });
 
-  test('net after commission — travel not commissioned', () {
-    expect(netAfterCommission(priceEgp: 1000, travelEgp: 50, commissionRate: 0.1), 950);
-    expect(netAfterCommission(priceEgp: 800, travelEgp: 0, commissionRate: 0.1), 720);
+  test('client price = base + fee on top; base recovered from the final price', () {
+    expect(customerPriceEgp(800, 0.1), 880);
+    expect(customerPriceEgp(1000, 0.1), 1100);
+    expect(customerPriceEgp(0, 0.1), 0);
+    expect(basePriceEgp(880, 0.1), 800);
+    expect(basePriceEgp(1100, 0.1), 1000);
+    expect(basePriceEgp(0, 0.1), 0);
+    for (final base in [150, 350, 505, 800, 1250, 2999]) {
+      expect(basePriceEgp(customerPriceEgp(base, 0.1), 0.1), base, reason: 'round trip $base');
+    }
   });
 
   test('cleaning size overlap', () {

@@ -75,7 +75,7 @@ void main() {
     expect(find.text('Prices by area'), findsOneWidget);
     expect(find.text('120–150 m²'.replaceAll('m²', 'م²')), findsOneWidget, reason: 'unit stays m²');
     expect(find.text('1,200 EGP'), findsOneWidget);
-    expect(find.text('Net 1,080'), findsOneWidget);
+    expect(find.text('Client pays 1,320'), findsOneWidget);
     expect(find.text('New service in Regular cleaning'), findsOneWidget);
     expect(t.takeException(), isNull);
   });

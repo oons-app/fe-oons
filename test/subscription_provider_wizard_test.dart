@@ -194,7 +194,7 @@ void main() {
       expect(find.textContaining('بدل'), findsNothing, reason: 'step 2 has no «بدل X بالزيارة» line');
       expect(find.byKey(const Key('wizard-save')), findsOneWidget);
       expect(find.text('يعني للزيارة'), findsOneWidget);
-      expect(find.text('بيوصلك بعد العمولة'), findsOneWidget);
+      expect(find.text('العميلة بتدفع'), findsOneWidget);
       expect(find.text('العميلة هتشوفها كده'), findsOneWidget);
       expect(find.text('معاينة'), findsOneWidget);
       expect(find.textContaining('من غير اشتراك ٥٠٠'), findsOneWidget);

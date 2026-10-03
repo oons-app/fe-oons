@@ -44,11 +44,11 @@ void main() {
       expect(arGrouped(2750), '٢٬٧٥٠');
     });
 
-    test('per visit and net', () {
+    test('per visit and what the client pays', () {
       expect(perVisitEgp(2500, 4), 625);
       expect(perVisitEgp(0, 0), isNull);
-      expect(netEgp(2500), 2250);
-      expect(netEgp(1800), 1620);
+      expect(clientPaysEgp(2500), 2750);
+      expect(clientPaysEgp(1800), 1980);
     });
 
     test('no-save copy covers every branch', () {

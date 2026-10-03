@@ -235,13 +235,12 @@ Future<void> editOrAddService(BuildContext context, WidgetRef ref, ProSpecialty 
   );
   if (result == null || !context.mounted) return;
   if (result.categoryId == '__delete__') {
-    result.dispose();
     if (existing != null) await deleteService(context, ref, existing);
     return;
   }
   final t = pv2(ref);
+  // The editor sheet disposes the draft once it has finished closing.
   final payload = result.toApiItem()..remove('id');
-  result.dispose();
   final repo = ref.read(repoProvider);
   await ProAutosave(context, ref).request(
     'svc:save:${existing?.id ?? 'new'}',

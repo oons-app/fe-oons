@@ -126,16 +126,12 @@ String pluralTiers(int n, {required bool ar}) {
   return '${toArabicDigits(n)} شريحة';
 }
 
-/// Net preview: commission on service price only; travel added after.
-int netAfterCommission({
-  required int priceEgp,
-  required int travelEgp,
-  required double commissionRate,
-}) {
-  final rate = commissionRate.clamp(0.0, 1.0);
-  final netService = (priceEgp * (1 - rate)).round();
-  return netService + travelEgp;
-}
+/// What the client pays for a service the provider prices at [baseEgp]. Oons'
+/// fee is added on top of her price; it is never taken out of it.
+int customerPriceEgp(int baseEgp, double feeRate) => baseEgp <= 0 ? 0 : (baseEgp * (1 + feeRate)).round();
+
+/// The provider's own price for a service the client pays [customerEgp] for.
+int basePriceEgp(int customerEgp, double feeRate) => customerEgp <= 0 ? 0 : (customerEgp / (1 + feeRate)).round();
 
 /// Suggested cleaning duration (minutes) from size × workers — editable in UI.
 int suggestCleaningDurationMin({required int sizeFromSqm, required int workers}) {

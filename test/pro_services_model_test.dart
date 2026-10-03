@@ -94,10 +94,10 @@ void main() {
   });
 
   group('prices', () {
-    test('net uses the real commission', () {
-      expect(netEgp(1200, 0.10), 1080);
-      expect(netEgp(800, 0.15), 680);
-      expect(netEgp(715, 0.10), 644);
+    test('the client pays her price plus the fee on top', () {
+      expect(clientPaysEgp(1200, 0.10), 1320);
+      expect(clientPaysEgp(800, 0.15), 920);
+      expect(clientPaysEgp(715, 0.10), 787);
     });
     test('bulk change rounds to 5 and never goes below 5', () {
       expect(bulkPrice(1200, 1.1), 1320);

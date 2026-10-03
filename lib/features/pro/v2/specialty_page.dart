@@ -59,6 +59,9 @@ class _ProSpecialtyScreenState extends ConsumerState<ProSpecialtyScreen> {
       ));
     } else {
       final approved = spec.status == SpecialtyStatus.approved;
+      // A specialty still in review can already be filled with services («جهّزي
+      // خدماتك»); they stay hidden from clients until it is approved.
+      final canAdd = approved || spec.status == SpecialtyStatus.pending;
       final services = spec.services;
       final shown = services.where((s) => filter == 'all' || (filter == 'on' ? s.active : !s.active)).toList();
       body
@@ -95,8 +98,8 @@ class _ProSpecialtyScreenState extends ConsumerState<ProSpecialtyScreen> {
             icon: 'list',
             title: none ? t('specEmptyNone', {'name': spec.name.of(lang)}) : t('specEmptyFilter'),
             body: none ? (approved ? t('specEmptyNoneBody') : (spec.status == SpecialtyStatus.pending ? t('pendingBanner') : t('attentionBanner'))) : t('specEmptyFilterBody'),
-            cta: none && approved ? t('newServiceIn', {'name': spec.name.of(lang)}) : (none && spec.status == SpecialtyStatus.attention ? t('resubmit') : null),
-            onCta: none && approved ? () => editOrAddService(context, ref, spec) : (none && spec.status == SpecialtyStatus.attention ? () => resubmitSpecialty(context, ref, spec) : null),
+            cta: none && canAdd ? t('newServiceIn', {'name': spec.name.of(lang)}) : (none && spec.status == SpecialtyStatus.attention ? t('resubmit') : null),
+            onCta: none && canAdd ? () => editOrAddService(context, ref, spec) : (none && spec.status == SpecialtyStatus.attention ? () => resubmitSpecialty(context, ref, spec) : null),
           ),
         ));
       } else {
@@ -105,7 +108,7 @@ class _ProSpecialtyScreenState extends ConsumerState<ProSpecialtyScreen> {
             ..add(_ServiceCard(item: s, ar: ar, lang: lang, t: t, commission: st.commissionRate, onOpen: () => showServiceSheet(context, ref, spec, s), onToggle: (v) => setServiceVisible(context, ref, s, v)))
             ..add(const SizedBox(height: Ds.s2));
         }
-        if (approved) {
+        if (canAdd) {
           body
             ..add(const SizedBox(height: Ds.s2))
             ..add(DsButton(label: t('newServiceIn', {'name': spec.name.of(lang)}), icon: 'plus', onTap: () => editOrAddService(context, ref, spec)));
@@ -174,7 +177,7 @@ class _TierRow extends StatelessWidget {
         Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
           Text(DsFormat.price(price, ar: ar), style: DsText.num(size: 14, weight: FontWeight.w600)),
           const SizedBox(height: 2),
-          Text('${t('net')} ${DsFormat.amount(netEgp(price, commission), ar: ar)}', style: DsText.meta),
+          Text('${t('net')} ${DsFormat.amount(clientPaysEgp(price, commission), ar: ar)}', style: DsText.meta),
         ]),
       ]),
     );
@@ -221,10 +224,9 @@ class _ServiceCard extends StatelessWidget {
                     ]),
                     if (meta.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 2), child: Text(meta, style: DsText.meta)),
                     const SizedBox(height: Ds.s2),
-                    Row(children: [
+                    Wrap(spacing: Ds.s2, runSpacing: 2, crossAxisAlignment: WrapCrossAlignment.center, children: [
                       Text(DsFormat.price(price, ar: ar), style: DsText.num(size: 15, weight: FontWeight.w600)),
-                      const SizedBox(width: Ds.s2),
-                      Text('${t('net')} ${DsFormat.amount(netEgp(price, commission), ar: ar)}', style: DsText.meta),
+                      Text('${t('net')} ${DsFormat.amount(clientPaysEgp(price, commission), ar: ar)}', style: DsText.meta),
                     ]),
                   ]),
                 ),

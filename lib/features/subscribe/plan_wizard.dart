@@ -1177,7 +1177,7 @@ class _PlanWizardFlowState extends State<PlanWizardFlow> {
       Row(children: [
         Expanded(child: _statTile('يعني للزيارة', perVisitEgp(draft.price, draft.totalQty), key: const Key('per-visit'))),
         const SizedBox(width: 8),
-        Expanded(child: _statTile('بيوصلك بعد العمولة', netEgp(draft.price), key: const Key('net'))),
+        Expanded(child: _statTile('العميلة بتدفع', clientPaysEgp(draft.price), key: const Key('net'))),
       ]),
       const SizedBox(height: 12),
       WizDashed(

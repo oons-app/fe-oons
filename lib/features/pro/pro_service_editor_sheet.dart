@@ -67,12 +67,21 @@ class ProServiceDraft {
     sizeToSqm = toRaw.isEmpty ? null : int.tryParse(toRaw);
   }
 
+  bool _disposed = false;
+
+  /// The editor sheet disposes the draft it popped when its route is really gone
+  /// (after the closing animation). Callers read what they need from a returned
+  /// draft and must not dispose it themselves: doing so while the sheet is still
+  /// animating out crashes that last frame. Safe to call twice.
   void dispose() {
+    if (_disposed) return;
+    _disposed = true;
     priceCtrl.dispose();
     travelCtrl.dispose();
     sizeFromCtrl.dispose();
     sizeToCtrl.dispose();
   }
+
 
   ProServiceDraft copyAsNew(String newId) {
     syncSizeFromControls();
@@ -319,6 +328,31 @@ class _ProServiceEditorSheetState extends State<_ProServiceEditorSheet> {
   bool deleteRequested = false;
   String? requestNameBusy;
 
+
+  /// What the client pays for the service: her base price plus Oons' fee on top.
+  /// The two price fields drive each other; only the base price is ever saved.
+  final TextEditingController customerCtrl = TextEditingController();
+
+  void _syncCustomerFromBase() {
+    final c = customerPriceEgp(draft.priceEgp, widget.commissionRate);
+    customerCtrl.text = c > 0 ? '$c' : '';
+  }
+
+  void _onBaseChanged(String v) {
+    final n = normalizeMoneyInput(v);
+    draft.priceCtrl.value = TextEditingValue(text: n, selection: TextSelection.collapsed(offset: n.length));
+    _syncCustomerFromBase();
+    setState(() {});
+  }
+
+  void _onCustomerChanged(String v) {
+    final n = normalizeMoneyInput(v);
+    customerCtrl.value = TextEditingValue(text: n, selection: TextSelection.collapsed(offset: n.length));
+    final base = basePriceEgp(int.tryParse(n) ?? 0, widget.commissionRate);
+    draft.priceCtrl.text = base > 0 ? '$base' : '';
+    setState(() {});
+  }
+
   Map get m => Copy.of(widget.lang)['svcMgmt'] as Map;
   bool get isEdit => widget.existing != null;
   bool get ar => widget.lang == 'ar';
@@ -356,6 +390,12 @@ class _ProServiceEditorSheetState extends State<_ProServiceEditorSheet> {
             benefits: List.of(e.benefits),
           )
         : ProServiceDraft(id: 'new');
+    // Opened from inside one specialty (or staging one): that specialty is the
+    // only choice, so it is already selected instead of leaving her at
+    // «اختاري تخصص الأول» with a disabled button.
+    if (e == null && draft.categoryId == null && widget.approvedCategories.length == 1) {
+      draft.categoryId = _catId(widget.approvedCategories.first);
+    }
     _primeBenefits();
     if (draft.categoryId != null) {
       // Only infer kind from the specialty when *adding* a service. On edit,
@@ -368,6 +408,7 @@ class _ProServiceEditorSheetState extends State<_ProServiceEditorSheet> {
       }
       _loadNameChips(draft.categoryId!);
     }
+    _syncCustomerFromBase();
   }
 
   /// One controller per "what's included" line. The provider types in a
@@ -477,6 +518,7 @@ class _ProServiceEditorSheetState extends State<_ProServiceEditorSheet> {
       c.dispose();
     }
     draft.dispose();
+    customerCtrl.dispose();
     super.dispose();
   }
 
@@ -618,9 +660,8 @@ class _ProServiceEditorSheetState extends State<_ProServiceEditorSheet> {
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.viewInsetsOf(context).bottom;
-    final price = draft.priceEgp;
     final travel = draft.travelEgp;
-    final net = netAfterCommission(priceEgp: price, travelEgp: travel, commissionRate: widget.commissionRate);
+    final pct = (widget.commissionRate * 100).round();
     final included = totalTasks - draft.excludedTaskIds.length;
     final suggested = draft.isCleaning
         ? suggestCleaningDurationMin(sizeFromSqm: int.tryParse(toWesternDigits(draft.sizeFromCtrl.text)) ?? draft.sizeFromSqm, workers: draft.workerCount)
@@ -810,14 +851,27 @@ class _ProServiceEditorSheetState extends State<_ProServiceEditorSheet> {
             const SizedBox(height: 6),
             ProField(
               controller: draft.priceCtrl,
-              hint: '350',
+              hint: '800',
               mono: true,
               keyboard: TextInputType.number,
-              onChanged: (v) {
-                final n = normalizeMoneyInput(v);
-                draft.priceCtrl.value = TextEditingValue(text: n, selection: TextSelection.collapsed(offset: n.length));
-                setState(() {});
+              onChanged: _onBaseChanged,
+            ),
+            const SizedBox(height: 12),
+            Text('${m['clientPriceLabel']}', style: const TextStyle(fontSize: 12, color: Pro.muted)),
+            const SizedBox(height: 6),
+            Focus(
+              // Typing a final price picks the nearest base price; once she leaves
+              // the field it shows the exact price that base price produces.
+              onFocusChange: (focused) {
+                if (!focused) setState(_syncCustomerFromBase);
               },
+              child: ProField(
+                controller: customerCtrl,
+                hint: '880',
+                mono: true,
+                keyboard: TextInputType.number,
+                onChanged: _onCustomerChanged,
+              ),
             ),
             if (!draft.isCleaning) ...[
               const SizedBox(height: 12),
@@ -840,9 +894,10 @@ class _ProServiceEditorSheetState extends State<_ProServiceEditorSheet> {
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(color: Pro.plumSoft, borderRadius: BorderRadius.zero),
               child: Text(
-                ar
-                    ? 'العميلة بتدفع ${toArabicDigits(price + travel)} ج.م · بيوصلك ${toArabicDigits(net)} ج.م بعد عمولة أُنس ${(widget.commissionRate * 100).round()}٪'
-                    : 'Client pays ${price + travel} EGP · you get $net after Oons ${(widget.commissionRate * 100).round()}% fee',
+                [
+                  '${m['feeAddedNote']}'.replaceAll('{pct}', ar ? toArabicDigits(pct) : '$pct'),
+                  if (travel > 0) '${m['travelAddedNote']}',
+                ].join(' '),
                 style: const TextStyle(fontSize: 13, height: 1.4, color: Pro.ink),
               ),
             ),

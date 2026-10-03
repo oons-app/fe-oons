@@ -1,3 +1,4 @@
+import 'package:oons/core/pro_format.dart' show customerPriceEgp;
 import 'package:oons/core/format.dart' show Loc;
 import 'package:oons/data/models.dart';
 
@@ -141,8 +142,8 @@ List<ProCategoryGroup> groupSpecialties({
   ];
 }
 
-/// What she takes home for a [priceEgp] service after Oons' commission.
-int netEgp(num priceEgp, double commissionRate) => (priceEgp * (1 - commissionRate)).round();
+/// What the client pays for a service she prices at [priceEgp]: Oons adds its fee on top.
+int clientPaysEgp(int priceEgp, double feeRate) => customerPriceEgp(priceEgp, feeRate);
 
 /// Rounds a price after a ±% change to the nearest 5 pounds (never below 5).
 int bulkPrice(int priceEgp, double factor) {

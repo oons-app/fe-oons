@@ -104,7 +104,7 @@ void main() {
       expect(find.text('ظاهرة ١'), findsOneWidget);
       expect(find.text('مخفية ١'), findsOneWidget);
       expect(find.text('١,٢٠٠ ج.م'), findsOneWidget);
-      expect(find.text('صافي ١,٠٨٠'), findsOneWidget, reason: '1200 less the 10% commission');
+      expect(find.text('العميلة بتدفع ١,٣٢٠'), findsOneWidget, reason: '1200 plus the 10% fee on top');
       expect(find.text('٦ ساعات · ٢ بنود'), findsOneWidget);
       expect(find.text('خدمة جديدة في تنظيف عادي'), findsOneWidget);
     });
@@ -143,13 +143,36 @@ void main() {
       await t.pump(const Duration(seconds: 2));
     });
 
+    testWidgets('editor: base and final price drive each other, fee added on top', (t) async {
+      final repo = repoWith();
+      await openSpecialty(t, repo, 'تنظيف عادي');
+      await t.tap(find.text('تنظيف مميز'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('عدّلي الخدمة'));
+      await t.pumpAndSettle();
+      expect(find.text('سعرك الأساسي'), findsOneWidget);
+      expect(find.text('السعر النهائي (ما تدفعه العميلة)'), findsOneWidget);
+      TextField fieldWith(String text) => t.widget<TextField>(find.byWidgetPredicate((w) => w is TextField && w.controller?.text == text));
+      expect(fieldWith('1200'), isNotNull);
+      expect(fieldWith('1320'), isNotNull);
+      // typing the base price fills the final price
+      await t.enterText(find.byWidgetPredicate((w) => w is TextField && w.controller?.text == '1200'), '800');
+      await t.pump();
+      expect(fieldWith('880'), isNotNull);
+      expect(find.textContaining('تُضاف رسوم أُنس ١٠٪ فوق سعركِ'), findsOneWidget);
+      // typing the final price fills the base price
+      await t.enterText(find.byWidgetPredicate((w) => w is TextField && w.controller?.text == '880'), '1100');
+      await t.pump();
+      expect(fieldWith('1000'), isNotNull);
+    });
+
     testWidgets('tapping the card opens the service sheet; the switch does not', (t) async {
       final repo = repoWith();
       await openSpecialty(t, repo, 'تنظيف عادي');
       await t.tap(find.text('تنظيف مميز'));
       await t.pumpAndSettle();
-      expect(find.text('صافي ليكي'), findsOneWidget);
-      expect(find.text('السعر'), findsOneWidget);
+      expect(find.text('العميلة بتدفع'), findsOneWidget);
+      expect(find.text('سعرك'), findsOneWidget);
       expect(find.text('المدة'), findsOneWidget);
       expect(find.text('الخدمة بتشمل'), findsOneWidget);
       expect(find.text('نفس المنظّفة'), findsOneWidget);
@@ -213,11 +236,33 @@ void main() {
       await t.pump(const Duration(seconds: 2));
     });
 
-    testWidgets('a pending specialty explains itself and offers no new-service button', (t) async {
+    testWidgets('a pending specialty can already be filled; the add form opens with it selected', (t) async {
       await openSpecialty(t, repoWith(), 'أظافر');
       expect(find.text('التخصص ده قيد المراجعة. جهّزي خدماتك، وهتظهر أول ما يتوافق عليه.'), findsWidgets);
-      expect(find.text('خدمة جديدة في أظافر'), findsNothing);
       expect(find.text('تعديل كل الأسعار'), findsNothing);
+      expect(find.text('خدمة جديدة في أظافر'), findsOneWidget);
+      await t.tap(find.text('خدمة جديدة في أظافر'));
+      await t.pumpAndSettle();
+      expect(find.text('أظافر ✓'), findsOneWidget, reason: 'the only specialty is already chosen');
+      expect(find.text('اختاري تخصص الأول'), findsNothing);
+    });
+
+    testWidgets('adding a service from a specialty page sends it and closes the form cleanly', (t) async {
+      final repo = repoWith();
+      await openSpecialty(t, repo, 'تنظيف عادي');
+      await t.tap(find.text('خدمة جديدة في تنظيف عادي'));
+      await t.pumpAndSettle();
+      expect(find.text('تنظيف عادي ✓'), findsOneWidget, reason: 'the specialty is preselected');
+      await t.enterText(find.byWidgetPredicate((w) => w is TextField && w.decoration?.hintText == '800'), '800');
+      await t.pump();
+      final add = find.text('+ خدمة');
+      await t.dragUntilVisible(add, find.byType(ListView).last, const Offset(0, -300));
+      await t.tap(add);
+      await t.pumpAndSettle(const Duration(milliseconds: 300));
+      await t.pump(const Duration(seconds: 2));
+      expect(repo.calls, contains('create'));
+      expect(repo.bodies['create'], containsPair('price', 80000));
+      expect(t.takeException(), isNull, reason: 'no use-after-dispose while the sheet closes');
     });
 
     testWidgets('a specialty with no services yet shows the empty state and its action', (t) async {
@@ -245,7 +290,7 @@ void main() {
       expect(find.text('١٨١–٢٥٠ م²'), findsOneWidget);
       expect(find.text('مساعدتين'), findsOneWidget);
       expect(find.text('٨٠٠ ج.م'), findsNWidgets(2));
-      expect(find.text('صافي ٧٢٠'), findsNWidgets(2));
+      expect(find.text('العميلة بتدفع ٨٨٠'), findsNWidgets(2));
       expect(find.text('تعديل'), findsOneWidget);
     });
 

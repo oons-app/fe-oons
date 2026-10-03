@@ -75,7 +75,7 @@ class _ServiceSheetBody extends ConsumerWidget {
         const SizedBox(height: Ds.s3),
         DsStatStrip(items: [
           DsStat(label: t('sheetPrice'), value: DsFormat.amount(priceEgp, ar: ar)),
-          DsStat(label: t('sheetNet'), value: DsFormat.amount(netEgp(priceEgp, st.commissionRate), ar: ar), accent: true),
+          DsStat(label: t('sheetClientPays'), value: DsFormat.amount(clientPaysEgp(priceEgp, st.commissionRate), ar: ar), accent: true),
           DsStat(label: t('sheetDuration'), value: DsFormat.durationShort(item.duration, ar: ar)),
         ]),
         if (includes.isNotEmpty) ...[
