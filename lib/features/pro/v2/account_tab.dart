@@ -73,7 +73,7 @@ class _ProAccountTabState extends ConsumerState<ProAccountTab> {
 
   Future<void> _loadPlans() async {
     final s = ref.read(sessionProvider);
-    if (!s.subscriptionsPilot || !(s.provider?.offersCleaning ?? false)) return;
+    if (!s.subscriptionsPilot) return;
     try {
       final r = await (widget.plansApi ?? const LiveProApi()).get('/pro/plans');
       final rows = ((r['plans'] as List?) ?? const []).whereType<Map>().where((p) => '${p['status']}' != 'archived').toList();
@@ -116,7 +116,7 @@ class _ProAccountTabState extends ConsumerState<ProAccountTab> {
     final me = s.provider;
     final available = availableOverride ?? me?.available ?? true;
     final linkOpen = me?.linkOpen ?? true;
-    final showPlans = s.subscriptionsPilot && (me?.offersCleaning ?? false);
+    final showPlans = s.subscriptionsPilot;
 
     Widget group(String title, List<Widget> rows) => Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,

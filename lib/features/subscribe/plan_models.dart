@@ -15,6 +15,7 @@ class PlanLine {
     required this.quantity,
     this.name = '',
     this.catalogItemId = '',
+    this.itemId = '',
     this.regularPiastres = 0,
     this.subPiastres = 0,
     this.durationMin = 0,
@@ -27,6 +28,7 @@ class PlanLine {
   /// Full catalog name in Arabic (e.g. `تنظيف مميز`); empty when missing.
   final String name;
   final String catalogItemId;
+  final String itemId;
   final int regularPiastres;
   final int subPiastres;
   final int durationMin;
@@ -48,6 +50,7 @@ class PlanLine {
         quantity: _i(raw['quantity'] ?? raw['qty']),
         name: _locAr(raw['name']),
         catalogItemId: '${raw['catalogItemId'] ?? ''}',
+        itemId: '${raw['itemId'] ?? ''}',
         regularPiastres: _i(raw['regularPriceSnapshotPiastres'] ?? raw['pricePiastres']),
         subPiastres: _i(raw['subPricePiastres']),
         durationMin: _i(raw['durationMin']),
@@ -92,6 +95,7 @@ class PlanData {
     required this.savePiastres,
     required this.savePct,
     this.raw = const {},
+    this.includedBenefits = const [],
   });
 
   final String id;
@@ -105,6 +109,7 @@ class PlanData {
   final int savePiastres;
   final int savePct;
   final Map<String, dynamic> raw;
+  final List<String> includedBenefits;
 
   String get title => planTitleFor(lines);
   List<PlanLine> get ordered => orderedLines(lines);
@@ -145,6 +150,10 @@ class PlanData {
       savePiastres: save,
       savePct: pctRaw != null ? _i(pctRaw) : savePctFor(save, payg),
       raw: plan,
+      includedBenefits: [
+        for (final b in (row['includedBenefits'] as List? ?? const []))
+          if ('$b'.trim().isNotEmpty) '$b'.trim(),
+      ],
     );
   }
 

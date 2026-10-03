@@ -63,6 +63,7 @@ class CC {
 
   // S3
   static const s3Title = 'الباقة فيها إيه';
+  static const s3Includes = 'ما تشمله الخدمات';
   static const s3Deep = 'تنظيف مميز';
   static const s3Regular = 'تنظيف عادي';
   static const s3DeepHeading = 'كامل من فوق لتحت';

@@ -70,6 +70,14 @@ class PlanCard extends StatelessWidget {
                           runSpacing: 5,
                           children: [for (final l in plan.ordered) _chip(l)],
                         ),
+                        if (plan.includedBenefits.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          for (final line in plan.includedBenefits)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 4),
+                              child: Text(line, style: const TextStyle(fontSize: 12.5, height: 1.45, color: Client.body)),
+                            ),
+                        ],
                         const SizedBox(height: 9),
                         Container(
                           padding: const EdgeInsets.only(top: 9),

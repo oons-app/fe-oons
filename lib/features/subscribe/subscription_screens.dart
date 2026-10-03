@@ -260,7 +260,10 @@ class _PlanIncludedScreenState extends ConsumerState<PlanIncludedScreen> {
   ServiceItem? _itemFor(PlanLine? l) {
     if (l == null) return null;
     for (final it in items) {
-      if ((l.catalogItemId.isNotEmpty && (it.id == l.catalogItemId || it.catalogItemId == l.catalogItemId))) return it;
+      final cat = l.catalogItemId;
+      final id = l.itemId;
+      if (cat.isNotEmpty && (it.id == cat || it.catalogItemId == cat)) return it;
+      if (id.isNotEmpty && (it.id == id || it.catalogItemId == id)) return it;
     }
     return null;
   }
@@ -313,6 +316,7 @@ class _PlanIncludedScreenState extends ConsumerState<PlanIncludedScreen> {
 
     final deepLine = firstOf(true), regLine = firstOf(false);
     final deepItem = _itemFor(deepLine), regItem = _itemFor(regLine);
+    final benefits = combinedPlanBenefits(p, items);
     List<ScopeRow> rows = prototypeScopeRows();
     if (deepItem != null && regItem != null && deepItem.isCleaning && regItem.isCleaning) {
       rows = scopeRowsFor(
@@ -378,13 +382,29 @@ class _PlanIncludedScreenState extends ConsumerState<PlanIncludedScreen> {
             ],
           ),
         ),
+        if (benefits.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(CC.s3Includes, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 8),
+                for (final line in benefits)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Text(line, style: const TextStyle(fontSize: 13.5, height: 1.45)),
+                  ),
+              ],
+            ),
+          ),
         if (deepLine != null)
           _Accordion(
             key: const ValueKey('acc-deep'),
             deep: true,
             chip: deepLine.fullName,
             heading: CC.s3DeepHeading,
-            body: _bodyFor(deepItem, CC.s3DeepBody),
+            body: _bodyFor(CC.s3DeepBody),
             open: deepOpen,
             onToggle: () => setState(() => deepOpen = !deepOpen),
           ),
@@ -394,7 +414,7 @@ class _PlanIncludedScreenState extends ConsumerState<PlanIncludedScreen> {
             deep: false,
             chip: regLine.fullName,
             heading: CC.s3RegularHeading,
-            body: _bodyFor(regItem, CC.s3RegularBody),
+            body: _bodyFor(CC.s3RegularBody),
             open: regularOpen,
             onToggle: () => setState(() => regularOpen = !regularOpen),
           ),
@@ -409,9 +429,38 @@ class _PlanIncludedScreenState extends ConsumerState<PlanIncludedScreen> {
     );
   }
 
-  String _bodyFor(ServiceItem? it, String fallback) {
-    final lines = it == null ? const <String>[] : it.benefits.map((b) => b.ar.trim()).where((e) => e.isNotEmpty).toList();
-    return lines.isEmpty ? fallback : lines.join('\n');
+  String _bodyFor(String fallback) => fallback;
+
+  List<String> combinedPlanBenefits(PlanData plan, List<ServiceItem> catalog) {
+    final seen = <String>{};
+    final out = <String>[];
+    void add(String raw) {
+      final text = raw.trim();
+      if (text.isEmpty || !seen.add(text)) return;
+      out.add(text);
+    }
+
+    for (final line in plan.includedBenefits) {
+      add(line);
+    }
+    for (final line in plan.ordered) {
+      final item = _matchItem(line, catalog);
+      if (item == null) continue;
+      for (final benefit in item.benefits) {
+        add(benefit.ar.isNotEmpty ? benefit.ar : benefit.en);
+      }
+    }
+    return out;
+  }
+
+  ServiceItem? _matchItem(PlanLine line, List<ServiceItem> catalog) {
+    for (final it in catalog) {
+      final cat = line.catalogItemId;
+      final id = line.itemId;
+      if (cat.isNotEmpty && (it.id == cat || it.catalogItemId == cat)) return it;
+      if (id.isNotEmpty && (it.id == id || it.catalogItemId == id)) return it;
+    }
+    return null;
   }
 
   Widget _cta(PlanData p) {
