@@ -199,6 +199,9 @@ class _NavTile extends StatelessWidget {
           color: selected ? Ops.plumActive : Colors.transparent,
           child: InkWell(
             onTap: onTap,
+            hoverColor: Ops.plumHairline,
+            splashColor: Colors.transparent,
+            highlightColor: Colors.transparent,
             child: Container(
               constraints: const BoxConstraints(minHeight: 40),
               // the 3px bar is the system's "you are here" mark (as in the bottom nav)
