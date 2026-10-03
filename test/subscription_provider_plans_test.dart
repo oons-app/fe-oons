@@ -62,18 +62,13 @@ void main() {
     expect(find.text('مؤرشفة'), findsOneWidget);
   });
 
-  testWidgets('three labelled entries: باقاتي · الأسبوع ده · المشتركات', (t) async {
+  testWidgets('two labelled entries: باقاتي · المشتركات (the week lives on الزيارات)', (t) async {
     final api = api0([planRow()]);
-    api.routes['GET /pro/schedule/week'] = (_) => {'from': '2026-10-02', 'capacityPerDay': 4, 'days': [], 'visits': []};
     api.routes['GET /pro/subscribers'] = (_) => {'summary': {'active': 0, 'visitsThisWeek': 0}, 'rows': []};
     await pumpPlans(t, api);
     expect(find.text('باقاتي'), findsWidgets);
-    expect(find.text('الأسبوع ده'), findsOneWidget);
+    expect(find.text('الأسبوع ده'), findsNothing);
     expect(find.text('المشتركات'), findsOneWidget);
-    await tapK(t, 'tab-week');
-    expect(api.where('GET', '/pro/schedule/week'), hasLength(1));
-    goBack(t);
-    await t.pumpAndSettle();
     await tapK(t, 'tab-subscribers');
     expect(api.where('GET', '/pro/subscribers'), hasLength(1));
   });

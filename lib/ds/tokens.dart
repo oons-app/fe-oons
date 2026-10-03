@@ -34,6 +34,7 @@ class Ds {
   static const olive = Color(0xFF6B7355);
   static const oliveText = Color(0xFF4E5540);
   static const oliveLight = Color(0xFFB9C19F); // check mark on ink (toast)
+  static const oliveTint = Color(0xFFE8EBE3); // soft safe background
 
   /// Needs attention only — never decoration.
   static const terracotta = Color(0xFFB5654B);

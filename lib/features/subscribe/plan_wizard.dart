@@ -312,7 +312,6 @@ class _PlanWizardState extends State<PlanWizard> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
                 child: _SectionTabs(
-                  onWeek: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => VisitWeekScreen(api: widget.api))),
                   onSubscribers: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => ProSubscribersScreen(api: widget.api))),
                 ),
               ),
@@ -464,10 +463,10 @@ class _PlanWizardState extends State<PlanWizard> {
   }
 }
 
-/// Three labelled entries: باقاتي · الأسبوع ده · المشتركات.
+/// Two labelled entries: باقاتي · المشتركات. (The week of visits lives on
+/// الزيارات now, as the seven-day strip.)
 class _SectionTabs extends StatelessWidget {
-  const _SectionTabs({required this.onWeek, required this.onSubscribers});
-  final VoidCallback onWeek;
+  const _SectionTabs({required this.onSubscribers});
   final VoidCallback onSubscribers;
 
   @override
@@ -491,7 +490,6 @@ class _SectionTabs extends StatelessWidget {
       color: Wiz.sand,
       child: Row(children: [
         tab('باقاتي', on: true, key: const Key('tab-plans')),
-        tab('الأسبوع ده', tap: onWeek, key: const Key('tab-week')),
         tab('المشتركات', tap: onSubscribers, key: const Key('tab-subscribers')),
       ]),
     );

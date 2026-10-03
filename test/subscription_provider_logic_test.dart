@@ -393,37 +393,7 @@ void main() {
     });
   });
 
-  group('week model', () {
-    test('reads the contract shape and the older one', () {
-      final a = WeekData.from({
-        'capacityPerDay': 3,
-        'days': [
-          {'date': '2026-10-02', 'count': 2}
-        ],
-        'visits': [
-          {'id': 'v1', 'date': '2026-10-02', 'time': '10:00', 'firstName': 'منى', 'area': 'الزمالك', 'type': 'deep', 'status': 'confirmed'},
-          {'id': 'v2', 'date': '2026-10-02', 'time': '12:00', 'firstName': 'سلمى', 'area': 'مصر الجديدة', 'type': 'regular', 'status': 'pending'},
-        ],
-      });
-      expect(a.capacity, 3);
-      expect(a.visits[0].type, 'deep');
-      expect(a.visits[0].confirmed, isTrue);
-      expect(a.visits[1].confirmed, isFalse);
-      final b = WeekData.from({
-        'capacity': 5,
-        'days': [
-          {'date': '2026-10-02', 'count': 1, 'capacity': 5}
-        ],
-        'visits': [
-          {'id': 'v3', 'date': '2026-10-02', 'time': '10:00', 'firstName': 'منى', 'visitType': 'deep', 'confirmed': true, 'status': 'booked'}
-        ],
-      });
-      expect(b.capacity, 5);
-      expect(b.visits.single.type, 'deep');
-      expect(b.visits.single.confirmed, isTrue);
-      expect(WeekData.from({'days': []}).capacity, 4);
-    });
-
+  group('roster model', () {
     test('subscriber row', () {
       final r = SubscriberRow.from({'id': 's1', 'firstName': 'منى', 'planTitle': 'نضافة شاملة', 'used': 1, 'minimum': 4, 'status': 'active'});
       expect(r.firstName, 'منى');

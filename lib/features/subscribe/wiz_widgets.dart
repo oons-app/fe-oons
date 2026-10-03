@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:oons/ds/ds.dart';
 import 'package:oons/features/subscribe/ar_eg.dart';
 
 /// Provider-subscription building blocks (Wiz palette only, no radius, no
@@ -212,14 +213,7 @@ class WizStatusChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final live = status == 'published' || status == 'active';
     final paused = status == 'paused';
-    final archived = status == 'archived';
-    final bg = live ? Wiz.successBg : paused ? Wiz.pendingBg : archived ? Wiz.chip : Wiz.plumTint;
-    final fg = live ? Wiz.successFg : paused ? Wiz.pendingFg : archived ? Wiz.muted : Wiz.plum;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      color: bg,
-      child: Text(planStatusLabel(status), style: ws(11, w: FontWeight.w600, c: fg)),
-    );
+    return DsStatusBadge(planStatusLabel(status), tone: live ? DsTone.olive : paused ? DsTone.attention : DsTone.neutral);
   }
 }
 

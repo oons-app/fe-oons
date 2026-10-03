@@ -83,6 +83,9 @@ class DsFormat {
   static String tasks(int n, {required bool ar}) =>
       count(n, ar: ar, one: 'بند', two: 'بندين', few: 'بنود', many: 'بند', oneEn: 'item', manyEn: 'items');
 
+  static String plans(int n, {required bool ar}) =>
+      count(n, ar: ar, one: 'باقة واحدة', two: 'باقتين', few: 'باقات', many: 'باقة', oneEn: 'plan', manyEn: 'plans');
+
   static String days(int n, {required bool ar}) =>
       count(n, ar: ar, one: 'يوم', two: 'يومين', few: 'أيام', many: 'يوم', oneEn: 'day', manyEn: 'days');
 

@@ -48,8 +48,11 @@ class FakeProSession extends StateNotifier<SessionState> implements Session {
   void setProvider(ProviderP p) => state = SessionState(token: 't', role: 'provider', provider: p, subscriptionsPilot: true);
   @override
   Future<void> refreshMe() async {}
+  int signOuts = 0, deletes = 0;
   @override
-  Future<void> signOut() async {}
+  Future<void> signOut() async => signOuts++;
+  @override
+  Future<void> deleteAccount() async => deletes++;
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
@@ -61,6 +64,8 @@ Map<String, dynamic> providerJson({
   List<String> slotHours = const [],
   bool paused = false,
   bool linkClosed = false,
+  List<Map<String, dynamic>> domains = const [],
+  Map<String, dynamic> extra = const {},
 }) =>
     {
       'id': 'p1',
@@ -81,6 +86,8 @@ Map<String, dynamic> providerJson({
       'bookingsPaused': paused,
       'linkClosed': linkClosed,
       'slug': 'nada',
+      'customDomains': domains,
+      ...extra,
     };
 
 /// Scripted repo: records every call, applies changes to [profile] and answers
@@ -178,6 +185,14 @@ class FakeProRepo extends Repo {
     _maybeFail();
     _items.removeWhere((i) => '${i['id']}' == itemId);
     return _answer();
+  }
+
+  @override
+  Future<Map<String, dynamic>> addProDomain(String host) async {
+    calls.add('domain $host');
+    _maybeFail();
+    profile['customDomains'] = [...(profile['customDomains'] as List), {'host': host, 'status': 'pending', 'verifyToken': 'tok123', 'tlsStatus': ''}];
+    return {'provider': profile, 'dnsHint': 'CNAME book → oons.app'};
   }
 
   @override

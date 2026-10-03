@@ -1,4 +1,5 @@
 import 'package:flutter/services.dart';
+import 'package:oons/ds/tokens.dart';
 import 'package:oons/core/pro_format.dart';
 
 /// Provider-side subscription copy, tokens and pure helpers. Arabic for the
@@ -6,37 +7,39 @@ import 'package:oons/core/pro_format.dart';
 /// imperative, Arabic-Indic numerals). Everything below the tokens is pure so it
 /// can be unit tested without a widget tree.
 class Wiz {
-  static const plum = Color(0xFF4A1E3C);
-  static const gold = Color(0xFFC9A97E);
-  static const cream = Color(0xFFF7F3EE);
-  static const surface = Color(0xFFFFFFFF);
-  static const ink = Color(0xFF241820);
-  static const plumTint = Color(0xFFEDE4EA);
-  static const goldTint = Color(0xFFF3EADB);
-  static const goldInk = Color(0xFF5E4320);
-  static const goldNote = Color(0xFF7A5A2E);
-  static const goldBorder = Color(0xFFE3CFAE);
-  static const border = Color(0xFFE4DBD3);
-  static const muted = Color(0xFF8A7C84);
-  static const soft = Color(0xFF6C5F66);
-  static const body = Color(0xFF4E434A);
-  static const successBg = Color(0xFFE6F0E8);
-  static const successFg = Color(0xFF2F5D3A);
-  static const pendingBg = Color(0xFFFBF1E2);
-  static const pendingFg = Color(0xFF8A6420);
-  static const danger = Color(0xFF9B3B3B);
-  static const dangerBg = Color(0xFFFDF4F4);
+  // Design system v2: the plan wizard and visit screens use the same palette as
+  // the rest of the provider app. The names stay (hundreds of call sites); the
+  // values are the shared `Ds` tokens. Gold is gone — one accent, plum.
+  static const plum = Ds.plum;
+  static const gold = Ds.divider;
+  static const cream = Ds.cream;
+  static const surface = Ds.white;
+  static const ink = Ds.ink;
+  static const plumTint = Ds.plumLight;
+  static const goldTint = Ds.surface;
+  static const goldInk = Ds.textBody;
+  static const goldNote = Ds.textMuted;
+  static const goldBorder = Ds.divider;
+  static const border = Ds.ink;
+  static const muted = Ds.textMuted;
+  static const soft = Ds.textBody;
+  static const body = Ds.textBody;
+  static const successBg = Ds.oliveTint;
+  static const successFg = Ds.oliveText;
+  static const pendingBg = Ds.terracottaBg;
+  static const pendingFg = Ds.terracottaText;
+  static const danger = Ds.terracottaText;
+  static const dangerBg = Ds.terracottaBg;
 
-  // Template-only greys (wizard prototype).
-  static const tile = Color(0xFFFBF8F5);
-  static const chip = Color(0xFFF2ECE6);
-  static const disabled = Color(0xFFDCD2CB);
-  static const inputBorder = Color(0xFFE0D6CE);
-  static const hair = Color(0xFFF0E9E2);
-  static const faint = Color(0xFFC9BCC4);
-  static const sand = Color(0xFFEDE7E0);
-  static const divider = Color(0xFFE9E1DA);
-  static const ghost = Color(0xFFA6999F);
+  static const tile = Ds.surface;
+  static const chip = Ds.surface;
+  static const disabled = Ds.divider;
+  static const inputBorder = Ds.ink;
+  static const hair = Ds.divider;
+  static const faint = Ds.textFaint;
+  static const sand = Ds.neutral;
+  static const divider = Ds.divider;
+  static const ghost = Ds.textFaint;
 
   static const text = 'IBMPlexSansArabic';
   static const mono = 'IBMPlexMono';
