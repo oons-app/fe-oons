@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:oons/admin_v2/theme/tokens.dart';
 
-/// Button vocabulary from `Oons Ops Console v2.html`.
-///
-/// The prototype uses a small set of inline button styles — primary (plum),
-/// ghost (sand outline), danger (terracotta outline), impersonate (warm fill),
-/// plus two variants that sit on the dark plum bars. [V2Btn] is the single
-/// widget for all of them so every screen stays consistent.
+/// The console's buttons, in the design system's shapes: primary (plum),
+/// ghost (white + ink border), danger (terracotta-light), impersonate (same
+/// family), plus two variants for the plum bars. Square, 1px border, ≥44px
+/// (38 / 32 for compact and table-row actions). One widget for all of them.
 enum V2BtnKind { primary, ghost, danger, imp, light, darkGhost }
 
 enum V2BtnSize { md, sm, row }
@@ -42,51 +40,52 @@ class V2Btn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ({Color bg, Color fg, Color? border, FontWeight weight}) s = switch (kind) {
-      V2BtnKind.primary => (bg: Ops.plum, fg: const Color(0xFFF6F0EF), border: null, weight: FontWeight.w600),
-      V2BtnKind.ghost => (bg: Ops.card, fg: Ops.plumInk, border: Ops.borderStrong, weight: FontWeight.w500),
-      V2BtnKind.danger => (bg: Ops.card, fg: Ops.terracottaInk, border: const Color(0xFFE3C9C0), weight: FontWeight.w600),
-      V2BtnKind.imp => (bg: Ops.impBg, fg: Ops.terracottaInk, border: Ops.impBorder, weight: FontWeight.w600),
-      V2BtnKind.light => (bg: Ops.plumTextSoft, fg: Ops.plum, border: null, weight: FontWeight.w700),
-      V2BtnKind.darkGhost => (bg: Colors.transparent, fg: Ops.plumTextSoft, border: const Color(0x4DF1E8EE), weight: FontWeight.w500),
+    final ({Color bg, Color fg, Color border, FontWeight weight}) s = switch (kind) {
+      V2BtnKind.primary => (bg: Ops.plum, fg: Ops.plumText, border: Ops.plum, weight: FontWeight.w700),
+      V2BtnKind.ghost => (bg: Ops.card, fg: Ops.ink, border: Ops.border, weight: FontWeight.w600),
+      V2BtnKind.danger => (bg: Ops.terracottaTint, fg: Ops.terracottaInk, border: Ops.terracotta, weight: FontWeight.w700),
+      V2BtnKind.imp => (bg: Ops.impBg, fg: Ops.terracottaInk, border: Ops.impBorder, weight: FontWeight.w700),
+      V2BtnKind.light => (bg: Ops.plumText, fg: Ops.plum, border: Ops.plumText, weight: FontWeight.w700),
+      V2BtnKind.darkGhost => (bg: Colors.transparent, fg: Ops.plumText, border: Ops.plumMuted, weight: FontWeight.w600),
     };
 
-    final (EdgeInsets pad, double fontSize) = switch (size) {
-      V2BtnSize.md => (const EdgeInsets.symmetric(horizontal: 15, vertical: 9), 12.5),
-      V2BtnSize.sm => (const EdgeInsets.symmetric(horizontal: 11, vertical: 6), 12.0),
-      V2BtnSize.row => (const EdgeInsets.symmetric(horizontal: 10, vertical: 5), 11.5),
+    // 44px targets; table-row actions are the one pointer-only exception (32px).
+    final (EdgeInsets pad, double fontSize, double minH) = switch (size) {
+      V2BtnSize.md => (const EdgeInsets.symmetric(horizontal: 18, vertical: 9), 13.5, Ops.minTarget),
+      V2BtnSize.sm => (const EdgeInsets.symmetric(horizontal: 14, vertical: 6), 12.5, 38.0),
+      V2BtnSize.row => (const EdgeInsets.symmetric(horizontal: 10, vertical: 4), 11.5, 32.0),
     };
-    final radius = size == V2BtnSize.row ? 8.0 : Ops.radiusBtn;
     final disabled = onPressed == null;
 
-    return Opacity(
-      opacity: disabled ? 0.5 : 1,
-      child: Material(
-        color: s.bg,
-        borderRadius: BorderRadius.circular(radius),
-        child: InkWell(
-          onTap: onPressed,
-          borderRadius: BorderRadius.circular(radius),
-          child: Container(
-            padding: pad,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(radius),
-              border: s.border == null ? null : Border.all(color: s.border!),
-            ),
-            child: Row(
-              mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
-              mainAxisAlignment: expand ? MainAxisAlignment.center : MainAxisAlignment.start,
-              children: [
-                if (leadingDot != null) ...[
-                  Container(width: 8, height: 8, decoration: BoxDecoration(color: leadingDot, shape: BoxShape.circle)),
-                  const SizedBox(width: 7),
+    return Semantics(
+      button: true,
+      enabled: !disabled,
+      child: Opacity(
+        opacity: disabled ? 0.45 : 1,
+        child: Material(
+          color: s.bg,
+          child: InkWell(
+            onTap: onPressed,
+            child: Container(
+              constraints: BoxConstraints(minHeight: minH),
+              padding: pad,
+              decoration: BoxDecoration(border: Border.all(color: s.border, width: Ops.rule)),
+              child: Row(
+                mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
+                mainAxisAlignment: expand ? MainAxisAlignment.center : MainAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  if (leadingDot != null) ...[
+                    Container(width: 8, height: 8, color: leadingDot),
+                    const SizedBox(width: 7),
+                  ],
+                  if (icon != null) ...[
+                    Icon(icon, size: fontSize + 2, color: s.fg),
+                    const SizedBox(width: 6),
+                  ],
+                  Flexible(child: Text(label, style: TextStyle(fontSize: fontSize, fontWeight: s.weight, color: s.fg, height: 1.2))),
                 ],
-                if (icon != null) ...[
-                  Icon(icon, size: fontSize + 2, color: s.fg),
-                  const SizedBox(width: 6),
-                ],
-                Text(label, style: TextStyle(fontSize: fontSize, fontWeight: s.weight, color: s.fg, fontFamily: Ops.sans)),
-              ],
+              ),
             ),
           ),
         ),

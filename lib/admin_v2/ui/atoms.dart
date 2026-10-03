@@ -1,17 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:oons/admin_v2/l10n/copy.dart';
 import 'package:oons/admin_v2/theme/tokens.dart';
+import 'package:oons/ds/tokens.dart';
 
 enum V2Tone { ok, warn, bad, info, plum, neutral }
 
-(Color, Color) v2ToneColors(V2Tone tone) => switch (tone) {
-      V2Tone.ok => (Ops.greenTint, Ops.greenInk),
-      V2Tone.warn => (Ops.goldTint, Ops.goldInk),
-      V2Tone.bad => (Ops.terracottaTint, Ops.terracottaInk),
-      V2Tone.info => (Ops.blueTint, Ops.blueInk),
-      V2Tone.plum => (Ops.plumChip, Ops.plumChipInk),
-      V2Tone.neutral => (Ops.greyTint, Ops.greyInk),
+/// Tone → (fill, text, border) in the design system's three meanings:
+/// ok = olive (done / verified) · warn + bad = terracotta (needs attention) ·
+/// plum / info / neutral stay quiet. The label always says what it means.
+(Color, Color, Color) v2ToneStyle(V2Tone tone) => switch (tone) {
+      V2Tone.ok => (Ops.green, Ops.plumText, Ops.ink),
+      V2Tone.warn => (Ops.terracottaTint, Ops.terracottaInk, Ops.terracotta),
+      V2Tone.bad => (Ops.terracottaTint, Ops.terracottaInk, Ops.terracotta),
+      V2Tone.info => (Ops.greyTint, Ops.greyInk, Ops.borderSoft),
+      V2Tone.plum => (Ops.plumChip, Ops.plumChipInk, Ops.plum),
+      V2Tone.neutral => (Ops.greyTint, Ops.greyInk, Ops.borderSoft),
     };
+
+/// Text + fill only (kept for the few call sites that draw their own box).
+(Color, Color) v2ToneColors(V2Tone tone) {
+  final (bg, fg, _) = v2ToneStyle(tone);
+  return (bg, fg);
+}
 
 /// Prototype `TONE_OF` — maps a human status label to its chip tone.
 V2Tone toneForLabel(String label) {
@@ -71,6 +81,7 @@ V2Tone toneForLabel(String label) {
   }
 }
 
+/// Mono bordered status — the console's `DsStatusBadge`.
 class V2StatusPill extends StatelessWidget {
   const V2StatusPill({super.key, required this.label, this.tone = V2Tone.neutral, this.large = false});
 
@@ -83,12 +94,12 @@ class V2StatusPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (bg, fg) = v2ToneColors(tone);
+    final (bg, fg, border) = v2ToneStyle(tone);
     return Container(
-      padding: EdgeInsetsDirectional.symmetric(horizontal: large ? 12 : 10, vertical: large ? 5 : 3),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(Ops.radiusPill)),
+      padding: EdgeInsetsDirectional.symmetric(horizontal: large ? 9 : 6, vertical: large ? 4 : 2),
+      decoration: BoxDecoration(color: bg, border: Border.all(color: border, width: Ops.rule)),
       child: Text(label,
-          style: TextStyle(fontSize: large ? 12.5 : 11.5, fontWeight: FontWeight.w600, color: fg, fontFamily: Ops.sans)),
+          style: TextStyle(fontSize: large ? 12 : 10.5, fontWeight: FontWeight.w600, color: fg, fontFamily: Ops.mono, height: 1.3)),
     );
   }
 }
@@ -103,17 +114,12 @@ class V2KpiTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: Ops.card,
-      borderRadius: BorderRadius.circular(Ops.radiusCard),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(Ops.radiusCard),
         child: Container(
           width: 160,
           padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(Ops.radiusCard),
-            border: Border.all(color: Ops.border),
-          ),
+          decoration: Ops.cardBox(),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -138,17 +144,13 @@ class V2Card extends StatelessWidget {
   Widget build(BuildContext context) {
     final body = Container(
       padding: padding ?? const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Ops.card,
-        borderRadius: BorderRadius.circular(Ops.radiusCard),
-        border: Border.all(color: Ops.border),
-      ),
+      decoration: Ops.cardBox(),
       child: child,
     );
     if (onTap == null) return body;
     return Material(
       color: Colors.transparent,
-      child: InkWell(onTap: onTap, borderRadius: BorderRadius.circular(Ops.radiusCard), child: body),
+      child: InkWell(onTap: onTap, child: body),
     );
   }
 }
@@ -184,11 +186,7 @@ class V2ErrorBanner extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Ops.terracottaTint,
-        borderRadius: BorderRadius.circular(Ops.radiusCtl),
-        border: Border.all(color: Ops.terracotta.withValues(alpha: 0.35)),
-      ),
+      decoration: Ops.cardBox(color: Ops.terracottaTint, border: Ops.terracotta),
       child: Row(
         children: [
           Expanded(child: Text(message, style: const TextStyle(color: Ops.terracottaInk, fontSize: 13))),
@@ -239,7 +237,7 @@ class V2DataTable extends StatelessWidget {
             constraints: BoxConstraints(minWidth: c.maxWidth < minWidth ? minWidth : c.maxWidth),
             child: SingleChildScrollView(
               child: DataTable(
-                headingRowColor: WidgetStateProperty.all(Ops.cardAlt),
+                headingRowColor: WidgetStateProperty.all(Ops.headBg),
                 dataRowMinHeight: 48,
                 dataRowMaxHeight: 64,
                 headingTextStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Ops.muted),
@@ -266,6 +264,7 @@ class V2DataTable extends StatelessWidget {
   }
 }
 
+/// Toggle chip: on = plum / cream, off = white with the ink rule (`DsChip`).
 class V2FilterChip extends StatelessWidget {
   const V2FilterChip({
     super.key,
@@ -281,47 +280,23 @@ class V2FilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: selected ? Ops.plum : Ops.card,
-      borderRadius: BorderRadius.circular(Ops.radiusBtn),
+    final fg = selected ? Ops.plumText : Ops.ink;
+    return Semantics(
+      button: true,
+      selected: selected,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(Ops.radiusBtn),
         child: Container(
-          padding: const EdgeInsetsDirectional.symmetric(horizontal: 13, vertical: 8),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(Ops.radiusBtn),
-            border: Border.all(color: selected ? Ops.plum : Ops.borderStrong),
-          ),
+          constraints: const BoxConstraints(minHeight: 36),
+          padding: const EdgeInsetsDirectional.symmetric(horizontal: 13, vertical: 7),
+          decoration: Ops.cardBox(color: selected ? Ops.plum : Ops.card, border: selected ? Ops.plum : Ops.border),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w600,
-                  color: selected ? const Color(0xFFF6F0EF) : Ops.plumInk,
-                ),
-              ),
+              Text(label, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: fg)),
               if (count != null) ...[
                 const SizedBox(width: 7),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                  decoration: BoxDecoration(
-                    color: selected ? const Color(0x2EFFFFFF) : const Color(0xFFEFE8DD),
-                    borderRadius: BorderRadius.circular(Ops.radiusPill),
-                  ),
-                  child: Text(
-                    '$count',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w500,
-                      fontFamily: Ops.mono,
-                      color: selected ? const Color(0xFFF6F0EF) : const Color(0xFF6B5D69),
-                    ),
-                  ),
-                ),
+                Text('$count', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w500, fontFamily: Ops.mono, color: selected ? Ops.plumMuted : Ops.muted)),
               ],
             ],
           ),
@@ -331,7 +306,7 @@ class V2FilterChip extends StatelessWidget {
   }
 }
 
-/// Rounded on/off toggle (`pill` in the prototype).
+/// Square on/off toggle (`pill` in the prototype) — same look as [V2FilterChip].
 class V2Pill extends StatelessWidget {
   const V2Pill({super.key, required this.label, required this.on, required this.onTap});
   final String label;
@@ -339,28 +314,7 @@ class V2Pill extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: on ? Ops.plum : Ops.cardAlt,
-      borderRadius: BorderRadius.circular(Ops.radiusPill),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(Ops.radiusPill),
-        child: Container(
-          padding: const EdgeInsetsDirectional.symmetric(horizontal: 13, vertical: 7),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(Ops.radiusPill),
-            border: Border.all(color: on ? Ops.plum : Ops.borderStrong),
-          ),
-          child: Text(label,
-              style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w600,
-                  color: on ? const Color(0xFFF6F0EF) : Ops.plumInk)),
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => V2FilterChip(label: label, selected: on, onTap: onTap);
 }
 
 /// Underline tab row (`tabBtn` in the prototype).
@@ -373,7 +327,7 @@ class V2TabBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Ops.border))),
+      decoration: const BoxDecoration(border: Border(bottom: Ds.dividerSide)),
       child: Wrap(
         spacing: 4,
         children: [
@@ -386,7 +340,7 @@ class V2TabBar extends StatelessWidget {
                   border: Border(
                     bottom: BorderSide(
                       color: tab == active ? Ops.plum : Colors.transparent,
-                      width: 2,
+                      width: 3,
                     ),
                   ),
                 ),
@@ -426,11 +380,7 @@ class V2SectionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: padding,
-      decoration: BoxDecoration(
-        color: Ops.card,
-        borderRadius: BorderRadius.circular(Ops.radiusCard),
-        border: Border.all(color: Ops.border),
-      ),
+      decoration: Ops.cardBox(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -475,19 +425,17 @@ class V2AttentionCard extends StatelessWidget {
     final needsAction = count > 0;
     return Material(
       color: Ops.card,
-      borderRadius: BorderRadius.circular(Ops.radiusCard),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(Ops.radiusCard),
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(Ops.radiusCard),
+            color: Ops.card,
             border: Border(
-              top: BorderSide(color: needsAction ? const Color(0xFFE0C9A8) : Ops.border),
-              right: BorderSide(color: needsAction ? const Color(0xFFE0C9A8) : Ops.border),
-              bottom: BorderSide(color: needsAction ? const Color(0xFFE0C9A8) : Ops.border),
-              left: BorderSide(color: needsAction ? Ops.terracotta : Ops.border, width: needsAction ? 3 : 1),
+              top: const BorderSide(color: Ops.border),
+              right: const BorderSide(color: Ops.border),
+              bottom: const BorderSide(color: Ops.border),
+              left: BorderSide(color: needsAction ? Ops.terracotta : Ops.border, width: needsAction ? 4 : Ops.rule),
             ),
           ),
           child: Column(
@@ -514,7 +462,7 @@ class V2AttentionCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 11),
-              Text('$hint →', style: const TextStyle(fontSize: 12, color: Color(0xFF6B5D69))),
+              Text('$hint →', style: const TextStyle(fontSize: 12, color: Ops.inkSoft)),
             ],
           ),
         ),
@@ -554,18 +502,13 @@ class V2MiniBar extends StatelessWidget {
           ),
           const SizedBox(width: 10),
           Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(Ops.radiusPill),
-              child: Container(
-                height: 9,
-                color: Ops.track,
-                child: FractionallySizedBox(
-                  alignment: AlignmentDirectional.centerStart,
-                  widthFactor: fraction.clamp(0, 1),
-                  child: Container(
-                    decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(Ops.radiusPill)),
-                  ),
-                ),
+            child: Container(
+              height: 10,
+              decoration: BoxDecoration(color: Ops.track, border: Border.all(color: Ops.border, width: Ops.rule)),
+              child: FractionallySizedBox(
+                alignment: AlignmentDirectional.centerStart,
+                widthFactor: fraction.clamp(0, 1),
+                child: Container(color: color),
               ),
             ),
           ),
@@ -592,7 +535,7 @@ class V2KpiCell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: Ops.cardAlt,
+      color: Ops.panelSand,
       padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

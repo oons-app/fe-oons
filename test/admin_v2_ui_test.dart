@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:oons/core/icons/ons_icons.dart';
 import 'package:oons/admin_v2/features/bookings/bookings_screen.dart';
 import 'package:oons/admin_v2/features/customers/customers_screen.dart';
 import 'package:oons/admin_v2/theme/theme.dart';
@@ -97,7 +98,7 @@ void main() {
     expect(find.text('ONS-1'), findsOneWidget);
     expect(find.text('ONS-2'), findsOneWidget);
     // Exactly the one selected row shows the check glyph.
-    expect(find.byIcon(Icons.check), findsOneWidget);
+    expect(find.byWidgetPredicate((w) => w is OnsIcon && w.name == 'check'), findsOneWidget);
   });
 
   testWidgets('V2GridTable lays out in RTL without overflow', (tester) async {

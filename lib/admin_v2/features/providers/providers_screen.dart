@@ -198,7 +198,7 @@ class _ProvidersScreenState extends ConsumerState<ProvidersScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               decoration: BoxDecoration(
                 color: Ops.panelSand,
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.zero,
                 border: Border.all(color: Ops.panelSandBorder),
               ),
               child: Wrap(

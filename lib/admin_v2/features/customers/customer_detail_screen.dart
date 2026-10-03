@@ -544,7 +544,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
                         width: 5,
                         height: 5,
                         margin: const EdgeInsets.only(top: 7),
-                        decoration: const BoxDecoration(color: Ops.barConfirmed, shape: BoxShape.circle),
+                        decoration: const BoxDecoration(color: Ops.barConfirmed),
                       ),
                       const SizedBox(width: 9),
                       Expanded(child: Text(i, style: const TextStyle(fontSize: 13, height: 1.6))),
@@ -696,7 +696,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
           Flexible(
             child: Text(v.isEmpty ? '—' : v,
                 textAlign: TextAlign.end,
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, fontFamily: mono ? Ops.mono : Ops.sans)),
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, fontFamily: mono ? Ops.mono : null)),
           ),
         ],
       ),

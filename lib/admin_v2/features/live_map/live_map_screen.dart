@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:oons/core/icons/ons_icons.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
@@ -143,10 +144,9 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> with WidgetsBindi
               child: Container(
                 decoration: BoxDecoration(
                   color: Ops.gold,
-                  shape: BoxShape.circle,
                   border: Border.all(color: Ops.card, width: 2),
                 ),
-                child: const Icon(Icons.place, size: 14, color: Ops.ink),
+                child: const OnsIcon('pin', size: 14, color: Ops.ink),
               ),
             ),
           ),
@@ -160,7 +160,7 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> with WidgetsBindi
             title: lang == 'ar' ? 'الخريطة المباشرة' : 'Live map',
             lang: lang,
             resultCount: liveVisits.length,
-            actions: [IconButton(onPressed: () => _load(), icon: const Icon(Icons.refresh))],
+            actions: [IconButton(onPressed: () => _load(), tooltip: 'Refresh', icon: const OnsIcon('retry', size: 20, color: Ops.ink))],
           ),
           if (error != null)
             Padding(

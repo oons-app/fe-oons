@@ -256,7 +256,7 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
       onRetry: _load,
       resultLabel: '${visible.length} ${lang == 'ar' ? 'نتيجة' : 'results'}',
       emptyText: lang == 'ar' ? 'لا فئات' : 'Nothing here yet',
-      actionsWidth: 210,
+      actionsWidth: 250,
       trailingActions: [
         V2Btn.primary(lang == 'ar' ? '+ فئة' : '+ New Category', onPressed: () => _edit(null), size: V2BtnSize.sm),
       ],

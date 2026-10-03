@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:oons/core/icons/ons_icons.dart';
 import 'package:flutter/services.dart';
 import 'package:oons/admin_v2/l10n/copy.dart';
+import 'package:oons/admin_v2/ui/buttons.dart';
 import 'package:oons/admin_v2/theme/tokens.dart';
+import 'package:oons/ds/tokens.dart';
 
 Future<bool> v2Confirm(
   BuildContext context, {
@@ -17,7 +20,7 @@ Future<bool> v2Confirm(
         context: context,
         barrierDismissible: true,
         barrierLabel: 'Dismiss',
-        barrierColor: const Color(0x703B2138),
+        barrierColor: Ds.scrim,
         transitionDuration: Ops.dFast,
         pageBuilder: (ctx, a1, a2) {
           return _V2Modal(
@@ -74,7 +77,7 @@ Future<bool> v2Form(
         context: context,
         barrierDismissible: true,
         barrierLabel: 'Dismiss',
-        barrierColor: const Color(0x703B2138),
+        barrierColor: Ds.scrim,
         transitionDuration: Ops.dFast,
         pageBuilder: (ctx, a1, a2) {
           return StatefulBuilder(
@@ -155,12 +158,7 @@ class _V2Modal extends StatelessWidget {
             constraints: const BoxConstraints(maxWidth: 480),
             child: Container(
             margin: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: Ops.card,
-              borderRadius: BorderRadius.circular(Ops.radiusModal),
-              border: Border.all(color: Ops.border),
-              boxShadow: const [BoxShadow(color: Color(0x28000000), blurRadius: 28, offset: Offset(0, 12))],
-            ),
+            decoration: Ops.cardBox(),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -171,11 +169,11 @@ class _V2Modal extends StatelessWidget {
                       Expanded(
                         child: Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Ops.ink)),
                       ),
-                      IconButton(onPressed: onClose, icon: const Icon(Icons.close, size: 18, color: Ops.muted)),
+                      IconButton(tooltip: 'Close', onPressed: onClose, icon: const OnsIcon('close', size: 18, color: Ops.ink)),
                     ],
                   ),
                 ),
-                const Divider(height: 1, color: Ops.borderSoft),
+                const Divider(height: 1, color: Ops.border),
                 Flexible(child: body),
                 const Divider(height: 1, color: Ops.borderSoft),
                 footer,
@@ -209,15 +207,12 @@ class _Footer extends StatelessWidget {
       padding: const EdgeInsetsDirectional.fromSTEB(16, 12, 16, 14),
       child: Row(
         children: [
-          TextButton(onPressed: onCancel, child: Text(cancelLabel)),
+          V2Btn(label: cancelLabel, onPressed: onCancel, kind: V2BtnKind.ghost),
           const Spacer(),
-          ElevatedButton(
+          V2Btn(
+            label: confirmLabel,
             onPressed: onConfirm,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: danger ? Ops.terracottaInk : Ops.plum,
-              foregroundColor: Colors.white,
-            ),
-            child: Text(confirmLabel),
+            kind: danger ? V2BtnKind.danger : V2BtnKind.primary,
           ),
         ],
       ),

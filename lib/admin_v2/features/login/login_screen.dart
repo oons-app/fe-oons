@@ -65,7 +65,7 @@ class _V2LoginScreenState extends ConsumerState<V2LoginScreen> {
                     width: 56,
                     height: 56,
                     alignment: Alignment.center,
-                    decoration: BoxDecoration(color: Ops.creamTile, borderRadius: BorderRadius.circular(12)),
+                    decoration: BoxDecoration(color: Ops.creamTile, borderRadius: BorderRadius.zero),
                     child: const Text('أُنس', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: Ops.plum)),
                   ),
                 ),

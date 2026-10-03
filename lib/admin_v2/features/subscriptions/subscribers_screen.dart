@@ -483,12 +483,6 @@ class _SubscribersScreenState extends ConsumerState<SubscribersScreen> {
               Text(r.nextRenewal.length >= 10 ? digits(r.nextRenewal.substring(0, 10), ar: lang == 'ar') : '—', style: const TextStyle(fontSize: 12, color: Ops.muted, fontFamily: Ops.mono)),
             ],
             actions: [
-              Flexible(
-                child: Wrap(
-                  alignment: WrapAlignment.end,
-                  spacing: 6,
-                  runSpacing: 4,
-                  children: [
               if (canWrite && r.status == 'pending_payment' && r.hasReceipt)
                 V2Btn(key: Key('confirm-${r.id}'), label: lang == 'ar' ? 'تأكيد إنستاباي' : 'Confirm InstaPay', onPressed: () => _confirmPay(r), size: V2BtnSize.row),
               if (canWrite && r.status == 'active')
@@ -498,9 +492,6 @@ class _SubscribersScreenState extends ConsumerState<SubscribersScreen> {
               if (canWrite) V2Btn(key: Key('credit-${r.id}'), label: t(V2SubsCopy.credit, lang), onPressed: () => _credit(r), size: V2BtnSize.row),
               if (canWrite) V2Btn(key: Key('move-${r.id}'), label: t(V2SubsCopy.moveVisit, lang), onPressed: () => _move(r), size: V2BtnSize.row),
             
-                  ],
-                ),
-              ),
             ],
           ),
       ],

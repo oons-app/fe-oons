@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:oons/core/icons/ons_icons.dart';
 import 'package:go_router/go_router.dart';
 import 'package:oons/admin_v2/data/paths.dart';
 import 'package:oons/admin_v2/theme/tokens.dart';
@@ -58,28 +59,24 @@ class _V2HeaderState extends State<V2Header> {
     return Container(
       padding: const EdgeInsets.fromLTRB(Ops.gutter, 14, Ops.gutter, 14),
       decoration: const BoxDecoration(
-        color: Color(0xF0F3EEE7),
-        border: Border(bottom: BorderSide(color: Ops.border)),
+        color: Ops.page,
+        border: Border(bottom: BorderSide(color: Ops.border, width: Ops.rule)),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(widget.title,
-                    style: const TextStyle(
-                        fontSize: 20, fontWeight: FontWeight.w700, color: Ops.ink, letterSpacing: -0.3)),
-                if (widget.subtitle.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(widget.subtitle, style: const TextStyle(fontSize: 12.5, color: Ops.muted, height: 1.35)),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(width: 14),
-          Wrap(
+      child: LayoutBuilder(builder: (context, box) {
+        // Title and controls side by side when there is room; stacked when not,
+        // so the title never gets squeezed into a sliver by the buttons.
+        final stacked = box.maxWidth < 760;
+        final title = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(widget.title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: Ops.ink)),
+            if (widget.subtitle.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text(widget.subtitle, style: const TextStyle(fontSize: 12.5, color: Ops.muted, height: 1.35)),
+            ],
+          ],
+        );
+        final controls = Wrap(
             spacing: 8,
             runSpacing: 8,
             crossAxisAlignment: WrapCrossAlignment.center,
@@ -87,15 +84,11 @@ class _V2HeaderState extends State<V2Header> {
               SizedBox(
                 width: 260,
                 child: Container(
-                  decoration: BoxDecoration(
-                    color: Ops.card,
-                    borderRadius: BorderRadius.circular(Ops.radiusCtl),
-                    border: Border.all(color: Ops.borderStrong),
-                  ),
+                  decoration: Ops.cardBox(),
                   padding: const EdgeInsetsDirectional.only(start: 12, end: 6),
                   child: Row(
                     children: [
-                      const Icon(Icons.search, size: 15, color: Ops.placeholder),
+                      const OnsIcon('search', size: 16, color: Ops.muted),
                       const SizedBox(width: 8),
                       Expanded(
                         child: TextField(
@@ -105,7 +98,10 @@ class _V2HeaderState extends State<V2Header> {
                           style: const TextStyle(fontSize: 13, color: Ops.ink),
                           decoration: InputDecoration(
                             isDense: true,
+                            filled: false,
                             border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
                             contentPadding: const EdgeInsets.symmetric(vertical: 10),
                             hintText: widget.searchHint ??
                                 (ar ? 'ابحث بالاسم أو الهاتف أو المرجع' : 'Search name, phone, or ref'),
@@ -119,7 +115,7 @@ class _V2HeaderState extends State<V2Header> {
                             _c.clear();
                             widget.onSearch?.call('');
                           },
-                          child: const Icon(Icons.close, size: 14, color: Ops.muted),
+                          child: const OnsIcon('close', size: 14, color: Ops.muted),
                         ),
                     ],
                   ),
@@ -135,9 +131,18 @@ class _V2HeaderState extends State<V2Header> {
               ),
               ...?widget.trailing,
             ],
-          ),
-        ],
-      ),
+          );
+        if (stacked) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [title, const SizedBox(height: 12), controls],
+          );
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [Expanded(child: title), const SizedBox(width: 14), controls],
+        );
+      }),
     );
   }
 }

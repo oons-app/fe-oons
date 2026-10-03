@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:oons/core/icons/ons_icons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:oons/admin_v2/chrome/modal.dart';
@@ -323,7 +324,7 @@ class _ProviderDetailScreenState extends ConsumerState<ProviderDetailScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 15),
               decoration: BoxDecoration(
                 color: Ops.panelSand,
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.zero,
                 border: Border.all(color: Ops.panelSandBorder),
               ),
               child: Column(
@@ -679,8 +680,8 @@ class _ProviderDetailScreenState extends ConsumerState<ProviderDetailScreen> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE6DED6)),
+        borderRadius: BorderRadius.zero,
+        border: Border.all(color: Ops.borderSoft),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1167,7 +1168,7 @@ class _ProviderDetailScreenState extends ConsumerState<ProviderDetailScreen> {
                               ),
                             ),
                             IconButton(
-                              icon: const Icon(Icons.close, size: 16, color: Ops.muted),
+                              icon: const OnsIcon('close', size: 16, color: Ops.muted),
                               onPressed: () => sb(() {
                                 benefitEn.removeAt(i).dispose();
                                 benefitAr.removeAt(i).dispose();
@@ -1557,7 +1558,7 @@ class _ProviderDetailScreenState extends ConsumerState<ProviderDetailScreen> {
           Flexible(
             child: Text(v.isEmpty ? '—' : v,
                 textAlign: TextAlign.end,
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, fontFamily: mono ? Ops.mono : Ops.sans)),
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, fontFamily: mono ? Ops.mono : null)),
           ),
         ],
       ),
@@ -1566,7 +1567,7 @@ class _ProviderDetailScreenState extends ConsumerState<ProviderDetailScreen> {
 
   Widget _statGrid(List<(String, String)> stats) {
     return Container(
-      decoration: BoxDecoration(color: Ops.borderSoft, borderRadius: BorderRadius.circular(11)),
+      decoration: BoxDecoration(color: Ops.borderSoft, borderRadius: BorderRadius.zero),
       clipBehavior: Clip.antiAlias,
       child: Wrap(
         spacing: 1,
@@ -1687,10 +1688,10 @@ class _DocCard extends StatelessWidget {
           height: 120,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(11),
-            color: accepted ? const Color(0xFFF1F6EF) : Ops.impBg,
+            borderRadius: BorderRadius.zero,
+            color: accepted ? Ops.greenTint : Ops.impBg,
             border: Border.all(
-              color: accepted ? const Color(0xFFCFDCCB) : const Color(0xFFD9BFB4),
+              color: accepted ? Ops.green : Ops.impBorder,
               style: accepted ? BorderStyle.solid : BorderStyle.solid,
             ),
           ),

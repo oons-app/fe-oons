@@ -121,7 +121,7 @@ class _ImpersonateScreenState extends ConsumerState<ImpersonateScreen> {
                         alignment: Alignment.center,
                         decoration: BoxDecoration(
                           color: Ops.plumChip,
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.zero,
                         ),
                         child: Text(name.isEmpty ? '?' : name.characters.first,
                             style: const TextStyle(fontWeight: FontWeight.w700, color: Ops.plumChipInk)),

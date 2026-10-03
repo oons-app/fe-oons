@@ -274,7 +274,7 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen> {
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: Ops.wellSand,
-                borderRadius: BorderRadius.circular(11),
+                borderRadius: BorderRadius.zero,
                 border: Border.all(color: Ops.borderSoft),
               ),
               child: Column(
@@ -351,7 +351,6 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen> {
                           height: 9,
                           decoration: BoxDecoration(
                             color: done ? Ops.barCompleted : Ops.borderStrong,
-                            shape: BoxShape.circle,
                           ),
                         ),
                         const SizedBox(width: 11),
@@ -398,8 +397,8 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen> {
                   margin: const EdgeInsets.only(bottom: 10),
                   decoration: BoxDecoration(
                     color: Ops.impBg,
-                    borderRadius: BorderRadius.circular(9),
-                    border: Border.all(color: const Color(0xFFD9BFB4)),
+                    borderRadius: BorderRadius.zero,
+                    border: Border.all(color: Ops.impBorder),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -451,7 +450,7 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen> {
                             ),
                           ),
                           child: ClipRRect(
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.zero,
                             child: Image.memory(bytes, height: 220, fit: BoxFit.cover),
                           ),
                         ),
@@ -489,7 +488,7 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen> {
                   style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: Ops.plumTextSoft)),
               const SizedBox(height: 4),
               Text('${lang == 'ar' ? 'الحالية' : 'Currently'} $status',
-                  style: const TextStyle(fontSize: 12, color: Color(0xFFBCA9B8))),
+                  style: const TextStyle(fontSize: 12, color: Ops.plumMuted)),
               const SizedBox(height: 10),
               GridView.count(
                 crossAxisCount: 2,
@@ -716,7 +715,7 @@ class _StatusButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: current ? Ops.plumTextSoft : Colors.transparent,
           borderRadius: BorderRadius.circular(Ops.radiusBtn),
-          border: Border.all(color: cancel ? const Color(0x80E29E8C) : const Color(0x42F1E8EE)),
+          border: Border.all(color: cancel ? Ops.terracotta : Ops.plumMuted),
         ),
         child: Text(
           label,
@@ -724,7 +723,7 @@ class _StatusButton extends StatelessWidget {
           style: TextStyle(
             fontSize: 12.5,
             fontWeight: FontWeight.w600,
-            color: current ? Ops.plum : (cancel ? const Color(0xFFE9A995) : Ops.plumTextSoft),
+            color: current ? Ops.plum : (cancel ? Ops.terracotta : Ops.plumTextSoft),
           ),
         ),
       ),

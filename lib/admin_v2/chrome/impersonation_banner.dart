@@ -24,17 +24,17 @@ class V2ImpersonationBanner extends StatelessWidget {
         padding: const EdgeInsetsDirectional.symmetric(horizontal: 20, vertical: 10),
         child: Row(
           children: [
-            const Icon(Icons.visibility, size: 16, color: Color(0xFFFFF6F2)),
+            const Icon(Icons.visibility, size: 16, color: Ops.plumText),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
                 '${t(V2Copy.impersonating, lang)} $kind · $name (${t(V2Copy.readOnly, lang)})',
-                style: const TextStyle(color: Color(0xFFFFF6F2), fontSize: 13, fontWeight: FontWeight.w600),
+                style: const TextStyle(color: Ops.plumText, fontSize: 13, fontWeight: FontWeight.w600),
               ),
             ),
             TextButton(
               onPressed: onExit,
-              style: TextButton.styleFrom(foregroundColor: const Color(0xFFFFF6F2)),
+              style: TextButton.styleFrom(foregroundColor: Ops.plumText),
               child: Text(t(V2Copy.exit, lang)),
             ),
           ],

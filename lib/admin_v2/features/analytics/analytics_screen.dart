@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:oons/core/icons/ons_icons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:oons/admin_v2/data/permissions.dart';
 import 'package:oons/admin_v2/data/session.dart';
@@ -79,7 +80,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
           V2PageHeader(
             title: lang == 'ar' ? 'التحليلات' : 'Analytics',
             lang: lang,
-            actions: [IconButton(onPressed: _load, icon: const Icon(Icons.refresh))],
+            actions: [IconButton(onPressed: _load, tooltip: 'Refresh', icon: const OnsIcon('retry', size: 20, color: Ops.ink))],
           ),
           V2Card(
             child: Column(

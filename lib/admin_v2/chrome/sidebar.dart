@@ -30,17 +30,14 @@ class V2Sidebar extends ConsumerWidget {
           Container(
             padding: const EdgeInsets.fromLTRB(14, 16, 14, 12),
             decoration: const BoxDecoration(
-              border: Border(bottom: BorderSide(color: Color(0x22EFE4EC))),
+              border: Border(bottom: BorderSide(color: Ops.plumHairline)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                  decoration: BoxDecoration(
-                    color: Ops.creamTile,
-                    borderRadius: BorderRadius.circular(11),
-                  ),
+                  color: Ops.creamTile,
                   child: Image.asset('assets/images/logo.png', height: 30, fit: BoxFit.contain),
                 ),
                 const SizedBox(height: 10),
@@ -93,7 +90,7 @@ class V2Sidebar extends ConsumerWidget {
           Container(
             padding: const EdgeInsets.fromLTRB(13, 12, 13, 14),
             decoration: const BoxDecoration(
-              border: Border(top: BorderSide(color: Color(0x22EFE4EC))),
+              border: Border(top: BorderSide(color: Ops.plumHairline)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -109,9 +106,9 @@ class V2Sidebar extends ConsumerWidget {
                       value: sess.viewAsRole ?? roleSuper,
                       isExpanded: true,
                       dropdownColor: Ops.plumActive,
-                      style: const TextStyle(color: Ops.plumText, fontSize: 12.5, fontFamily: Ops.sans),
+                      style: const TextStyle(color: Ops.plumText, fontSize: 12.5),
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      borderRadius: BorderRadius.circular(9),
+                      borderRadius: BorderRadius.zero,
                       items: const [
                         DropdownMenuItem(value: roleSuper, child: Text('super_admin')),
                         DropdownMenuItem(value: roleOps, child: Text('ops')),
@@ -167,10 +164,10 @@ class _RoleChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final isSuper = role == roleSuper;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
         color: isSuper ? Ops.plumChip : Ops.greyTint,
-        borderRadius: BorderRadius.circular(Ops.radiusPill),
+        border: Border.all(color: isSuper ? Ops.plum : Ops.borderSoft, width: Ops.rule),
       ),
       child: Text(
         roleLabel(role),
@@ -194,52 +191,46 @@ class _NavTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 3),
-      child: Material(
-        color: selected ? Ops.plumActive : Colors.transparent,
-        borderRadius: BorderRadius.circular(Ops.radiusNav),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(Ops.radiusNav),
-          child: Padding(
-            padding: const EdgeInsetsDirectional.symmetric(horizontal: 10, vertical: 9),
-            child: Row(
-              children: [
-                Container(
-                  width: 6,
-                  height: 6,
-                  decoration: BoxDecoration(
-                    color: selected ? Ops.green : const Color(0x3DEFE4EC),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: selected ? Ops.plumText : Ops.navIdle,
-                      fontSize: 13,
-                      fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-                    ),
-                  ),
-                ),
-                if (badge > 0)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
-                    decoration: BoxDecoration(
-                      color: Ops.terracotta,
-                      borderRadius: BorderRadius.circular(Ops.radiusPill),
-                    ),
+      padding: const EdgeInsets.only(bottom: 2),
+      child: Semantics(
+        button: true,
+        selected: selected,
+        child: Material(
+          color: selected ? Ops.plumActive : Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            child: Container(
+              constraints: const BoxConstraints(minHeight: 40),
+              // the 3px bar is the system's "you are here" mark (as in the bottom nav)
+              decoration: BoxDecoration(
+                border: BorderDirectional(start: BorderSide(color: selected ? Ops.plumText : Colors.transparent, width: 3)),
+              ),
+              padding: const EdgeInsetsDirectional.symmetric(horizontal: 12, vertical: 9),
+              child: Row(
+                children: [
+                  Expanded(
                     child: Text(
-                      '$badge',
-                      style: const TextStyle(
-                          fontSize: 11, fontWeight: FontWeight.w700, fontFamily: Ops.mono, color: Color(0xFFFFF6F2)),
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: selected ? Ops.plumText : Ops.navIdle,
+                        fontSize: 13,
+                        fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                      ),
                     ),
                   ),
-              ],
+                  if (badge > 0)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                      color: Ops.terracotta,
+                      child: Text(
+                        '$badge',
+                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, fontFamily: Ops.mono, color: Ops.plumText),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
         ),

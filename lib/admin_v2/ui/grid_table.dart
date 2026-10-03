@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:oons/core/icons/ons_icons.dart';
 import 'package:oons/admin_v2/theme/tokens.dart';
 
 /// A column in [V2GridTable]. Give it either a [fixed] pixel width or a [flex]
@@ -127,11 +128,7 @@ class V2GridTable extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: BoxDecoration(
-        color: Ops.card,
-        borderRadius: BorderRadius.circular(Ops.radiusCard),
-        border: Border.all(color: Ops.border),
-      ),
+      decoration: Ops.cardBox(),
       clipBehavior: Clip.antiAlias,
       child: LayoutBuilder(
         builder: (context, box) {
@@ -147,7 +144,7 @@ class V2GridTable extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
                     decoration: const BoxDecoration(
                       color: Ops.headBg,
-                      border: Border(bottom: BorderSide(color: Ops.border)),
+                      border: Border(bottom: BorderSide(color: Ops.border, width: Ops.rule)),
                     ),
                     child: Row(
                       children: _track([
@@ -214,14 +211,14 @@ class _V2RowState extends State<_V2Row> {
               if (widget.bulkMode)
                 _Check(selected: r.selected, onTap: r.onToggleSelect),
               ...r.cells,
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  for (var i = 0; i < r.actions.length; i++) ...[
-                    if (i > 0) const SizedBox(width: 6),
-                    r.actions[i],
-                  ],
-                ],
+              // Wrap, not Row: a long label or an extra action drops to a second line
+              // instead of overflowing the row.
+              Wrap(
+                alignment: WrapAlignment.end,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 6,
+                runSpacing: 6,
+                children: r.actions,
               ),
             ]),
           ),
@@ -258,7 +255,7 @@ class _SkeletonRowState extends State<_SkeletonRow> with SingleTickerProviderSta
         widthFactor: widthFactor,
         child: Container(
           height: 11,
-          decoration: BoxDecoration(color: Ops.rowBorder, borderRadius: BorderRadius.circular(4)),
+          color: Ops.rowBorder,
         ),
       );
 
@@ -303,11 +300,10 @@ class _Check extends StatelessWidget {
             height: 22,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(6),
-              color: selected ? Ops.plum : Ops.cardAlt,
-              border: Border.all(color: selected ? Ops.plum : const Color(0xFFC9BBA9)),
+              color: selected ? Ops.plum : Ops.card,
+              border: Border.all(color: Ops.border, width: Ops.rule),
             ),
-            child: selected ? const Icon(Icons.check, size: 14, color: Color(0xFFF6F0EF)) : null,
+            child: selected ? const OnsIcon('check', size: 14, color: Ops.plumText) : null,
           ),
         ),
       ),

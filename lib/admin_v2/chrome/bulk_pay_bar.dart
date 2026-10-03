@@ -51,7 +51,7 @@ class V2BulkPayBar extends StatelessWidget {
                                 ? 'رسوم الأمان ${money(trustFeeExcludedPiastres, lang)} مستبعدة'
                                 : '${money(trustFeeExcludedPiastres, lang)} trust fee excluded')
                             : (ar ? 'رسوم الأمان مستبعدة من الصافي' : 'Trust fee excluded from gross'),
-                        style: const TextStyle(color: Color(0xFF9C8898), fontSize: 12)),
+                        style: const TextStyle(color: Ops.plumMuted, fontSize: 12)),
                   ],
                 ),
               ),

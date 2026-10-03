@@ -367,7 +367,7 @@ class _ServiceRequestsScreenState extends ConsumerState<ServiceRequestsScreen> {
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(color: Ops.impBg, borderRadius: BorderRadius.circular(10)),
+              decoration: BoxDecoration(color: Ops.impBg, borderRadius: BorderRadius.zero),
               child: Text(categoryNote, style: const TextStyle(fontSize: 12.5, color: Ops.inkSoft, height: 1.4)),
             ),
           ],

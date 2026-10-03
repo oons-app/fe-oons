@@ -138,7 +138,7 @@ class _SuperAdminBookingAlertsState extends ConsumerState<SuperAdminBookingAlert
           SnackBar(
             content: Text(
               body.isEmpty ? title : '$title\n$body',
-              style: const TextStyle(color: Color(0xFFF1E8EE), fontSize: 13, height: 1.35),
+              style: const TextStyle(color: Ops.plumText, fontSize: 13, height: 1.35),
             ),
             backgroundColor: Ops.plum,
             behavior: SnackBarBehavior.floating,
@@ -146,7 +146,7 @@ class _SuperAdminBookingAlertsState extends ConsumerState<SuperAdminBookingAlert
             action: path.startsWith('/')
                 ? SnackBarAction(
                     label: 'فتح',
-                    textColor: const Color(0xFFF1E8EE),
+                    textColor: Ops.plumText,
                     onPressed: () {
                       if (mounted) context.go(path);
                     },

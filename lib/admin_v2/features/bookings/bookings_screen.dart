@@ -418,7 +418,7 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> with WidgetsBin
               padding: const EdgeInsets.all(13),
               decoration: BoxDecoration(
                 color: Ops.wellSand,
-                borderRadius: BorderRadius.circular(11),
+                borderRadius: BorderRadius.zero,
                 border: Border.all(color: Ops.borderSoft),
               ),
               child: Column(
@@ -532,7 +532,7 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> with WidgetsBin
             style: TextStyle(
                 fontWeight: strong ? FontWeight.w600 : FontWeight.w400,
                 fontSize: 13,
-                fontFamily: mono ? Ops.mono : Ops.sans,
+                fontFamily: mono ? Ops.mono : null,
                 color: Ops.ink)),
         if (bottom.isNotEmpty)
           Text(bottom,

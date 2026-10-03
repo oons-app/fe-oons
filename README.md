@@ -17,7 +17,7 @@ built and deployed independently:
 | Entry point | Audience | Live at |
 |---|---|---|
 | `lib/main.dart` | Customers + providers (booking, provider profile/services/team, jobs) | https://lady.oons.app |
-| `lib/admin_v2/main.dart` | Staff — the Ops Console | https://bo.oons.app |
+| `lib/admin_v2/main.dart` | Staff — the Ops Console (Ons design system, see `DESIGN_SYSTEM.md`) | https://bo.oons.app |
 
 They share `lib/core/` and `lib/data/` but otherwise don't import from each
 other. `lib/admin/` is an earlier, now-frozen admin UI kept only for

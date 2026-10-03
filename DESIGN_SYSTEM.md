@@ -107,6 +107,30 @@ Older widgets keep their names but are adapters over this system: `Pro*` (`pro_c
 
 Mapping to the backend: the prototype's **category** is a vertical (`cleaning`, `beauty`, `chef`), its **specialty** is a backend `Category`, its **service** is a `ServiceItem`. Area-priced cleaning packages (`kind: cleaning`) are the **tiers** table of a specialty.
 
+## Where it is used: the Ops Console (bo.oons.app)
+
+`lib/admin_v2` runs on this system too — same rules, same palette, no palette of its own.
+
+| layer | file | what it does |
+|---|---|---|
+| tokens | `admin_v2/theme/tokens.dart` (`Ops`) | every name the console already used (`Ops.card`, `Ops.plum`…) now **resolves to `Ds`**; all `Ops.radius*` are `0`; `Ops.border` is the ink rule, `Ops.borderSoft` the row hairline; `Ops.cardBox()` is `Ds.card()` |
+| Material theme | `admin_v2/theme/theme.dart` | square inputs/buttons/dialogs/menus, ink borders, plum primary, no elevation, no splash; Archivo (EN) / IBM Plex Sans Arabic (AR) |
+| atoms | `admin_v2/ui/atoms.dart` | `V2StatusPill` = `DsStatusBadge` (mono, bordered), `V2FilterChip`/`V2Pill` = `DsChip`, `V2Card`/`V2SectionCard` = `DsCard`, `V2MiniBar` = `DsMeter`, tab bar = 3px plum underline |
+| buttons | `admin_v2/ui/buttons.dart` | `V2Btn`: primary plum · ghost white + ink border · danger terracotta-light; 44px (`sm` 38, table-row 32) |
+| table / list | `admin_v2/ui/grid_table.dart`, `list_view.dart` | white card with ink border, surface header over an ink rule, `divider` row hairlines, row actions wrap instead of overflowing |
+| chrome | `admin_v2/chrome/*` | plum sidebar with the 3px "you are here" bar, cream header (stacks title over controls below 760px), square modal on the 42% scrim, ink toast with Ons check icon |
+
+**Tone mapping.** The console keeps its six `V2Tone`s; the system has three meanings:
+`ok` → olive (done / verified) · `warn` and `bad` → terracotta (needs attention) · `plum`, `info`, `neutral` stay quiet.
+The pill's label always says what the colour means.
+
+**Rules for new console code.** Read colour/size from `Ops` / `Ds`; never write a hex, a `BorderRadius.circular(n)`, a `BoxShadow` or `BoxShape.circle`
+(`test/admin_v2_ds_test.dart` scans `lib/admin_v2` and fails). Use `V2Btn`, `V2Card`, `V2StatusPill`, `V2FilterChip` — not raw Material buttons.
+Icons: `OnsIcon` where the set has one (close, search, check, retry, pin, alert).
+
+**Console-only exceptions.** It is a pointer-driven desktop tool: table-row actions are 32px, not 44px; ids, refs, dates and counts stay Latin-digit mono
+(the rule already allows Latin for ids and codes); a few Material glyphs without an Ons equivalent (download, attach, sort arrows, visibility) remain.
+
 ## Adding to the system
 
 1. Put the component in `lib/ds/primitives/`, export it from `ds.dart`.

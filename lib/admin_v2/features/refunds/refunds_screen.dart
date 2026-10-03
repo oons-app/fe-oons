@@ -90,7 +90,7 @@ class _RefundsScreenState extends ConsumerState<RefundsScreen> {
         children: [
           Container(
             padding: const EdgeInsets.all(11),
-            decoration: BoxDecoration(color: Ops.wellSand, borderRadius: BorderRadius.circular(10), border: Border.all(color: Ops.borderSoft)),
+            decoration: BoxDecoration(color: Ops.wellSand, borderRadius: BorderRadius.zero, border: Border.all(color: Ops.borderSoft)),
             child: Text(
               lang == 'ar'
                   ? 'حجز $ref0 · مرتجع ${money(asInt(r['refundAmount']), lang)} من إجمالي ${money(asInt(r['total']), lang)}'

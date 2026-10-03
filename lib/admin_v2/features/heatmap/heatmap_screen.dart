@@ -101,8 +101,8 @@ class _HeatmapScreenState extends ConsumerState<HeatmapScreen> {
                             padding: const EdgeInsets.all(14),
                             decoration: BoxDecoration(
                               color: Ops.cardAlt,
-                              borderRadius: BorderRadius.circular(13),
-                              border: Border.all(color: label == 'Undersupplied' ? const Color(0xFFE0C9A8) : Ops.borderSoft),
+                              borderRadius: BorderRadius.zero,
+                              border: Border.all(color: label == 'Undersupplied' ? Ops.terracotta : Ops.borderSoft),
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,

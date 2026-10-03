@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:oons/core/icons/ons_icons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:oons/admin_v2/chrome/toast.dart';
 import 'package:oons/admin_v2/data/maps.dart';
@@ -100,7 +101,7 @@ class _BlockedPhonesScreenState extends ConsumerState<BlockedPhonesScreen> {
         V2PageHeader(
           title: ar ? 'أرقام موقوفة' : 'Blocked numbers',
           lang: lang,
-          actions: [IconButton(onPressed: _load, icon: const Icon(Icons.refresh))],
+          actions: [IconButton(onPressed: _load, tooltip: 'Refresh', icon: const OnsIcon('retry', size: 20, color: Ops.ink))],
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),

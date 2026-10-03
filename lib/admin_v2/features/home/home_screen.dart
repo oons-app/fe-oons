@@ -322,7 +322,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                                         child: Container(
                                           decoration: BoxDecoration(
                                             color: asInt(days[i]['count']) == dmax ? Ops.green : Ops.barConfirmed,
-                                            borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+                                            borderRadius: BorderRadius.zero,
                                           ),
                                         ),
                                       ),
@@ -456,7 +456,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
           ),
           const SizedBox(height: 12),
           Container(
-            decoration: BoxDecoration(color: Ops.borderSoft, borderRadius: BorderRadius.circular(11)),
+            decoration: BoxDecoration(color: Ops.borderSoft, borderRadius: BorderRadius.zero),
             clipBehavior: Clip.antiAlias,
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -503,7 +503,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
             decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Ops.borderSoft))),
             child: Row(
               children: [
-                Container(width: 8, height: 8, decoration: const BoxDecoration(color: Ops.green, shape: BoxShape.circle)),
+                Container(width: 8, height: 8, decoration: const BoxDecoration(color: Ops.green)),
                 const SizedBox(width: 9),
                 Text(lang == 'ar' ? 'زيارات مباشرة' : 'Live visits',
                     style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700)),
