@@ -198,7 +198,7 @@ Future<void> showCleaningTaskChecklistSheet({
     context: context,
     isScrollControlled: true,
     backgroundColor: Pro.bg,
-    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
     builder: (ctx) => StatefulBuilder(
       builder: (ctx, setSheetState) {
         final included = 18 - current.excludedTaskIds.length;
@@ -211,7 +211,7 @@ Future<void> showCleaningTaskChecklistSheet({
             controller: ctrl,
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
             children: [
-              Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: Pro.lineSoft, borderRadius: BorderRadius.circular(2)))),
+              Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: Pro.lineSoft, borderRadius: BorderRadius.zero))),
               const SizedBox(height: 12),
               Text(ar ? 'الشغل اللي الباقة شاملته' : 'Package tasks', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Pro.ink)),
               const SizedBox(height: 4),
@@ -229,7 +229,7 @@ Future<void> showCleaningTaskChecklistSheet({
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         decoration: BoxDecoration(
                           color: on ? Pro.ink : Pro.card,
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.zero,
                           border: Border.all(color: on ? Pro.ink : Pro.line),
                         ),
                         child: Text(
@@ -276,7 +276,7 @@ Future<ProServiceDraft?> showProServiceEditorSheet({
     context: context,
     isScrollControlled: true,
     backgroundColor: Pro.bg,
-    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
+    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
     builder: (ctx) => _ProServiceEditorSheet(
       lang: lang,
       approvedCategories: approvedCategories,
@@ -416,10 +416,10 @@ class _ProServiceEditorSheetState extends State<_ProServiceEditorSheet> {
                 onTap: () => setState(() {
                   benefitCtrls.removeAt(i).dispose();
                 }),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.zero,
                 child: Container(
                   padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(color: Pro.chip, borderRadius: BorderRadius.circular(10)),
+                  decoration: BoxDecoration(color: Pro.chip, borderRadius: BorderRadius.zero),
                   child: const Icon(Icons.close, size: 16, color: Pro.muted),
                 ),
               ),
@@ -604,7 +604,7 @@ class _ProServiceEditorSheetState extends State<_ProServiceEditorSheet> {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
         decoration: BoxDecoration(
           color: on ? Pro.ink : Pro.card,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.zero,
           border: Border.all(color: on ? Pro.ink : Pro.line),
         ),
         child: Text(
@@ -637,7 +637,7 @@ class _ProServiceEditorSheetState extends State<_ProServiceEditorSheet> {
           controller: ctrl,
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
           children: [
-            Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: Pro.lineSoft, borderRadius: BorderRadius.circular(2)))),
+            Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: Pro.lineSoft, borderRadius: BorderRadius.zero))),
             const SizedBox(height: 12),
             Row(
               children: [
@@ -716,7 +716,7 @@ class _ProServiceEditorSheetState extends State<_ProServiceEditorSheet> {
                     onTap: () => setState(() => draft.duration = min),
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(color: on ? Pro.plum : Pro.chip, borderRadius: BorderRadius.circular(10)),
+                      decoration: BoxDecoration(color: on ? Pro.plum : Pro.chip, borderRadius: BorderRadius.zero),
                       child: Text(formatServiceDuration(min, ar: ar), style: TextStyle(fontFamily: T.mono, fontSize: 12, fontWeight: FontWeight.w600, color: on ? Colors.white : Pro.muted)),
                     ),
                   );
@@ -784,7 +784,7 @@ class _ProServiceEditorSheetState extends State<_ProServiceEditorSheet> {
                     onTap: () => setState(() => draft.duration = min),
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(color: on ? Pro.plum : Pro.chip, borderRadius: BorderRadius.circular(10)),
+                      decoration: BoxDecoration(color: on ? Pro.plum : Pro.chip, borderRadius: BorderRadius.zero),
                       child: Text(formatServiceDuration(min, ar: ar), style: TextStyle(fontFamily: T.mono, fontSize: 12, fontWeight: FontWeight.w600, color: on ? Colors.white : Pro.muted)),
                     ),
                   );
@@ -838,7 +838,7 @@ class _ProServiceEditorSheetState extends State<_ProServiceEditorSheet> {
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: Pro.plumSoft, borderRadius: BorderRadius.circular(12)),
+              decoration: BoxDecoration(color: Pro.plumSoft, borderRadius: BorderRadius.zero),
               child: Text(
                 ar
                     ? 'العميلة بتدفع ${toArabicDigits(price + travel)} ج.م · بيوصلك ${toArabicDigits(net)} ج.م بعد عمولة أُنس ${(widget.commissionRate * 100).round()}٪'

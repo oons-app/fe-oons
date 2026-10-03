@@ -51,7 +51,7 @@ class _ProCouponsScreenState extends ConsumerState<ProCouponsScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Pro.bg,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
       builder: (ctx) => _CouponEditorSheet(
         lang: lang,
         existing: existing,
@@ -134,7 +134,7 @@ class _ProCouponsScreenState extends ConsumerState<ProCouponsScreen> {
       padding: const EdgeInsets.only(bottom: 10),
       child: InkWell(
         onTap: () => _openEditor(existing: c),
-        borderRadius: BorderRadius.circular(Pro.rCard),
+        borderRadius: BorderRadius.zero,
         child: ProCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -368,7 +368,7 @@ class _CouponEditorSheetState extends State<_CouponEditorSheet> {
               padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 12),
               decoration: BoxDecoration(
                 color: const Color(0xFFFBF8F5),
-                borderRadius: BorderRadius.circular(Pro.rSm),
+                borderRadius: BorderRadius.zero,
                 border: Border.all(color: const Color(0xFFE0D6CE)),
               ),
               child: Text(
@@ -413,7 +413,7 @@ class _CouponEditorSheetState extends State<_CouponEditorSheet> {
           controller: ctrl,
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
           children: [
-            Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: Pro.lineSoft, borderRadius: BorderRadius.circular(2)))),
+            Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: Pro.lineSoft, borderRadius: BorderRadius.zero))),
             const SizedBox(height: 12),
             Row(
               children: [
@@ -437,7 +437,7 @@ class _CouponEditorSheetState extends State<_CouponEditorSheet> {
               padding: const EdgeInsets.symmetric(horizontal: 13),
               decoration: BoxDecoration(
                 color: const Color(0xFFFBF8F5),
-                borderRadius: BorderRadius.circular(Pro.rSm),
+                borderRadius: BorderRadius.zero,
                 border: Border.all(color: const Color(0xFFE0D6CE)),
               ),
               child: DropdownButtonHideUnderline(

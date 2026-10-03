@@ -53,7 +53,7 @@ Future<void> showProTour(BuildContext context, {required String lang}) async {
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 88),
                 child: Material(
                   color: Pro.ink,
-                  borderRadius: BorderRadius.circular(18),
+                  borderRadius: BorderRadius.zero,
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
                     child: Column(

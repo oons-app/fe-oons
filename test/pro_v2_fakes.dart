@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:oons/core/locale.dart';
 import 'package:oons/data/api.dart';
 import 'package:oons/data/models.dart';
 import 'package:oons/data/repo.dart';
@@ -40,6 +41,13 @@ Map<String, dynamic> catRow(String id, String ar, String vertical, String status
       'status': status,
       'slug': id,
     };
+
+/// A locale that never touches Hive's disk (real I/O stalls inside widget tests).
+class FixedLocale extends LocaleController {
+  FixedLocale(String code) {
+    state = Locale(code);
+  }
+}
 
 /// A signed-in provider whose profile the tests can read back.
 class FakeProSession extends StateNotifier<SessionState> implements Session {
@@ -214,7 +222,7 @@ class FakeProRepo extends Repo {
 }
 
 /// Hosts [child] in a router (so `context.push` works) with Arabic + the fakes.
-Widget proHost(Widget child, {required FakeProRepo repo, List<GoRoute> routes = const [], List<Override> extra = const []}) {
+Widget proHost(Widget child, {required FakeProRepo repo, List<GoRoute> routes = const [], List<Override> extra = const [], String lang = 'ar'}) {
   final router = GoRouter(
     initialLocation: '/start',
     routes: [
@@ -226,11 +234,12 @@ Widget proHost(Widget child, {required FakeProRepo repo, List<GoRoute> routes = 
     overrides: [
       sessionProvider.overrideWith((ref) => FakeProSession(repo.profile)),
       repoProvider.overrideWithValue(repo),
+      localeProvider.overrideWith((ref) => FixedLocale(lang)),
       ...extra,
     ],
     child: MaterialApp.router(
       routerConfig: router,
-      locale: const Locale('ar'),
+      locale: Locale(lang),
       supportedLocales: const [Locale('ar'), Locale('en')],
       localizationsDelegates: GlobalMaterialLocalizations.delegates,
     ),

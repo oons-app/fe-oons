@@ -64,7 +64,7 @@ IBM Plex Sans Arabic (Arabic) / Archivo (English) come from the theme; numbers a
 | `DsButton` | primary (54px plum, label + trailing icon), secondary (white + ink border), danger (terracotta-light). `compact` = 46px, `busy` = spinner in the button and no second tap |
 | `DsTextLink` | underlined 1px link; `danger` for terracotta |
 | `DsSegmented` | bordered row; selected cell plum/cream, hairline between cells |
-| `DsChip` | toggle; on = plum/cream, off = white/ink; `mono` for hours |
+| `DsChip` | toggle; on = plum/cream, off = white/ink; `mono` for hours, `compact` to fit seven on a row |
 | `DsSwitch` | square 44×24, square knob, plum track when on; always give it a `label` |
 | `DsStatusBadge` | mono 10.5 bordered; `DsTone.olive` / `neutral` / `attention` |
 | `DsTag` | small plum-light label («باقة») |
@@ -89,6 +89,23 @@ IBM Plex Sans Arabic (Arabic) / Archivo (English) come from the theme; numbers a
 - **Optimistic toggle:** apply → `PATCH` just that field → `DsToast.show(context, 'اتحفظ')`; on failure revert and `DsToast.show(..., error: true)`. (`lib/features/pro/v2/autosave.dart`)
 - **RTL first:** use `EdgeInsetsDirectional` / `AlignmentDirectional`; arrows mirror through the icon set, never by flipping a whole widget.
 - **Copy:** Egyptian colloquial, feminine address, short sentences, «إنستاباي» not "InstaPay".
+
+## Where it is used: the provider app (v2)
+
+| surface | file |
+|---|---|
+| bottom nav + cross-tab jumps (`ProNav`) | `lib/app/shell.dart`, `lib/features/pro/v2/pro_nav.dart` |
+| الزيارات | `v2/visits_tab.dart` — stats, seven-day strip, cards, past list |
+| خدماتي | `v2/services_tab.dart` (+ `areas_hours.dart`, `specialty_page.dart`, `service_sheet.dart`, `tiers_sheet.dart`, `request_specialty.dart`) |
+| الأرباح | `v2/earnings_tab.dart` |
+| حسابي | `v2/account_tab.dart`, `link_page.dart`, `details_page.dart`, `legal_page.dart`, `plans_route.dart` |
+| auto-save | `v2/autosave.dart` (`AutosaveQueue`, `ProAutosave`) |
+| grouping (category → specialty → service) | `v2/services_model.dart` |
+| strings | `lib/l10n/pro_v2_copy.dart`, registered as `Copy.of(lang)['pv2']` |
+
+Older widgets keep their names but are adapters over this system: `Pro*` (`pro_chrome.dart`) and the plan wizard's `Wiz` tokens now resolve to `Ds` values. New code uses `Ds*` directly.
+
+Mapping to the backend: the prototype's **category** is a vertical (`cleaning`, `beauty`, `chef`), its **specialty** is a backend `Category`, its **service** is a `ServiceItem`. Area-priced cleaning packages (`kind: cleaning`) are the **tiers** table of a specialty.
 
 ## Adding to the system
 

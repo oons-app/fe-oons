@@ -86,7 +86,7 @@ class _ProSettlementsScreenState extends ConsumerState<ProSettlementsScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 9),
         alignment: Alignment.center,
-        decoration: BoxDecoration(color: on ? Pro.plum : Pro.card, borderRadius: BorderRadius.circular(10), border: Border.all(color: Pro.line)),
+        decoration: BoxDecoration(color: on ? Pro.plum : Pro.card, borderRadius: BorderRadius.zero, border: Border.all(color: Pro.line)),
         child: Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: on ? Colors.white : Pro.ink)),
       ),
     );

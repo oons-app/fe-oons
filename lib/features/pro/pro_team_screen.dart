@@ -45,7 +45,7 @@ class _ProTeamScreenState extends ConsumerState<ProTeamScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Pro.bg,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
       builder: (ctx) => _WorkerEditorSheet(lang: lang, existing: existing, repo: ref.read(repoProvider)),
     );
     if (changed == true) {
@@ -134,7 +134,7 @@ class _ProTeamScreenState extends ConsumerState<ProTeamScreen> {
       padding: const EdgeInsets.only(bottom: 10),
       child: InkWell(
         onTap: () => _openEditor(existing: w),
-        borderRadius: BorderRadius.circular(Pro.rCard),
+        borderRadius: BorderRadius.zero,
         child: ProCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -352,7 +352,7 @@ class _WorkerEditorSheetState extends State<_WorkerEditorSheet> {
           controller: ctrl,
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
           children: [
-            Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: Pro.lineSoft, borderRadius: BorderRadius.circular(2)))),
+            Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: Pro.lineSoft, borderRadius: BorderRadius.zero))),
             const SizedBox(height: 12),
             Row(
               children: [

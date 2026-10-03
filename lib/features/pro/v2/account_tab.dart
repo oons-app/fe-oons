@@ -215,7 +215,9 @@ class _ProAccountTabState extends ConsumerState<ProAccountTab> {
               DsListRow(label: t('rowLegal'), icon: 'info', onTap: () => context.push('/pro/legal')),
             ]),
             const SizedBox(height: Ds.s6),
-            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            // Wrap, not Row: in a long language the two links drop to two lines
+            // instead of overflowing.
+            Wrap(alignment: WrapAlignment.spaceBetween, children: [
               DsTextLink(t('signOut'), onTap: () => ref.read(sessionProvider.notifier).signOut()),
               DsTextLink(t('deleteAccount'), danger: true, onTap: _deleteAccount),
             ]),

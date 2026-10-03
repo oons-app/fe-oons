@@ -502,7 +502,7 @@ class _ProRegisterScreenState extends ConsumerState<ProRegisterScreen> {
           children: [
             if (bytes != null) ...[
               ClipRRect(
-                borderRadius: BorderRadius.circular(6),
+                borderRadius: BorderRadius.zero,
                 child: Image.memory(
                   Uint8List.fromList(bytes),
                   width: 48,
@@ -758,7 +758,7 @@ class _ProJobScreenState extends ConsumerState<ProJobScreen> {
                                 margin: EdgeInsetsDirectional.only(end: i == 3 ? 0 : 6),
                                 decoration: BoxDecoration(
                                   color: on ? Pro.plum : const Color(0xFFE6DDD6),
-                                  borderRadius: BorderRadius.circular(999),
+                                  borderRadius: BorderRadius.zero,
                                 ),
                               ),
                             );
@@ -978,10 +978,10 @@ class _ProJobScreenState extends ConsumerState<ProJobScreen> {
   Widget _softAction(String label, VoidCallback onTap) {
     return Material(
       color: Pro.chip,
-      borderRadius: BorderRadius.circular(Pro.rSm),
+      borderRadius: BorderRadius.zero,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(Pro.rSm),
+        borderRadius: BorderRadius.zero,
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 10),
           alignment: Alignment.center,
@@ -1100,7 +1100,7 @@ class _ProJobScreenState extends ConsumerState<ProJobScreen> {
     final selected = await showModalBottomSheet<Set<String>>(
       context: context,
       backgroundColor: Pro.bg,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
       builder: (ctx) => _TeamPickerSheet(lang: lang, roster: eligible, initiallySelected: currentIds),
     );
     if (selected == null || !mounted) return;
@@ -1143,7 +1143,7 @@ class _ProJobScreenState extends ConsumerState<ProJobScreen> {
     final picked = await showModalBottomSheet<String>(
       context: context,
       backgroundColor: Pro.bg,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
       builder: (ctx) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),

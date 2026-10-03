@@ -199,7 +199,6 @@ class WizRadio extends StatelessWidget {
         width: 22,
         height: 22,
         decoration: BoxDecoration(
-          shape: BoxShape.circle,
           border: Border.all(color: selected ? Wiz.plum : Wiz.faint, width: selected ? 6 : 1.5),
         ),
       );
