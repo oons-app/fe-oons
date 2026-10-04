@@ -444,7 +444,7 @@ class _BookScreenState extends ConsumerState<BookScreen> {
         couponDiscount = ok ? ((r['discount'] as num?)?.toInt() ?? 0) : 0;
         couponMessage = ok
             ? (label is Map ? '${label[lang] ?? label['en'] ?? ''}' : (bf['couponApplied'] ?? ''))
-            : '${r['message'] ?? (bf['couponInvalid'] ?? '')}';
+            : couponRejectText('${r['message'] ?? (bf['couponInvalid'] ?? '')}', lang);
       });
     } catch (e) {
       if (!mounted) return;

@@ -25,6 +25,8 @@ class _V2ReferralSettingsState extends State<V2ReferralSettings> {
   final percent = TextEditingController();
   final capEgp = TextEditingController();
   final days = TextEditingController();
+  final providerIds = TextEditingController();
+  List<String> providerNames = [];
   bool enabled = true;
   bool loaded = false;
   bool saving = false;
@@ -43,6 +45,7 @@ class _V2ReferralSettingsState extends State<V2ReferralSettings> {
     percent.dispose();
     capEgp.dispose();
     days.dispose();
+    providerIds.dispose();
     super.dispose();
   }
 
@@ -55,6 +58,11 @@ class _V2ReferralSettingsState extends State<V2ReferralSettings> {
         percent.text = '${(d['percent'] as num?)?.toInt() ?? 50}';
         capEgp.text = '${((d['maxDiscount'] as num?)?.toInt() ?? 50000) ~/ 100}';
         days.text = '${(d['validDays'] as num?)?.toInt() ?? 90}';
+        providerIds.text = [for (final x in (d['providerIds'] as List? ?? const [])) '$x'].join(', ');
+        providerNames = [
+          for (final p in (d['providers'] as List? ?? const []))
+            if (p is Map && p['name'] is Map) '${(p['name'] as Map)[ar ? 'ar' : 'en'] ?? ''}'.trim(),
+        ];
         loaded = true;
         error = null;
       });
@@ -87,10 +95,14 @@ class _V2ReferralSettingsState extends State<V2ReferralSettings> {
         'percent': p,
         'maxDiscount': cap * 100,
         'validDays': d,
+        'providerIds': [
+          for (final x in providerIds.text.split(RegExp(r'[,\s]+'))) if (x.trim().isNotEmpty) x.trim(),
+        ],
       });
       if (mounted) {
         v2Toast(context, ar ? 'تم الحفظ' : 'Saved');
         widget.onChanged?.call();
+        await _load();
       }
     } on ApiException catch (e) {
       if (mounted) v2Toast(context, e.message, error: true);
@@ -141,6 +153,18 @@ class _V2ReferralSettingsState extends State<V2ReferralSettings> {
                     _num(ar ? 'الخصم ٪' : 'Discount %', percent, hint: '50'),
                     _num(ar ? 'حد أقصى ج.م (٠ = بدون)' : 'Cap EGP (0 = none)', capEgp, hint: '500'),
                     _num(ar ? 'الصلاحية (أيام)' : 'Valid (days)', days, hint: '90'),
+                    SizedBox(
+                      width: 440,
+                      child: V2FormField(
+                        label: ar ? 'تعمل مع هذه المتخصصات فقط (معرّفات مفصولة بفاصلة، فارغ = الكل)' : 'Works only with these professionals (ids, comma-separated; empty = any)',
+                        child: TextField(
+                          controller: providerIds,
+                          enabled: widget.canWrite,
+                          style: const TextStyle(fontFamily: Ops.mono, fontSize: 12),
+                          decoration: InputDecoration(helperText: providerNames.isEmpty ? (ar ? 'أي متخصصة' : 'Any professional') : providerNames.join(' · ')),
+                        ),
+                      ),
+                    ),
                     if (widget.canWrite) V2Btn.primary(saving ? '…' : (ar ? 'حفظ' : 'Save'), onPressed: saving ? null : _save),
                   ],
                 ),

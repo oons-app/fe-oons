@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:oons/features/invite/invite_model.dart';
 import 'package:oons/features/invite/invite_screen.dart';
+import 'package:oons/l10n/errors.dart';
 import 'package:oons/l10n/invite_copy.dart';
 
 import 'pro_v2_fakes.dart';
@@ -25,7 +26,7 @@ class InviteRepo extends FakeProRepo {
   }
 }
 
-Map<String, dynamic> infoJson({List<Map<String, dynamic>> rewards = const [], bool enabled = true, bool canApply = true, int percent = 50, int cap = 50000}) => {
+Map<String, dynamic> infoJson({List<Map<String, dynamic>> providers = const [], List<Map<String, dynamic>> rewards = const [], bool enabled = true, bool canApply = true, int percent = 50, int cap = 50000}) => {
       'enabled': enabled,
       'code': 'K7M2QX',
       'percent': percent,
@@ -34,6 +35,7 @@ Map<String, dynamic> infoJson({List<Map<String, dynamic>> rewards = const [], bo
       'invited': 2,
       'completed': 1,
       'rewards': rewards,
+      'providers': providers,
       'usedCode': false,
       'canApplyCode': canApply,
     };
@@ -132,6 +134,25 @@ void main() {
     await open(t, InviteRepo(infoJson(cap: 50000)));
     expect(find.textContaining('٥٠٠'), findsOneWidget);
     expect(find.textContaining(ar['terms']!.split('{cap}').last), findsOneWidget, reason: 'subscriptions are excluded');
+  });
+
+  testWidgets('the terms name the professionals the coupon works with', (t) async {
+    await open(t, InviteRepo(infoJson(providers: [
+      {'id': 'p1', 'name': {'ar': 'ندى أحمد', 'en': 'Nada Ahmed'}},
+    ])));
+    expect(find.textContaining('ندى أحمد'), findsOneWidget);
+    expect(find.textContaining(ar['withProviders']!.split('{names}').first), findsOneWidget);
+  });
+
+  testWidgets('no names listed when it works with any professional', (t) async {
+    await open(t, InviteRepo(infoJson()));
+    expect(find.textContaining(ar['withProviders']!.split('{names}').first), findsNothing);
+  });
+
+  test('coupon refusals are shown in Arabic, unknown ones pass through', () {
+    expect(couponRejectText('This coupon only works with selected professionals.', 'ar'), 'هذا الكوبون يعمل مع متخصصات محددة فقط.');
+    expect(couponRejectText('This coupon has expired.', 'en'), 'This coupon has expired.');
+    expect(couponRejectText('Something new', 'ar'), 'Something new');
   });
 
   testWidgets('English', (t) async {

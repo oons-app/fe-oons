@@ -33,6 +33,7 @@ class ReferralInfo {
     required this.invited,
     required this.completed,
     required this.rewards,
+    this.providers = const [],
     required this.usedCode,
     required this.canApplyCode,
   });
@@ -45,6 +46,14 @@ class ReferralInfo {
   final int invited;
   final int completed;
   final List<ReferralReward> rewards;
+
+  /// The professionals the reward works with, by name. Empty = any professional.
+  final List<Map> providers;
+
+  String providerNames(String lang) => [
+        for (final p in providers)
+          if (p['name'] is Map) '${(p['name'] as Map)[lang] ?? (p['name'] as Map)['en'] ?? ''}'.trim(),
+      ].where((n) => n.isNotEmpty).join(lang == 'ar' ? '، ' : ', ');
 
   /// She already entered someone's code.
   final bool usedCode;
@@ -64,6 +73,7 @@ class ReferralInfo {
           for (final r in (j['rewards'] as List? ?? const []))
             if (r is Map) ReferralReward.fromJson(r),
         ],
+        providers: [for (final p in (j['providers'] as List? ?? const [])) if (p is Map) p],
         usedCode: j['usedCode'] == true,
         canApplyCode: j['canApplyCode'] == true,
       );

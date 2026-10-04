@@ -107,6 +107,7 @@ class _InviteScreenState extends ConsumerState<InviteScreen> {
       'cap': r.maxDiscount > 0 ? _fill(t['cap']!, {'max': DsFormat.amount(capEgp, ar: ar)}) : '',
     });
 
+    final who = r.providerNames(lang);
     return [
       Text(_fill(t['heroTitle']!, p), style: DsText.subTitle.copyWith(fontSize: 24)),
       const SizedBox(height: Ds.s2),
@@ -201,7 +202,7 @@ class _InviteScreenState extends ConsumerState<InviteScreen> {
         Text(t['usedCode']!, style: DsText.meta),
       ],
       const SizedBox(height: Ds.s5),
-      Text(terms, style: DsText.hint),
+      Text(who.isEmpty ? terms : '$terms ${_fill(t['withProviders']!, {'names': who})}', key: const Key('invite-terms'), style: DsText.hint),
     ];
   }
 }

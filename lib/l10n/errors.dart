@@ -129,3 +129,29 @@ bool _technical(String low) =>
     low.contains('dioexception') ||
     low.contains('exception') ||
     low.contains('instance of');
+
+
+/// The coupon check answers in English; show it in the language of the app.
+String couponRejectText(String message, String lang) {
+  if (lang != 'ar') return message;
+  const ar = <String, String>{
+    'Coupon not found.': 'الكوبون غير موجود.',
+    'Enter a coupon code.': 'اكتبي كود الكوبون.',
+    'This coupon is not active.': 'هذا الكوبون غير مفعّل.',
+    'This coupon is not active yet.': 'هذا الكوبون لم يبدأ بعد.',
+    'This coupon has expired.': 'انتهت صلاحية هذا الكوبون.',
+    'This coupon has been fully redeemed.': 'تم استخدام هذا الكوبون بالكامل.',
+    'You have already used this coupon.': 'استخدمتِ هذا الكوبون من قبل.',
+    'This coupon does not apply to these services.': 'هذا الكوبون لا ينطبق على هذه الخدمات.',
+    'Service total is below the coupon minimum.': 'قيمة الخدمة أقل من الحد الأدنى للكوبون.',
+    'This coupon is for another professional.': 'هذا الكوبون لمتخصصة أخرى.',
+    'This coupon only works with selected professionals.': 'هذا الكوبون يعمل مع متخصصات محددة فقط.',
+    'This coupon belongs to another customer.': 'هذا الكوبون لعميلة أخرى.',
+    'This coupon does not apply to this service.': 'هذا الكوبون لا ينطبق على هذه الخدمة.',
+    'This coupon does not cover this area.': 'هذا الكوبون لا يشمل هذه المنطقة.',
+    'This coupon does not apply to these categories.': 'هذا الكوبون لا ينطبق على هذه التخصصات.',
+    'Coupon does not apply.': 'الكوبون لا ينطبق على هذا الحجز.',
+    'Coupon does not apply to this booking.': 'الكوبون لا ينطبق على هذا الحجز.',
+  };
+  return ar[message] ?? message;
+}
