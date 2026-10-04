@@ -34,15 +34,15 @@
   var style = document.createElement('style');
   style.textContent = [
     '#oons-consent{position:fixed;inset-inline:16px;bottom:16px;z-index:2147483000;max-width:420px;',
-    'background:#3A2431;color:#F4EBE1;border-radius:16px;padding:16px 16px 14px;',
-    'box-shadow:0 12px 40px rgba(0,0,0,.35);font:14px/1.45 system-ui,-apple-system,sans-serif}',
+    'background:#3E2136;color:#F7F4EE;border-radius:0;padding:16px 16px 14px;',
+    'border:1px solid #F7F4EE;font:14px/1.45 system-ui,-apple-system,sans-serif}',
     '#oons-consent h2{margin:0 0 8px;font-size:16px;font-weight:700}',
     '#oons-consent p{margin:0 0 12px;opacity:.9}',
     '#oons-consent .row{display:flex;flex-wrap:wrap;gap:8px}',
-    '#oons-consent button{appearance:none;border:0;border-radius:12px;min-height:40px;padding:0 12px;',
+    '#oons-consent button{appearance:none;border:0;border-radius:0;min-height:40px;padding:0 12px;',
     'font:600 13px/1 system-ui,sans-serif;cursor:pointer}',
-    '#oons-consent .all{background:#C9B39B;color:#3A2431}',
-    '#oons-consent .analytics{background:transparent;color:#F4EBE1;border:1px solid rgba(244,235,225,.35)}',
+    '#oons-consent .all{background:#C9B39B;color:#3E2136}',
+    '#oons-consent .analytics{background:transparent;color:#F7F4EE;border:1px solid rgba(244,235,225,.35)}',
     '#oons-consent .reject{background:transparent;color:#BAA9AF;border:1px solid rgba(244,235,225,.2)}'
   ].join('');
   document.head.appendChild(style);
