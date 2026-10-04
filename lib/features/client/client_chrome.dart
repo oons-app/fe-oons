@@ -247,9 +247,9 @@ class ClientTrustBanner extends StatelessWidget {
   }
 }
 
-/// Warns that a paid booking needs a national ID photo on file within the
-/// server's window (be-oons markPaid/tickIDUploadDeadlines) or it gets
-/// auto-cancelled and refunded. Ticks its own remaining-time label every
+/// Asks her to upload a national ID photo within the server's window
+/// (be-oons markPaid/tickIDUploadDeadlines). The visit stays booked either
+/// way. Ticks its own remaining-time label every
 /// minute — 8 hours is coarse enough that a minute's resolution is plenty,
 /// and only this small widget rebuilds, not its whole host screen.
 class ClientIDUploadBanner extends StatefulWidget {
@@ -299,8 +299,8 @@ class _ClientIDUploadBannerState extends State<ClientIDUploadBanner> {
             Expanded(
               child: Text(
                 ar
-                    ? 'ارفعي صورة بطاقتك خلال $remaining، وإلا هيتلغي حجزك وترجعلك فلوسك.'
-                    : 'Upload your ID photo within $remaining, or your booking will be cancelled and refunded.',
+                    ? 'ارفعي صورة بطاقتك خلال $remaining. الزيارة مستمرة.'
+                    : 'Upload your ID photo within $remaining. The visit stays booked.',
                 style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, height: 1.45, color: Client.bg),
               ),
             ),
