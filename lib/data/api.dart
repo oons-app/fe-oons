@@ -4,6 +4,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:oons/core/meta_cookies.dart'
     if (dart.library.html) 'package:oons/core/meta_cookies_web.dart' as meta_ck;
+import 'package:oons/data/client_device.dart';
 import 'package:oons/data/e2e.dart';
 
 const _labApiPref = 'debug_api_base';
@@ -123,6 +124,10 @@ class ApiClient {
         _access = t;
         if (t != null) o.headers['Authorization'] = 'Bearer $t';
         o.headers['X-Locale'] = Hive.box('prefs').get('locale', defaultValue: 'ar');
+        final device = await clientDeviceHeaders();
+        device.forEach((k, v) {
+          if (v.isNotEmpty) o.headers[k] = v;
+        });
         meta_ck.metaForwardHeaders().forEach((k, v) {
           if (v.isNotEmpty) o.headers[k] = v;
         });

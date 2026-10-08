@@ -174,6 +174,66 @@ void main() {
     expect(compareCustomerRows(a, b, 'name', true, 'en') > 0, isTrue);
   });
 
+  test('compareCustomerRows sorts last active with empty rows last', () {
+    final recent = {'firstName': 'A', 'lastSeenAt': '2026-10-08T10:00:00Z'};
+    final older = {'firstName': 'B', 'lastSeenAt': '2026-10-01T10:00:00Z'};
+    final none = {'firstName': 'C'};
+    final rows = [none, older, recent]..sort((a, b) => compareCustomerRows(a, b, 'lastSeen', false, 'en'));
+    expect(rows.map((r) => r['firstName']).toList(), ['A', 'B', 'C']);
+  });
+
+  test('customer activity tooltip lists the device while she is online', () {
+    final row = {
+      'lastSeenAt': DateTime.now().toUtc().toIso8601String(),
+      'activity': {
+        'platform': 'ios',
+        'model': 'iPhone',
+        'os': 'Version 18.1',
+        'browser': 'Safari',
+        'appVersion': '2.0.0',
+        'appBuild': '26',
+        'locale': 'ar',
+      },
+    };
+    expect(customerIsOnline(row), isTrue);
+    final tip = customerActivityTip(row, 'en');
+    expect(tip, contains('Online'));
+    expect(tip, contains('Device: iPhone'));
+    expect(tip, contains('System: Version 18.1'));
+    expect(tip, contains('Browser: Safari'));
+    expect(tip, contains('App: 2.0.0 (26)'));
+    expect(tip, contains('Language: Arabic'));
+
+    final quiet = {
+      'lastSeenAt': DateTime.now().toUtc().subtract(const Duration(hours: 5)).toIso8601String(),
+    };
+    expect(customerIsOnline(quiet), isFalse);
+    expect(customerActivityTip(quiet, 'en'), isEmpty);
+  });
+
+  testWidgets('online last-active cell exposes the device tooltip', (tester) async {
+    final row = {
+      'lastSeenAt': DateTime.now().toUtc().toIso8601String(),
+      'activity': {
+        'platform': 'web',
+        'model': 'Mac',
+        'browser': 'Chrome',
+        'appVersion': '2.0.0',
+        'appBuild': '26',
+        'locale': 'en',
+      },
+    };
+    await tester.pumpWidget(MaterialApp(
+      theme: opsV2Theme(arabic: false),
+      home: Scaffold(body: customerLastActiveCell(row, 'en')),
+    ));
+    expect(find.byType(Tooltip), findsOneWidget);
+    final tip = tester.widget<Tooltip>(find.byType(Tooltip));
+    expect(tip.message, contains('Device: Mac'));
+    expect(tip.message, contains('Browser: Chrome'));
+    expect(tip.message, contains('App: 2.0.0 (26)'));
+  });
+
   test('compareBookingRows defaults to newest slot first', () {
     final older = {'ref': 'ONS-1', 'slotStart': '2026-09-20T10:00:00Z', 'total': 500};
     final newer = {'ref': 'ONS-2', 'slotStart': '2026-09-23T10:00:00Z', 'total': 100};

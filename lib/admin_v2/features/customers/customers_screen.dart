@@ -45,11 +45,123 @@ int compareCustomerRows(Map<String, dynamic> a, Map<String, dynamic> b, String k
       va = parseTime(a['lastSlot']) ?? '${a['lastStatus'] ?? ''}';
       vb = parseTime(b['lastSlot']) ?? '${b['lastStatus'] ?? ''}';
       break;
+    case 'lastSeen':
+      va = parseTime(a['lastSeenAt']);
+      vb = parseTime(b['lastSeenAt']);
+      break;
     default:
       va = parseTime(a['createdAt']);
       vb = parseTime(b['createdAt']);
   }
   return compareSortValues(va, vb, asc: asc);
+}
+
+/// She counts as online when the app has been seen inside this window.
+const customerOnlineWindow = Duration(minutes: 3);
+
+@visibleForTesting
+bool customerIsOnline(Map<String, dynamic> row, [DateTime? now]) {
+  final seen = parseTime(row['lastSeenAt']);
+  if (seen == null) return false;
+  return (now ?? DateTime.now()).difference(seen).abs() <= customerOnlineWindow;
+}
+
+/// Device lines for the last-active tooltip. Empty when there is nothing to add
+/// beyond a quiet timestamp.
+@visibleForTesting
+String customerActivityTip(Map<String, dynamic> row, String lang) {
+  final when = formatWhen(row['lastSeenAt'], lang);
+  if (when.isEmpty) return '';
+  final ar = lang == 'ar';
+  final online = customerIsOnline(row);
+  final details = <String>[];
+  final raw = row['activity'];
+  if (raw is Map) {
+    final a = <String, String>{};
+    raw.forEach((k, v) => a['$k'] = '${v ?? ''}'.trim());
+    void add(String label, String value) {
+      if (value.isEmpty) return;
+      details.add('$label: $value');
+    }
+
+    final model = a['model'] ?? '';
+    final platform = a['platform'] ?? '';
+    add(ar ? 'الجهاز' : 'Device', model.isNotEmpty ? model : _platformName(platform, ar));
+    add(ar ? 'النظام' : 'System', a['os'] ?? '');
+    add(ar ? 'المتصفح' : 'Browser', a['browser'] ?? '');
+    final version = a['appVersion'] ?? '';
+    final build = a['appBuild'] ?? '';
+    if (version.isNotEmpty) {
+      add(ar ? 'التطبيق' : 'App', build.isEmpty ? version : '$version ($build)');
+    }
+    add(ar ? 'اللغة' : 'Language', _localeName(a['locale'] ?? '', ar));
+  }
+  if (!online && details.isEmpty) return '';
+  return [
+    if (online) (ar ? 'متصلة الآن' : 'Online'),
+    when,
+    ...details,
+  ].join('\n');
+}
+
+String _platformName(String platform, bool ar) {
+  switch (platform) {
+    case 'ios':
+      return 'iOS';
+    case 'android':
+      return 'Android';
+    case 'web':
+      return ar ? 'الموقع' : 'Web';
+    default:
+      return platform;
+  }
+}
+
+String _localeName(String code, bool ar) {
+  switch (code) {
+    case 'ar':
+      return ar ? 'العربية' : 'Arabic';
+    case 'en':
+      return ar ? 'الإنجليزية' : 'English';
+    default:
+      return code;
+  }
+}
+
+Widget customerLastActiveCell(Map<String, dynamic> row, String lang) {
+  final when = formatWhen(row['lastSeenAt'], lang);
+  if (when.isEmpty) {
+    return const Text('—', style: TextStyle(fontSize: 13, color: Ops.muted));
+  }
+  final online = customerIsOnline(row);
+  final child = Row(
+    children: [
+      if (online) ...[
+        Container(
+          width: 7,
+          height: 7,
+          decoration: const BoxDecoration(color: Ops.green, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 6),
+      ],
+      Flexible(
+        child: Text(
+          when,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 12.5,
+            fontFamily: Ops.mono,
+            color: online ? Ops.greenInk : Ops.muted,
+            fontWeight: online ? FontWeight.w600 : FontWeight.w400,
+          ),
+        ),
+      ),
+    ],
+  );
+  final tip = customerActivityTip(row, lang);
+  if (tip.isEmpty) return child;
+  return Tooltip(message: tip, waitDuration: const Duration(milliseconds: 300), child: child);
 }
 
 class CustomersScreen extends ConsumerStatefulWidget {
@@ -69,6 +181,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
   String sortKey = 'createdAt';
   bool sortAsc = false;
   Timer? _debounce;
+  Timer? _presence;
 
   static const _visitFilters = [
     ('any', 'Has visits'),
@@ -82,30 +195,40 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
   void initState() {
     super.initState();
     _load();
+    _presence = Timer.periodic(Ops.refreshEvery, (_) {
+      if (!mounted || loading) return;
+      _load(silent: true);
+    });
   }
 
   @override
   void dispose() {
     _debounce?.cancel();
+    _presence?.cancel();
     super.dispose();
   }
 
-  Future<void> _load() async {
+  Future<void> _load({bool silent = false}) async {
     try {
-      setState(() {
-        loading = true;
-        error = null;
-      });
+      if (!silent) {
+        setState(() {
+          loading = true;
+          error = null;
+        });
+      }
       final query = <String, dynamic>{'limit': 100};
       if (q.isNotEmpty) query['q'] = q;
       if (visits.isNotEmpty) query['visits'] = visits;
       final data = await staffClient.get('/admin/users', query: query);
+      if (!mounted) return;
       setState(() {
         customers = asMapList(data['users'] ?? data['customers']);
         _applySort(lang: ref.read(localeCodeProvider));
         loading = false;
+        error = null;
       });
     } on ApiException catch (e) {
+      if (!mounted || silent) return;
       setState(() {
         error = e.message;
         loading = false;
@@ -227,6 +350,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
         V2Col(lang == 'ar' ? 'المنطقة' : 'Area', fixed: 120, sortKey: 'area'),
         V2Col(lang == 'ar' ? 'الحجوزات' : 'Bookings', fixed: 100, sortKey: 'bookingCount'),
         V2Col(lang == 'ar' ? 'انضمّت' : 'Joined', fixed: 110, sortKey: 'createdAt'),
+        V2Col(lang == 'ar' ? 'آخر نشاط' : 'Last active', fixed: 188, sortKey: 'lastSeen'),
         V2Col(lang == 'ar' ? 'آخر حجز' : 'Last visit', fixed: 120, sortKey: 'lastVisit'),
       ],
       rows: [
@@ -242,6 +366,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                   maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, color: Ops.inkSoft)),
               Text('${asInt(c['bookingCount'])}', style: const TextStyle(fontSize: 13, fontFamily: Ops.mono)),
               Text(formatDayOnly(c['createdAt']), style: const TextStyle(fontSize: 12.5, fontFamily: Ops.mono, color: Ops.muted)),
+              customerLastActiveCell(c, lang),
               '${c['lastStatus'] ?? ''}'.isEmpty
                   ? const Text('—', style: TextStyle(fontSize: 13, color: Ops.muted))
                   : Align(
