@@ -137,10 +137,10 @@ Widget customerLastActiveCell(Map<String, dynamic> row, String lang) {
   final child = Row(
     children: [
       if (online) ...[
-        Container(
+        const SizedBox(
           width: 7,
           height: 7,
-          decoration: const BoxDecoration(color: Ops.green, shape: BoxShape.circle),
+          child: ColoredBox(color: Ops.green),
         ),
         const SizedBox(width: 6),
       ],
