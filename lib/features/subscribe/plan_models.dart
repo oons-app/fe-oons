@@ -1,6 +1,25 @@
 import 'package:oons/core/pro_format.dart';
 import 'package:oons/features/subscribe/customer_copy.dart';
 
+/// The "we bring the cleaning products" line. It belongs on a one-off visit,
+/// not on a subscription.
+bool isCleaningSuppliesBenefit(String raw) {
+  final s = raw.trim().toLowerCase();
+  if (s.isEmpty) return false;
+  const needles = [
+    'شاملة المنظفات',
+    'مواد التنظيف',
+    'includes supplies',
+    'cleaning products',
+    'tools & supplies',
+    'tools and supplies',
+  ];
+  for (final n in needles) {
+    if (s.contains(n)) return true;
+  }
+  return false;
+}
+
 int _i(Object? v) => v is num ? v.toInt() : int.tryParse('${v ?? ''}') ?? 0;
 
 String _locAr(Object? v) {
@@ -152,7 +171,7 @@ class PlanData {
       raw: plan,
       includedBenefits: [
         for (final b in (row['includedBenefits'] as List? ?? const []))
-          if ('$b'.trim().isNotEmpty) '$b'.trim(),
+          if ('$b'.trim().isNotEmpty && !isCleaningSuppliesBenefit('$b')) '$b'.trim(),
       ],
     );
   }

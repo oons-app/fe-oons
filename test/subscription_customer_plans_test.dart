@@ -42,6 +42,16 @@ void main() {
       expect(find.text(CC.startPlan), findsOneWidget);
     });
 
+    testWidgets('drops the cleaning-products line and keeps the rest', (t) async {
+      _phone(t);
+      final row = planRow('a');
+      row['includedBenefits'] = ['شاملة المنظفات: ديتول، كلور', 'نفس المتخصصة'];
+      final plan = PlanData.fromRow(row);
+      await t.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(child: PlanCard(plan: plan, selected: false, onTap: () {})))));
+      expect(find.textContaining('منظف'), findsNothing);
+      expect(find.text('نفس المتخصصة'), findsOneWidget);
+    });
+
     testWidgets('save block hidden when saving <= 0 and no recommended line', (t) async {
       _phone(t);
       final plan = PlanData.fromRow(planRow('b', payg: 50000, price: 55000, save: -5000));

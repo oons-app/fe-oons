@@ -100,6 +100,7 @@ class MyPlan {
     required this.paused,
     required this.pauseScheduled,
     required this.cyclePaid,
+    this.receiptWaiting = false,
   });
 
   final String id;
@@ -116,6 +117,9 @@ class MyPlan {
   final bool paused;
   final bool pauseScheduled;
   final bool cyclePaid;
+
+  /// She already uploaded the InstaPay screenshot. Ops still has to confirm it.
+  final bool receiptWaiting;
 
   /// First upcoming (booked) visit by date.
   MyVisit? get nextVisit {
@@ -205,6 +209,7 @@ class MyPlan {
       paused: sub['status'] == 'paused',
       pauseScheduled: sub['pauseScheduled'] == true,
       cyclePaid: '${cycle['status'] ?? 'paid'}' == 'paid',
+      receiptWaiting: '${sub['paymentReceiptUrl'] ?? ''}'.trim().isNotEmpty && '${sub['status'] ?? ''}' == 'pending_payment',
     );
   }
 }

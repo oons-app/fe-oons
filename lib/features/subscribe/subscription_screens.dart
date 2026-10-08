@@ -436,7 +436,7 @@ class _PlanIncludedScreenState extends ConsumerState<PlanIncludedScreen> {
     final out = <String>[];
     void add(String raw) {
       final text = raw.trim();
-      if (text.isEmpty || !seen.add(text)) return;
+      if (text.isEmpty || isCleaningSuppliesBenefit(text) || !seen.add(text)) return;
       out.add(text);
     }
 

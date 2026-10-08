@@ -323,6 +323,10 @@ class _PlanPayingScreenState extends ConsumerState<PlanPayingScreen> with Widget
       if (!mounted || done) return;
       final sub = r['subscription'] is Map ? r['subscription'] as Map : const {};
       final status = '${sub['status'] ?? ''}';
+      final shot = '${sub['paymentReceiptUrl'] ?? ''}'.trim().isNotEmpty;
+      if (shot && !receiptSubmitted) {
+        setState(() => receiptSubmitted = true);
+      }
       if (status == 'active') {
         done = true;
         _poll?.cancel();
@@ -393,10 +397,15 @@ class _PlanPayingScreenState extends ConsumerState<PlanPayingScreen> with Widget
   }
 
   Future<void> _pickReceipt() async {
-    final f = await pickPayReceipt();
-    if (f == null) return;
-    final bytes = await f.readAsBytes();
-    if (mounted) setState(() => receiptBytes = Uint8List.fromList(bytes));
+    try {
+      final f = await pickPayReceipt();
+      if (f == null) return;
+      final bytes = await f.readAsBytes();
+      if (mounted) setState(() => receiptBytes = Uint8List.fromList(bytes));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('مقدرناش نفتح الصورة. جرّبي تاني من الاستوديو.')));
+    }
   }
 
   Future<void> _submitReceipt() async {
@@ -405,10 +414,22 @@ class _PlanPayingScreenState extends ConsumerState<PlanPayingScreen> with Widget
     try {
       final r = await subApi.upload('/subscriptions/${widget.subscriptionId}/pay/receipt', 'receipt', receiptBytes!, filename: 'instapay.jpg');
       if (!mounted) return;
+      final sub = r['subscription'];
+      final saved = r['receiptSubmitted'] == true || (sub is Map && '${sub['paymentReceiptUrl'] ?? ''}'.trim().isNotEmpty);
       setState(() {
         receiptBusy = false;
-        receiptSubmitted = r['receiptSubmitted'] == true;
+        receiptSubmitted = saved;
       });
+      if (!saved) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('الصورة ما اترفعتش. جرّبي تاني.')));
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('وصلتنا صورة التحويل. بنراجعها، والمواعيد محجوزة.')));
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => receiptBusy = false);
+      final msg = e.message.trim().isEmpty ? 'الصورة ما اترفعتش. جرّبي تاني.' : e.message;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     } catch (_) {
       if (!mounted) return;
       setState(() => receiptBusy = false);
@@ -455,6 +476,7 @@ class _PlanPayingScreenState extends ConsumerState<PlanPayingScreen> with Widget
   Widget _payingBody() {
     if (method == 'manual') {
       final book = Map<String, String>.from(((Copy.of('ar')['book'] as Map?) ?? const {}).map((k, v) => MapEntry('$k', '$v')));
+      book['manualWaiting'] = 'وصلتنا صورة التحويل. بنراجعها دلوقتي، والمواعيد محجوزة لحد ما الباقة تتأكد.';
       return PayManualPanel(
         lang: 'ar',
         bf: book,

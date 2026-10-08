@@ -30,6 +30,7 @@ class PlanCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final border = selected ? Client.plum : Client.ink;
+    final benefits = [for (final line in plan.includedBenefits) if (!isCleaningSuppliesBenefit(line)) line];
     return Semantics(
       container: true,
       selected: selected,
@@ -70,9 +71,9 @@ class PlanCard extends StatelessWidget {
                           runSpacing: 5,
                           children: [for (final l in plan.ordered) _chip(l)],
                         ),
-                        if (plan.includedBenefits.isNotEmpty) ...[
+                        if (benefits.isNotEmpty) ...[
                           const SizedBox(height: 10),
-                          for (final line in plan.includedBenefits)
+                          for (final line in benefits)
                             Padding(
                               padding: const EdgeInsets.only(bottom: 4),
                               child: Text(line, style: const TextStyle(fontSize: 12.5, height: 1.45, color: Client.body)),

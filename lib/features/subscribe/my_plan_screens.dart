@@ -178,6 +178,21 @@ class _MyPlanScreenState extends ConsumerState<MyPlanScreen> {
     final next = p.nextVisit;
     return ListView(
       children: [
+        if (p.status == 'pending_payment')
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              color: Client.warnTint,
+              child: Text(
+                p.receiptWaiting
+                    ? 'وصلتنا صورة التحويل. بنراجعها، والمواعيد محجوزة لحد ما الباقة تتأكد.'
+                    : 'الباقة لسه مستنية الدفع. حوّلي بإنستاباي وارفعي صورة التحويل.',
+                style: const TextStyle(fontSize: 14, height: 1.45, fontWeight: FontWeight.w700),
+              ),
+            ),
+          ),
         Container(
           margin: const EdgeInsets.symmetric(horizontal: 16),
           decoration: BoxDecoration(color: Client.plum, border: Border.all(color: Client.ink)),
@@ -231,7 +246,7 @@ class _MyPlanScreenState extends ConsumerState<MyPlanScreen> {
                       ],
                     ),
                     const SizedBox(height: 8),
-                    Text('${p.cycleLong}${CC.s5PaidAdvance}', style: const TextStyle(color: _onPlumMuted, fontSize: 11.5)),
+                    Text('${p.cycleLong}${p.status == 'pending_payment' ? '' : CC.s5PaidAdvance}', style: const TextStyle(color: _onPlumMuted, fontSize: 11.5)),
                   ],
                 ),
               ),
