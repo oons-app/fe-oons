@@ -98,6 +98,8 @@ class _ProVisitsTabState extends ConsumerState<ProVisitsTab> {
           date: '${local.year.toString().padLeft(4, '0')}-${local.month.toString().padLeft(2, '0')}-${local.day.toString().padLeft(2, '0')}',
           time: '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}',
           firstName: b.clientName?.of('ar') ?? '',
+          address: b.clientLocked ? '' : (bk.address?.line1.of('ar') ?? ''),
+          phone: b.clientPhone ?? '',
         ),
       ));
     } else {
@@ -283,6 +285,8 @@ class _VisitCard extends StatelessWidget {
     final time = DsFormat.time('${local.hour}:${local.minute}', ar: ar);
     final name = bundle.clientName?.of(lang) ?? '';
     final area = bundle.clientArea == null || bundle.clientArea!.isEmpty ? '' : areaName(bundle.clientArea!, lang);
+    final street = bundle.clientLocked ? '' : (b.address?.line1.of(lang) ?? '');
+    final phone = bundle.clientPhone ?? '';
     final price = DsFormat.pricePiastres(b.serviceEarning, ar: ar);
     final isPlan = b.isPlanVisit || (bundle.planTag ?? '').isNotEmpty;
     return Semantics(
@@ -326,6 +330,14 @@ class _VisitCard extends StatelessWidget {
                         const Spacer(),
                         Text(price, style: DsText.num(size: 13.5, weight: FontWeight.w600)),
                       ]),
+                      if (street.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Text(street, style: DsText.body),
+                      ],
+                      if (phone.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(phone, style: DsText.meta),
+                      ],
                     ]),
                   ),
                 ),

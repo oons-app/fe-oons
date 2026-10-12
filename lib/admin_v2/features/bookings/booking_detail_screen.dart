@@ -71,6 +71,28 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen> {
     }
   }
 
+  Future<void> _fulfillVisit() async {
+    final lang = ref.read(localeCodeProvider);
+    final ok = await v2Confirm(
+      context,
+      title: lang == 'ar' ? 'الزيارة خلصت؟' : 'Mark this visit done?',
+      body: lang == 'ar'
+          ? 'الحجز يتقفل كأنه خلص، والعميلة يوصلها طلب تكتب تقييم.'
+          : 'The booking is closed as completed, and the customer is asked to write a review.',
+      confirmLabel: lang == 'ar' ? 'الزيارة خلصت' : 'Mark visit done',
+    );
+    if (!ok) return;
+    try {
+      await staffClient.post('/admin/bookings/${widget.bookingId}/fulfill');
+      if (mounted) {
+        v2Toast(context, lang == 'ar' ? 'الزيارة اتقفلت. طلبنا من العميلة تقييم.' : 'Visit closed. The customer was asked to review.');
+        _load();
+      }
+    } on ApiException catch (e) {
+      if (mounted) v2Toast(context, e.message, error: true);
+    }
+  }
+
   Future<void> _forceStatus(String key, String label) async {
     final lang = ref.read(localeCodeProvider);
     final ok = await v2Confirm(
@@ -227,6 +249,10 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen> {
     if (b == null) return const V2Empty();
 
     final canWrite = staffCan(role, 'bookings.write');
+    final canFulfill = staffCan(role, 'visits.fulfill');
+    final rawStatus = '${b['status']}'.toLowerCase();
+    final canCloseVisit = canFulfill &&
+        (rawStatus == 'paid' || rawStatus == 'on_the_way' || rawStatus == 'in_progress' || rawStatus == 'rescheduled');
     final status = statusLabel('${b['status']}', lang);
     final client = nestedPerson(b, const ['client', 'customer', 'user']);
     final provider = nestedPerson(b, const ['provider', 'pro']);
@@ -476,6 +502,13 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen> {
               ],
             ],
           ),
+        ),
+      if (canCloseVisit)
+        V2Btn(
+          label: lang == 'ar' ? 'الزيارة خلصت' : 'Mark visit done',
+          kind: V2BtnKind.primary,
+          expand: true,
+          onPressed: _fulfillVisit,
         ),
       if (canWrite)
         Container(

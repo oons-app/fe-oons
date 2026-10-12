@@ -50,6 +50,7 @@ bool staffCan(String role, String perm) {
       return role == roleFinance;
     case 'app.force_update':
     case 'push.campaigns':
+    case 'visits.fulfill':
       return false;
     case 'providers.vet':
     case 'id.photos':
@@ -155,6 +156,7 @@ const allPermKeys = [
   'app.force_update',
   'push.campaigns',
   'phones.block',
+  'visits.fulfill',
   'staff.write',
   'corporate.write',
   'audit.read',

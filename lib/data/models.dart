@@ -470,7 +470,9 @@ class BookingBundle {
     int? clientReviewCount;
     if (j['client'] is Map) {
       final c = j['client'] as Map;
-      clientName = Loc.fromJson(c['firstName']);
+      final first = Loc.fromJson(c['firstName']);
+      final last = c['lastName'] == null ? const Loc('', '') : Loc.fromJson(c['lastName']);
+      clientName = Loc('${first.en} ${last.en}'.trim(), '${first.ar} ${last.ar}'.trim());
       clientArea = '${c['area'] ?? ''}';
       final ph = '${c['phone'] ?? ''}'.trim();
       clientPhone = ph.isEmpty ? null : ph;

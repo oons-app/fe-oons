@@ -40,6 +40,8 @@ class VisitCheckInScreen extends StatefulWidget {
     this.date = '',
     this.time = '',
     this.firstName = '',
+    this.address = '',
+    this.phone = '',
     this.api = const LiveProApi(),
     this.now,
     this.locate = deviceLocation,
@@ -53,6 +55,10 @@ class VisitCheckInScreen extends StatefulWidget {
   final String date;
   final String time;
   final String firstName;
+
+  /// Street address already known because the visit is today.
+  final String address;
+  final String phone;
   final ProApi api;
   final DateTime Function()? now;
   final LocationFetcher locate;
@@ -194,7 +200,12 @@ class _VisitCheckInScreenState extends State<VisitCheckInScreen> {
                   ),
                 ]),
               ),
-            AddressRevealCard(revealed: revealed, area: widget.area, full: full),
+            AddressRevealCard(revealed: revealed, area: widget.area, full: full, preview: widget.address),
+            if (widget.phone.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(widget.phone, key: const Key('client-phone'), style: ws(14, w: FontWeight.w600)),
+              ),
             if (!isToday)
               Padding(
                 padding: const EdgeInsets.only(top: 10),
@@ -323,10 +334,13 @@ class _VisitCheckInScreenState extends State<VisitCheckInScreen> {
 /// Address card: only the area while locked; the full address slides in once
 /// the provider has checked in.
 class AddressRevealCard extends StatelessWidget {
-  const AddressRevealCard({super.key, required this.revealed, required this.area, this.full});
+  const AddressRevealCard({super.key, required this.revealed, required this.area, this.full, this.preview = ''});
   final bool revealed;
   final String area;
   final String? full;
+
+  /// Address shown on the day of the visit, before she checks in.
+  final String preview;
   @override
   Widget build(BuildContext context) {
     final hasFull = revealed && (full ?? '').isNotEmpty;
@@ -357,11 +371,17 @@ class AddressRevealCard extends StatelessWidget {
                     padding: const EdgeInsets.only(top: 8),
                     child: Text(full!, style: ws(14, h: 1.6)),
                   )
-                : Padding(
-                    key: const Key('address-locked'),
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Text('العنوان بيظهر عند الوصول', style: ws(13, c: Wiz.goldNote)),
-                  ),
+                : preview.trim().isNotEmpty
+                    ? Padding(
+                        key: const Key('address-same-day'),
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(preview, style: ws(14, h: 1.6)),
+                      )
+                    : Padding(
+                        key: const Key('address-locked'),
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text('العنوان بيظهر عند الوصول', style: ws(13, c: Wiz.goldNote)),
+                      ),
           ),
         ),
       ]),

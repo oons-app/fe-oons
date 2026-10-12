@@ -23,6 +23,7 @@ const _statusOrder = [
   ('Completed', 'completed', Ops.barCompleted),
   ('Pending payment', 'pending', Ops.barPending),
   ('Cancelled by client', 'cancelled', Ops.barCancelled),
+  ('Refunded', 'refunded', Ops.barPending),
 ];
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -73,12 +74,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     });
     try {
       final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
       String ymd(DateTime d) =>
           '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
       final results = await Future.wait([
         staffClient.get('/admin/home', query: {
-          'from': ymd(DateTime(now.year, now.month, now.day).subtract(Duration(days: rangeDays))),
-          'to': ymd(DateTime(now.year, now.month, now.day)),
+          'from': ymd(today.subtract(Duration(days: rangeDays))),
+          'to': ymd(today.add(Duration(days: rangeDays))),
         }),
         staffClient.get('/admin/bookings', query: {'live': '1', 'limit': 20}).catchError((_) => <String, dynamic>{}),
         staffClient.get('/admin/heatmap').catchError((_) => <String, dynamic>{}),
@@ -126,29 +128,39 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     };
   }
 
-  int get _followUp {
-    var n = asInt(home['bookingsToday']);
-    for (final s in asMapList(home['bookingsByStatus'])) {
-      final k = '${s['status'] ?? ''}'.toLowerCase();
-      if (k.contains('pending') || k.contains('cancel')) n += asInt(s['count']);
-    }
-    return n;
-  }
+  int get _followUp => _statusCount('pending');
 
   Future<void> _setRange(int d) async {
     setState(() => rangeDays = d);
     _load();
   }
 
+  bool _statusHit(String key, String status) {
+    switch (key) {
+      case 'confirmed':
+        return status == 'paid' || status == 'rescheduled' || status.contains('confirm');
+      case 'in_progress':
+        return status == 'in_progress' || status == 'on_the_way';
+      case 'completed':
+        return status == 'completed' || status == 'released';
+      case 'pending':
+        return status.contains('pending');
+      case 'cancelled':
+        return status.contains('cancel');
+      case 'refunded':
+        return status == 'refunded';
+      default:
+        return status == key;
+    }
+  }
+
   int _statusCount(String key) {
+    var n = 0;
     for (final s in asMapList(home['bookingsByStatus'])) {
       final k = '${s['status'] ?? ''}'.toLowerCase();
-      if (key == 'confirmed' && (k.contains('confirm') || k == 'paid')) return asInt(s['count']);
-      if (key == 'pending' && k.contains('pending')) return asInt(s['count']);
-      if (key == 'cancelled' && k.contains('cancel')) return asInt(s['count']);
-      if (k == key || k.contains(key.replaceAll('_', ''))) return asInt(s['count']);
+      if (_statusHit(key, k)) n += asInt(s['count']);
     }
-    return 0;
+    return n;
   }
 
   @override
@@ -300,7 +312,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
           _twoCol(
             left: V2SectionCard(
               title: lang == 'ar' ? 'الحجوزات باليوم' : 'Bookings by day',
-              subtitle: '$chartTotal ${lang == 'ar' ? 'في' : 'in'} $rangeDays ${lang == 'ar' ? 'يوم' : 'days'}',
+              subtitle: '$chartTotal · ${home['chartFrom'] ?? ''} – ${home['chartTo'] ?? ''}',
               child: days.isEmpty
                   ? Text(lang == 'ar' ? 'لا بيانات' : 'No data', style: const TextStyle(color: Ops.muted, fontSize: 13))
                   : SizedBox(
@@ -338,7 +350,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                                 Expanded(
                                   child: Center(
                                     child: (i % (days.length > 14 ? 5 : 2) == 0)
-                                        ? Text(_dayLabel('${days[i]['date']}'),
+                                        ? Text(_dayLabel('${days[i]['day'] ?? days[i]['date']}'),
                                             style: const TextStyle(fontSize: 10, fontFamily: Ops.mono, color: Ops.faint))
                                         : const SizedBox(),
                                   ),

@@ -282,6 +282,24 @@ class _SubscribersScreenState extends ConsumerState<SubscribersScreen> {
     }
   }
 
+  Future<void> _fulfill(SubRow r) async {
+    final lang = _lang;
+    final ok = await v2Confirm(
+      context,
+      title: t(V2SubsCopy.fulfillTitle, lang),
+      body: t(V2SubsCopy.fulfillBody, lang),
+      confirmLabel: t(V2SubsCopy.fulfillVisit, lang),
+    );
+    if (!ok) return;
+    try {
+      await client.post('/admin/subscriptions/${r.id}/fulfill-visit');
+      _toast(t(V2SubsCopy.fulfillDone, lang));
+      _load();
+    } catch (e) {
+      _toast(_err(e), error: true);
+    }
+  }
+
   Future<void> _move(SubRow r) async {
     final lang = _lang;
     final vid = TextEditingController(text: r.nextVisitId);
@@ -420,6 +438,7 @@ class _SubscribersScreenState extends ConsumerState<SubscribersScreen> {
       return const V2Gate(allowed: false, child: SizedBox.shrink());
     }
     final canWrite = staffCan(role, 'bookings.write');
+    final canFulfill = staffCan(role, 'visits.fulfill');
     final canSettings = staffCan(role, 'payments.settings');
     ref.listen(v2QueryProvider, (_, n) {
       final next = n.trim();
@@ -434,7 +453,7 @@ class _SubscribersScreenState extends ConsumerState<SubscribersScreen> {
       onRetry: _load,
       resultLabel: V2SubsCopy.results(visible.length, lang),
       emptyText: t(V2SubsCopy.empty, lang),
-      actionsWidth: canWrite ? 360 : 8,
+      actionsWidth: canFulfill ? 470 : (canWrite ? 360 : 8),
       strip: V2Card(
         padding: const EdgeInsets.all(14),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -485,6 +504,8 @@ class _SubscribersScreenState extends ConsumerState<SubscribersScreen> {
             actions: [
               if (canWrite && r.status == 'pending_payment' && r.hasReceipt)
                 V2Btn(key: Key('confirm-${r.id}'), label: lang == 'ar' ? 'تأكيد إنستاباي' : 'Confirm InstaPay', onPressed: () => _confirmPay(r), size: V2BtnSize.row),
+              if (canFulfill && (r.status == 'active' || r.status == 'at_risk'))
+                V2Btn(key: Key('fulfill-${r.id}'), label: t(V2SubsCopy.fulfillVisit, lang), onPressed: () => _fulfill(r), size: V2BtnSize.row),
               if (canWrite && r.status == 'active')
                 V2Btn(key: Key('pause-${r.id}'), label: t(V2SubsCopy.pause, lang), onPressed: () => _pause(r), size: V2BtnSize.row),
               if (canWrite && (r.status == 'active' || r.status == 'paused' || r.status == 'at_risk'))

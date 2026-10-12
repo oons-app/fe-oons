@@ -69,6 +69,13 @@ abstract final class V2SubsCopy {
   static const cancel = {'en': 'Cancel', 'ar': 'إلغاء الاشتراك'};
   static const credit = {'en': 'Credit', 'ar': 'رصيد'};
   static const moveVisit = {'en': 'Move visit', 'ar': 'نقل زيارة'};
+  static const fulfillVisit = {'en': 'Mark visit done', 'ar': 'الزيارة خلصت'};
+  static const fulfillTitle = {'en': 'Mark the next visit done?', 'ar': 'تتسجّل الزيارة الجاية خلصت؟'};
+  static const fulfillBody = {
+    'en': 'The next booked visit is closed as completed, and the customer is asked to write a review.',
+    'ar': 'الزيارة الجاية المحجوزة تتقفل كأنها خلصت، والعميلة يوصلها طلب تكتب تقييم.',
+  };
+  static const fulfillDone = {'en': 'Visit closed. The customer was asked to review.', 'ar': 'الزيارة اتقفلت. طلبنا من العميلة تقييم.'};
   static const settings = {'en': 'Pilot settings', 'ar': 'إعدادات التجربة'};
   static const pauseTitle = {'en': 'Pause this subscription?', 'ar': 'توقّفي الاشتراك ده؟'};
   static const pauseBody = {
