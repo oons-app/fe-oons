@@ -37,11 +37,11 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
   late final line1 = TextEditingController(text: widget.existing?.line1.of('ar') ?? widget.existing?.line1.en ?? '');
   late final reachNotes = TextEditingController(text: widget.existing?.reachNotes.of('ar') ?? widget.existing?.reachNotes.en ?? '');
   final search = TextEditingController();
-  late String area = widget.existing?.area ?? 'madinaty';
-  late String city = areaIsGiza(widget.existing?.area ?? 'madinaty') ? 'giza' : 'cairo';
+  late String area = widget.existing != null && widget.existing!.area.trim().isNotEmpty ? widget.existing!.area : 'capital';
+  late String city = areaIsGiza(area) ? 'giza' : 'cairo';
   late bool isDefault = widget.existing?.isDefault ?? false;
-  late double lat = (widget.existing?.lat ?? 0) != 0 ? widget.existing!.lat : coordsForArea(widget.existing?.area ?? 'madinaty').$1;
-  late double lng = (widget.existing?.lng ?? 0) != 0 ? widget.existing!.lng : coordsForArea(widget.existing?.area ?? 'madinaty').$2;
+  late double lat = (widget.existing?.lat ?? 0) != 0 ? widget.existing!.lat : coordsForArea(area).$1;
+  late double lng = (widget.existing?.lng ?? 0) != 0 ? widget.existing!.lng : coordsForArea(area).$2;
   final mapKey = GlobalKey<DeliveryPinMapState>();
   List<GeoHit> hits = [];
   bool busy = false;
@@ -50,6 +50,14 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
   String? streetErr;
   Timer? searchWait;
   Timer? reverseWait;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.existing == null && (ref.read(sessionProvider).user?.addresses.isEmpty ?? true)) {
+      isDefault = true;
+    }
+  }
 
   @override
   void dispose() {
@@ -65,11 +73,15 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
   void _onMapMoved(LatLng p) {
     lat = p.latitude;
     lng = p.longitude;
-    final next = areaFromCoords(lat, lng);
+    final next = liveAreaForPin(lat, lng, allCatalogAreaIds());
     setState(() {
       area = next;
       city = areaIsGiza(next) ? 'giza' : 'cairo';
     });
+    // A pin move must not replace a street the customer already typed. The
+    // reverse lookup at the area centroid was saving "ميدان 4" over the
+    // building address.
+    if (line1.text.trim().isNotEmpty) return;
     reverseWait?.cancel();
     reverseWait = Timer(const Duration(milliseconds: 550), _reverse);
   }
@@ -115,8 +127,7 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
     search.clear();
     setState(() {
       hits = [];
-      streetDirty = false;
-      if (hit.line.trim().isNotEmpty) line1.text = hit.line;
+      if (line1.text.trim().isEmpty && hit.line.trim().isNotEmpty) line1.text = hit.line;
     });
     mapKey.currentState?.moveTo(hit.lat, hit.lng);
   }
@@ -217,7 +228,6 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
                       return InkWell(
                         onTap: () async {
                           final c = coordsForArea(id);
-                          streetDirty = false;
                           setState(() {
                             area = id;
                             city = areaIsGiza(id) ? 'giza' : 'cairo';
@@ -282,14 +292,16 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
                     label: '${p['saveAddress']}',
                     enabled: !busy,
                     onTap: () async {
-                      final labelEmpty = label.text.trim().isEmpty;
                       final streetEmpty = line1.text.trim().isEmpty;
-                      if (labelEmpty || streetEmpty) {
+                      if (streetEmpty) {
                         setState(() {
-                          labelErr = labelEmpty ? '${p['labelRequired']}' : null;
-                          streetErr = streetEmpty ? '${p['streetRequired']}' : null;
+                          labelErr = null;
+                          streetErr = '${p['streetRequired']}';
                         });
                         return;
+                      }
+                      if (label.text.trim().isEmpty) {
+                        label.text = lang == 'ar' ? 'البيت' : 'Home';
                       }
                       setState(() {
                         busy = true;

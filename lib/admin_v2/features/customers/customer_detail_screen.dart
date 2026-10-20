@@ -337,7 +337,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
     final label = TextEditingController();
     final line1 = TextEditingController();
     final city = TextEditingController();
-    var area = 'zamalek';
+    var area = 'capital';
     var isDefault = false;
     try {
       final ok = await v2Form(
@@ -356,7 +356,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
               child: DropdownButtonFormField<String>(
                 initialValue: area,
                 items: [
-                  for (final a in const ['zamalek', 'dokki', 'mohandeseen', 'maadi', 'nasr_city', 'heliopolis', 'new_cairo'])
+                  for (final a in const ['capital', 'madinaty', 'rehab'])
                     DropdownMenuItem(value: a, child: Text(areaName(a, lang))),
                 ],
                 onChanged: (v) => area = v ?? area,

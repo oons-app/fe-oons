@@ -49,7 +49,10 @@ class UserMe {
         firstName: Loc.fromJson(j['firstName']),
         lastName: Loc.fromJson(j['lastName']),
         initials: Loc.fromJson(j['initials']),
-        area: '${j['area'] ?? 'zamalek'}',
+        area: () {
+          final raw = '${j['area'] ?? ''}'.trim();
+          return raw.isEmpty ? 'capital' : raw;
+        }(),
         addresses: ((j['addresses'] as List?) ?? []).map((e) => Address.fromJson(e)).toList(),
         instructions: ((j['instructions'] as List?) ?? []).map((e) => Instruction.fromJson(e as Map)).toList(),
         savedIds: ((j['savedIds'] as List?) ?? []).map((e) => '$e').toList(),

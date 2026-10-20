@@ -250,6 +250,26 @@ const areaCoords = {
 
 (double, double) coordsForArea(String area) => areaCoords[area] ?? (30.0444, 31.2357);
 
+/// Closest live service area to a dropped pin. Falls back to the
+/// Administrative Capital when the catalog is empty or the pin matches none.
+String liveAreaForPin(double lat, double lng, Iterable<String> areas) {
+  var best = 'capital';
+  var bestD = double.infinity;
+  var found = false;
+  for (final id in areas) {
+    final key = id.trim();
+    if (key.isEmpty) continue;
+    final c = coordsForArea(key);
+    final d = (lat - c.$1) * (lat - c.$1) + (lng - c.$2) * (lng - c.$2);
+    if (d < bestD) {
+      bestD = d;
+      best = key;
+      found = true;
+    }
+  }
+  return found ? best : 'capital';
+}
+
 /// Closest Greater Cairo service area to a dropped pin.
 String areaFromCoords(double lat, double lng) {
   var best = 'zamalek';
