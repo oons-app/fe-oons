@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:oons/core/icons/ons_icons.dart';
 import 'package:oons/admin_v2/features/bookings/bookings_screen.dart';
+import 'package:oons/admin_v2/data/maps.dart';
 import 'package:oons/admin_v2/features/customers/customers_screen.dart';
 import 'package:oons/admin_v2/theme/theme.dart';
 import 'package:oons/admin_v2/ui/atoms.dart';
@@ -155,6 +156,22 @@ void main() {
     expect(tapped, 'name');
     await tester.tap(find.text('Joined'));
     expect(tapped, 'createdAt');
+  });
+
+  test('customerResultLabel prefers the server total', () {
+    expect(customerResultLabel(100, 700, 'en'), '700 registered');
+    expect(customerResultLabel(100, 700, 'ar'), '700 مسجّلة');
+    expect(customerResultLabel(76, 0, 'en'), '76 registered');
+  });
+
+  test('personName reads first and last from loc maps', () {
+    final row = {
+      'firstName': {'en': 'Amany', 'ar': 'Amany'},
+      'lastName': {'en': 'Salah', 'ar': 'Salah'},
+      'phone': '01000092348',
+    };
+    expect(personName(row, 'en'), 'Amany Salah');
+    expect(personName({'phone': '01000092348', 'firstName': {'en': '', 'ar': ''}}, 'en'), '01000092348');
   });
 
   test('compareCustomerRows defaults to newest joined first', () {

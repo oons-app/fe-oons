@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -20,6 +22,7 @@ class _Session extends StaffSession {
 class FakeSubsApi implements SubsApi {
   final calls = <Call>[];
   final routes = <String, FakeRoute>{};
+  final receipts = <String>[];
   Future<Map<String, dynamic>> _do(String m, String p, {Object? data, Map<String, dynamic>? query}) async {
     final c = Call(m, p, data, query);
     calls.add(c);
@@ -37,13 +40,31 @@ class FakeSubsApi implements SubsApi {
   Future<Map<String, dynamic>> post(String path, {Object? data}) => _do('POST', path, data: data);
   @override
   Future<Map<String, dynamic>> patch(String path, {Object? data}) => _do('PATCH', path, data: data);
+  @override
+  Future<Uint8List?> receiptBytes(String path) async {
+    receipts.add(path);
+    return Uint8List.fromList(_png);
+  }
 }
+
+// 1×1 PNG so the receipt dialog can decode.
+const _png = <int>[
+  0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
+  0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4,
+  0x89, 0x00, 0x00, 0x00, 0x0A, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x63, 0x00, 0x01, 0x00, 0x00,
+  0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE,
+  0x42, 0x60, 0x82,
+];
 
 Map<String, dynamic> _list(String status) => {
       'summary': {'active': 7, 'visitsThisWeek': 12},
       'provisional': {'atRiskRule': '2 consecutive skipped visits'},
       'rows': [
-        {'id': 's1', 'customerName': 'منى سعيد', 'providerName': 'هبة علي', 'planTitle': 'نضافة شاملة', 'used': 2, 'minimum': 4, 'status': 'active', 'nextRenewal': '2026-11-01', 'lastPayment': '2026-10-01'},
+        {
+          'id': 's1', 'customerName': 'منى سعيد', 'providerName': 'هبة علي', 'planTitle': 'نضافة شاملة',
+          'used': 2, 'minimum': 4, 'status': 'active', 'nextRenewal': '2026-11-01', 'lastPayment': '2026-10-01',
+          'bookedVisits': [{'id': 'v9', 'date': '2026-10-22', 'time': '09:00'}],
+        },
         if (status == 'all' || status == 'at_risk') {'id': 's2', 'customerName': 'سلمى', 'providerName': 'نورا', 'planTitle': 'الأساسيات', 'used': 0, 'minimum': 4, 'status': 'at_risk', 'nextRenewal': '', 'lastPayment': ''},
       ],
     };
@@ -169,7 +190,7 @@ void main() {
     await t.pumpAndSettle();
     expect(api.where('POST', '/admin/subscriptions/s1/pause'), hasLength(1));
     await tapK(t, 'move-s1');
-    await t.enterText(find.byKey(const Key('move-visit-id')), 'v9');
+    expect(find.byKey(const Key('move-visit-id')), findsNothing);
     await t.tap(find.text('تأكيد'));
     await t.pumpAndSettle();
     expect(find.text('اختاري التاريخ والميعاد.'), findsOneWidget);
@@ -189,6 +210,39 @@ void main() {
     expect(body['enabled'], true);
     expect(body['customerIds'], ['c1']);
     expect(body.containsKey('paymentMethods'), isFalse, reason: 'existing values are not overwritten with a constant');
+  });
+
+  testWidgets('receipt opens from the row, including a paused plan', (t) async {
+    final api = _api();
+    api.routes['GET /admin/subscriptions'] = (_) => {
+          'summary': {'active': 0, 'visitsThisWeek': 0},
+          'provisional': {'atRiskRule': '2 consecutive skipped visits'},
+          'rows': [
+            {
+              'id': 's3', 'customerName': 'مروة', 'providerName': 'ندى', 'planTitle': 'باقة',
+              'used': 1, 'minimum': 4, 'status': 'paused', 'hasReceipt': true,
+              'paymentReceiptUrl': '/uploads/subscription-receipt-x.jpg',
+              'bookedVisits': [{'id': 'v1', 'date': '2026-10-29', 'time': '09:00'}],
+            },
+          ],
+        };
+    api.routes['POST /admin/subscriptions/s3/fulfill-visit'] = (_) => {'ok': true};
+    await pumpAdmin(t, api, role: roleSuper);
+    expect(find.byKey(const Key('fulfill-s3')), findsOneWidget);
+    await tapK(t, 'receipt-s3');
+    expect(api.receipts, ['/uploads/subscription-receipt-x.jpg']);
+    expect(find.byType(InteractiveViewer), findsOneWidget);
+  });
+
+  testWidgets('shift asks for the new first date before it posts', (t) async {
+    final api = _api();
+    api.routes['POST /admin/subscriptions/s1/shift'] = (_) => {'ok': true, 'moved': 1};
+    await pumpAdmin(t, api);
+    await tapK(t, 'shift-s1');
+    await t.tap(find.text('تأكيد'));
+    await t.pumpAndSettle();
+    expect(find.text('اختاري تاريخ أول زيارة.'), findsOneWidget);
+    expect(api.where('POST', '/admin/subscriptions/s1/shift'), isEmpty);
   });
 
   testWidgets('load error is shown with retry', (t) async {

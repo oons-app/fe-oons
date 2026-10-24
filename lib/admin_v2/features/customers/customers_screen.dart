@@ -19,6 +19,13 @@ import 'package:oons/admin_v2/ui/grid_table.dart';
 import 'package:oons/admin_v2/ui/list_view.dart';
 import 'package:oons/data/api.dart';
 
+/// Server total when known; otherwise the rows already on screen.
+@visibleForTesting
+String customerResultLabel(int loaded, int total, String lang) {
+  final n = total > 0 ? total : loaded;
+  return '$n ${lang == 'ar' ? 'مسجّلة' : 'registered'}';
+}
+
 /// Newest registrations first. Empty values always sink to the bottom.
 @visibleForTesting
 int compareCustomerRows(Map<String, dynamic> a, Map<String, dynamic> b, String key, bool asc, String lang) {
@@ -172,7 +179,10 @@ class CustomersScreen extends ConsumerStatefulWidget {
 }
 
 class _CustomersScreenState extends ConsumerState<CustomersScreen> {
+  static const _pageSize = 200;
+
   List<Map<String, dynamic>> customers = [];
+  int total = 0;
   bool loading = true;
   String? error;
   String q = '';
@@ -216,13 +226,26 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
           error = null;
         });
       }
-      final query = <String, dynamic>{'limit': 100};
-      if (q.isNotEmpty) query['q'] = q;
-      if (visits.isNotEmpty) query['visits'] = visits;
-      final data = await staffClient.get('/admin/users', query: query);
+      final rows = <Map<String, dynamic>>[];
+      var counted = 0;
+      var skip = 0;
+      while (true) {
+        final query = <String, dynamic>{'limit': _pageSize, 'skip': skip};
+        if (q.isNotEmpty) query['q'] = q;
+        if (visits.isNotEmpty) query['visits'] = visits;
+        final data = await staffClient.get('/admin/users', query: query);
+        counted = asInt(data['total']);
+        final batch = asMapList(data['users'] ?? data['customers']);
+        rows.addAll(batch);
+        if (batch.length < _pageSize || (counted > 0 && rows.length >= counted)) {
+          break;
+        }
+        skip = rows.length;
+      }
       if (!mounted) return;
       setState(() {
-        customers = asMapList(data['users'] ?? data['customers']);
+        customers = rows;
+        total = counted > 0 ? counted : rows.length;
         _applySort(lang: ref.read(localeCodeProvider));
         loading = false;
         error = null;
@@ -319,7 +342,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
       loading: loading,
       error: error,
       onRetry: _load,
-      resultLabel: '${customers.length} ${lang == 'ar' ? 'مسجّلة' : 'registered'}',
+      resultLabel: customerResultLabel(customers.length, total, lang),
       emptyText: lang == 'ar' ? 'لا عميلات مطابقة' : 'Nothing here yet',
       actionsWidth: (canImpersonate || canBook ? 170 : 8) + (canBlock ? 88 : 0),
       sortKey: sortKey,

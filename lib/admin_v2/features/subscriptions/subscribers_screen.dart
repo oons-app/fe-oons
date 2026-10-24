@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:oons/admin_v2/chrome/modal.dart';
@@ -21,6 +23,7 @@ abstract class SubsApi {
   Future<Map<String, dynamic>> get(String path, {Map<String, dynamic>? query});
   Future<Map<String, dynamic>> post(String path, {Object? data});
   Future<Map<String, dynamic>> patch(String path, {Object? data});
+  Future<Uint8List?> receiptBytes(String path);
 }
 
 class StaffSubsApi implements SubsApi {
@@ -31,6 +34,24 @@ class StaffSubsApi implements SubsApi {
   Future<Map<String, dynamic>> post(String path, {Object? data}) => staffClient.post(path, data: data);
   @override
   Future<Map<String, dynamic>> patch(String path, {Object? data}) => staffClient.patch(path, data: data);
+  @override
+  Future<Uint8List?> receiptBytes(String path) => staffClient.uploadBytes(path);
+}
+
+/// One booked visit the console can move without a raw id.
+class PlanVisit {
+  const PlanVisit({required this.id, required this.date, required this.time});
+  final String id;
+  final String date;
+  final String time;
+
+  static PlanVisit? from(Object? raw) {
+    final m = asMap(raw);
+    if (m == null) return null;
+    final id = idOf(m);
+    if (id.isEmpty) return null;
+    return PlanVisit(id: id, date: '${m['date'] ?? ''}', time: '${m['time'] ?? ''}');
+  }
 }
 
 /// One row of `GET /admin/subscriptions`, tolerant of the older nested shape.
@@ -46,6 +67,8 @@ class SubRow {
     required this.nextRenewal,
     required this.nextVisitId,
     this.hasReceipt = false,
+    this.receiptUrl = '',
+    this.bookedVisits = const [],
   });
   final String id;
   final String customer;
@@ -57,6 +80,8 @@ class SubRow {
   final String nextRenewal;
   final String nextVisitId;
   final bool hasReceipt;
+  final String receiptUrl;
+  final List<PlanVisit> bookedVisits;
 
   static SubRow from(Map<String, dynamic> r) {
     final sub = asMap(r['subscription']) ?? r;
@@ -73,7 +98,12 @@ class SubRow {
       status: status,
       nextRenewal: '${r['nextRenewal'] ?? ''}',
       nextVisitId: nv != null ? idOf(nv) : '${r['nextVisitId'] ?? ''}',
-      hasReceipt: r['hasReceipt'] == true,
+      hasReceipt: r['hasReceipt'] == true || '${r['paymentReceiptUrl'] ?? ''}'.trim().isNotEmpty,
+      receiptUrl: '${r['paymentReceiptUrl'] ?? ''}'.trim(),
+      bookedVisits: [
+        for (final v in (r['bookedVisits'] as List?) ?? const [])
+          if (PlanVisit.from(v) != null) PlanVisit.from(v)!,
+      ],
     );
   }
 }
@@ -300,9 +330,36 @@ class _SubscribersScreenState extends ConsumerState<SubscribersScreen> {
     }
   }
 
+  Future<void> _openReceipt(SubRow r) async {
+    final lang = _lang;
+    Uint8List? bytes;
+    try {
+      bytes = await client.receiptBytes(r.receiptUrl);
+    } catch (e) {
+      if (mounted) _toast(_err(e), error: true);
+      return;
+    }
+    if (!mounted) return;
+    if (bytes == null || bytes.isEmpty) {
+      _toast(lang == 'ar' ? 'تعذر عرض الإيصال' : 'Could not load the screenshot', error: true);
+      return;
+    }
+    final image = bytes;
+    await showDialog<void>(
+      context: context,
+      builder: (_) => Dialog(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 640, maxHeight: 820),
+          child: InteractiveViewer(child: Image.memory(image, fit: BoxFit.contain)),
+        ),
+      ),
+    );
+  }
+
   Future<void> _move(SubRow r) async {
     final lang = _lang;
-    final vid = TextEditingController(text: r.nextVisitId);
+    if (r.bookedVisits.isEmpty) return;
+    var visit = r.bookedVisits.first.id;
     DateTime? date;
     TimeOfDay? time;
     String two(int n) => n.toString().padLeft(2, '0');
@@ -313,10 +370,25 @@ class _SubscribersScreenState extends ConsumerState<SubscribersScreen> {
       bodyBuilder: (ctx, setLocal) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (r.nextVisitId.isEmpty) ...[
-            V2FormField(label: t(V2SubsCopy.moveVisitId, lang), child: TextField(key: const Key('move-visit-id'), controller: vid)),
-            const SizedBox(height: 12),
-          ],
+          if (r.bookedVisits.length > 1)
+            V2FormField(
+              label: t(V2SubsCopy.moveWhich, lang),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final v in r.bookedVisits)
+                    V2Btn(
+                      key: Key('move-pick-${v.id}'),
+                      label: v.date.length >= 10 ? v.date.substring(0, 10) : v.id,
+                      kind: visit == v.id ? V2BtnKind.primary : V2BtnKind.ghost,
+                      size: V2BtnSize.row,
+                      onPressed: () => setLocal(() => visit = v.id),
+                    ),
+                ],
+              ),
+            ),
+          if (r.bookedVisits.length > 1) const SizedBox(height: 12),
           V2FormField(
             label: t(V2SubsCopy.moveDate, lang),
             child: Align(
@@ -350,14 +422,13 @@ class _SubscribersScreenState extends ConsumerState<SubscribersScreen> {
         ],
       ),
       onValidate: () {
-        if (date == null || time == null || vid.text.trim().isEmpty) {
+        if (date == null || time == null || visit.isEmpty) {
           _toast(t(V2SubsCopy.moveInvalid, lang), error: true);
           return false;
         }
         return true;
       },
     );
-    final visit = vid.text.trim();
     if (!ok || date == null || time == null || visit.isEmpty) return;
     try {
       await client.post('/admin/subscriptions/visits/$visit/move', data: {
@@ -365,6 +436,56 @@ class _SubscribersScreenState extends ConsumerState<SubscribersScreen> {
         'slot': '${two(time!.hour)}:${two(time!.minute)}',
       });
       _toast(t(V2SubsCopy.moveDone, lang));
+      _load();
+    } catch (e) {
+      _toast(_err(e), error: true);
+    }
+  }
+
+  Future<void> _shift(SubRow r) async {
+    final lang = _lang;
+    DateTime? date;
+    String two(int n) => n.toString().padLeft(2, '0');
+    final ok = await v2Form(
+      context,
+      title: t(V2SubsCopy.shiftTitle, lang),
+      confirmLabel: t(V2SubsCopy.confirm, lang),
+      bodyBuilder: (ctx, setLocal) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(t(V2SubsCopy.shiftBody, lang), style: const TextStyle(fontSize: 13, color: Ops.inkSoft, height: 1.45)),
+          const SizedBox(height: 12),
+          V2FormField(
+            label: t(V2SubsCopy.shiftDate, lang),
+            child: Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: V2Btn(
+                key: const Key('shift-date'),
+                label: date == null ? t(V2SubsCopy.movePick, lang) : '${date!.year}-${two(date!.month)}-${two(date!.day)}',
+                onPressed: () async {
+                  final now = DateTime.now();
+                  final d = await showDatePicker(context: ctx, initialDate: date ?? now, firstDate: now, lastDate: now.add(const Duration(days: 180)));
+                  if (d != null) setLocal(() => date = d);
+                },
+              ),
+            ),
+          ),
+        ],
+      ),
+      onValidate: () {
+        if (date == null) {
+          _toast(t(V2SubsCopy.shiftInvalid, lang), error: true);
+          return false;
+        }
+        return true;
+      },
+    );
+    if (!ok || date == null) return;
+    try {
+      await client.post('/admin/subscriptions/${r.id}/shift', data: {
+        'date': '${date!.year}-${two(date!.month)}-${two(date!.day)}',
+      });
+      _toast(t(V2SubsCopy.shiftDone, lang));
       _load();
     } catch (e) {
       _toast(_err(e), error: true);
@@ -453,7 +574,7 @@ class _SubscribersScreenState extends ConsumerState<SubscribersScreen> {
       onRetry: _load,
       resultLabel: V2SubsCopy.results(visible.length, lang),
       emptyText: t(V2SubsCopy.empty, lang),
-      actionsWidth: canFulfill ? 470 : (canWrite ? 360 : 8),
+      actionsWidth: canFulfill ? 640 : (canWrite ? 520 : 8),
       strip: V2Card(
         padding: const EdgeInsets.all(14),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -502,17 +623,21 @@ class _SubscribersScreenState extends ConsumerState<SubscribersScreen> {
               Text(r.nextRenewal.length >= 10 ? digits(r.nextRenewal.substring(0, 10), ar: lang == 'ar') : '—', style: const TextStyle(fontSize: 12, color: Ops.muted, fontFamily: Ops.mono)),
             ],
             actions: [
+              if (r.receiptUrl.isNotEmpty)
+                V2Btn(key: Key('receipt-${r.id}'), label: lang == 'ar' ? 'الإيصال' : 'Receipt', onPressed: () => _openReceipt(r), size: V2BtnSize.row),
               if (canWrite && r.status == 'pending_payment' && r.hasReceipt)
                 V2Btn(key: Key('confirm-${r.id}'), label: lang == 'ar' ? 'تأكيد إنستاباي' : 'Confirm InstaPay', onPressed: () => _confirmPay(r), size: V2BtnSize.row),
-              if (canFulfill && (r.status == 'active' || r.status == 'at_risk'))
+              if (canFulfill && (r.status == 'active' || r.status == 'paused' || r.status == 'at_risk'))
                 V2Btn(key: Key('fulfill-${r.id}'), label: t(V2SubsCopy.fulfillVisit, lang), onPressed: () => _fulfill(r), size: V2BtnSize.row),
               if (canWrite && r.status == 'active')
                 V2Btn(key: Key('pause-${r.id}'), label: t(V2SubsCopy.pause, lang), onPressed: () => _pause(r), size: V2BtnSize.row),
               if (canWrite && (r.status == 'active' || r.status == 'paused' || r.status == 'at_risk'))
                 V2Btn(key: Key('cancel-${r.id}'), label: t(V2SubsCopy.cancel, lang), onPressed: () => _cancel(r), kind: V2BtnKind.danger, size: V2BtnSize.row),
               if (canWrite) V2Btn(key: Key('credit-${r.id}'), label: t(V2SubsCopy.credit, lang), onPressed: () => _credit(r), size: V2BtnSize.row),
-              if (canWrite) V2Btn(key: Key('move-${r.id}'), label: t(V2SubsCopy.moveVisit, lang), onPressed: () => _move(r), size: V2BtnSize.row),
-            
+              if (canWrite && r.bookedVisits.isNotEmpty)
+                V2Btn(key: Key('move-${r.id}'), label: t(V2SubsCopy.moveVisit, lang), onPressed: () => _move(r), size: V2BtnSize.row),
+              if (canWrite && r.bookedVisits.isNotEmpty)
+                V2Btn(key: Key('shift-${r.id}'), label: t(V2SubsCopy.shift, lang), onPressed: () => _shift(r), size: V2BtnSize.row),
             ],
           ),
       ],

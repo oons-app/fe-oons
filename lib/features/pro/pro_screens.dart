@@ -929,9 +929,9 @@ class _ProJobScreenState extends ConsumerState<ProJobScreen> {
               decoration: const BoxDecoration(color: Pro.bg, border: Border(top: BorderSide(color: Pro.lineSoft))),
               child: Column(
                 children: [
-                  if ((bk.status == 'paid' || bk.status == 'rescheduled') && locked)
+                  if ((bk.status == 'paid' || bk.status == 'rescheduled') && !bk.providerAccepted)
                     ProPrimaryButton(label: '${p['acceptJob']}', enabled: !busy, onTap: () => _act(() => ref.read(repoProvider).proAccept(widget.id), doneKey: 'doneAccept')),
-                  if (bk.status == 'paid' && !locked)
+                  if ((bk.status == 'paid' || bk.status == 'rescheduled') && bk.providerAccepted)
                     ProPrimaryButton(label: '${p['depart']}', enabled: !busy, onTap: () => _act(() => ref.read(repoProvider).proDepart(widget.id), pingAfter: true, doneKey: 'doneDepart')),
                   if (bk.status == 'on_the_way' && bk.entryPhotoUrl != null && bk.entryPhotoUrl!.isNotEmpty && bk.providerCheckIn == null)
                     ProPrimaryButton(

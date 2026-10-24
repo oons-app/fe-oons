@@ -90,12 +90,21 @@ abstract final class V2SubsCopy {
   static const creditInvalid = {'en': 'Enter an amount above zero.', 'ar': 'اكتبي مبلغ أكبر من صفر.'};
   static const creditDone = {'en': 'Credit added.', 'ar': 'اتضاف الرصيد.'};
   static const moveTitle = {'en': 'Move a visit', 'ar': 'نقل زيارة'};
-  static const moveVisitId = {'en': 'Visit id', 'ar': 'رقم الزيارة'};
+  static const moveWhich = {'en': 'Visit', 'ar': 'الزيارة'};
   static const moveDate = {'en': 'New date', 'ar': 'التاريخ الجديد'};
   static const moveTime = {'en': 'New time', 'ar': 'الميعاد الجديد'};
   static const movePick = {'en': 'Choose', 'ar': 'اختاري'};
   static const moveInvalid = {'en': 'Choose a date and a time.', 'ar': 'اختاري التاريخ والميعاد.'};
   static const moveDone = {'en': 'Visit moved.', 'ar': 'اتنقلت الزيارة.'};
+  static const shift = {'en': 'Shift plan', 'ar': 'ترحيل الباقة'};
+  static const shiftTitle = {'en': 'Shift the remaining visits', 'ar': 'ترحيل الزيارات الباقية'};
+  static const shiftBody = {
+    'en': 'Every remaining visit moves by the same number of days. Clock times stay. Nothing changes if a day is already taken.',
+    'ar': 'كل الزيارات الباقية تتحرك بنفس عدد الأيام، والساعة تفضل زي ما هي. لو اليوم متاخد مش هيتغير حاجة.',
+  };
+  static const shiftDate = {'en': 'New date of the first visit', 'ar': 'تاريخ أول زيارة جديد'};
+  static const shiftInvalid = {'en': 'Choose the new first date.', 'ar': 'اختاري تاريخ أول زيارة.'};
+  static const shiftDone = {'en': 'Visits shifted.', 'ar': 'اترحّلت الزيارات.'};
   static const confirm = {'en': 'Confirm', 'ar': 'تأكيد'};
   static const settingsTitle = {'en': 'Pilot settings', 'ar': 'إعدادات التجربة'};
   static const settingsEnabled = {'en': 'Pilot enabled', 'ar': 'التجربة شغّالة'};
