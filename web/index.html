@@ -106,6 +106,12 @@
       width: 100% !important;
       height: 100% !important;
     }
+    /* iOS Safari zooms a focused control under 16px, including Flutter's
+       semantics <input>. That zoom also resizes the visual viewport and can
+       reload the SPA back onto /otp after a correct code. */
+    input, textarea, select {
+      font-size: 16px !important;
+    }
   </style>
   <script>
     // Break stuck Flutter SW reload loops from older deploys (once per session).
@@ -131,6 +137,10 @@
         pinFlutterViewport();
         if (++n > 20) clearInterval(t);
       }, 250);
+
+      document.addEventListener('submit', function (e) {
+        e.preventDefault();
+      }, true);
 
       if (!('serviceWorker' in navigator)) return;
       var KEY = 'oons_sw_cleared_v3';

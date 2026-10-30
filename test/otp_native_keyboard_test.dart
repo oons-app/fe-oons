@@ -40,6 +40,7 @@ void main() {
     expect(field.keyboardType, TextInputType.number);
     expect(field.autofillHints, contains('oneTimeCode'));
     expect(field.autofocus, isTrue);
+    expect(field.style?.fontSize, greaterThanOrEqualTo(16), reason: 'iOS Safari zooms (and can reload) inputs under 16px');
     await t.pump(const Duration(seconds: 21)); // let the resend timer finish
   });
 

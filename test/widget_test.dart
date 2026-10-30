@@ -90,6 +90,8 @@ void main() {
     expect(gateRedirect(loc: '/onboard/0', onboarded: false, authed: true, provider: false), '/home');
     expect(gateRedirect(loc: '/home', onboarded: false, authed: false, provider: false), '/onboard/0');
     expect(gateRedirect(loc: '/register', onboarded: true, authed: false, provider: false), isNull);
+    expect(gateRedirect(loc: '/otp', onboarded: true, authed: true, provider: false), '/home');
+    expect(gateRedirect(loc: '/otp', onboarded: true, authed: true, provider: true), '/pro/jobs');
     expect(gateRedirect(loc: '/profile', onboarded: true, authed: true, provider: false), isNull);
     expect((Copy.of('en')['dispute'] as Map)['cta'], isNotEmpty);
     expect((Copy.of('ar')['dispute'] as Map)['cta'], isNotEmpty);

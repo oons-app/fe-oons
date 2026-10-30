@@ -641,7 +641,7 @@ class ClientTextField extends StatelessWidget {
             maxLines: maxLines,
             keyboardType: keyboardType,
             onChanged: onChanged,
-            style: const TextStyle(fontSize: 15, color: Client.ink),
+            style: const TextStyle(fontSize: 16, color: Client.ink),
             decoration: InputDecoration(
               hintText: hint,
               hintStyle: const TextStyle(color: Client.muted2),

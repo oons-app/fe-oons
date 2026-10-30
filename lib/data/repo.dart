@@ -194,15 +194,15 @@ class Session extends StateNotifier<SessionState> {
     await _applyMe(token, r);
     final resolvedRole = '${r['role'] ?? role}';
     final uid = state.user?.id ?? state.provider?.id;
-    await AppAnalytics.login(role: resolvedRole, eventId: uid != null ? '$uid:login' : eventId);
+    unawaited(AppAnalytics.login(role: resolvedRole, eventId: uid != null ? '$uid:login' : eventId));
     if (uid != null) {
-      await AppAnalytics.identify(
+      unawaited(AppAnalytics.identify(
         userId: uid,
         audience: resolvedRole == 'provider' ? AnalyticsAudience.provider : AnalyticsAudience.customer,
         area: state.user?.area ?? (state.provider?.areas.isNotEmpty == true ? state.provider!.areas.first : null),
         country: 'EG',
         providerSlug: state.provider?.slug,
-      );
+      ));
     }
     return eventId;
   }

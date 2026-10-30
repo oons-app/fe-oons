@@ -416,6 +416,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
       return;
     }
     setState(() => busy = true);
+    _focus.unfocus();
     try {
       final eventId = await ref.read(sessionProvider.notifier).verify(widget.phone, code, role: widget.role);
       unawaited(AppAnalytics.otpVerificationAttempted(role: widget.role, success: true, eventId: eventId));
@@ -516,14 +517,17 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                                           enableInteractiveSelection: false,
                                           showCursor: false,
                                           maxLength: 4,
-                                          // The text itself is drawn by the boxes underneath.
-                                          style: const TextStyle(color: Colors.transparent, fontSize: 1),
+                                          // Invisible — digits are drawn by the boxes. Stay at 16px so
+                                          // iOS Safari does not zoom (and then reload) on focus.
+                                          style: const TextStyle(color: Colors.transparent, fontSize: 16, height: 1),
                                           cursorColor: Colors.transparent,
+                                          scrollPadding: EdgeInsets.zero,
                                           decoration: const InputDecoration(
                                             border: InputBorder.none,
                                             counterText: '',
                                             contentPadding: EdgeInsets.zero,
                                             fillColor: Colors.transparent,
+                                            isCollapsed: true,
                                           ),
                                           onChanged: _onCode,
                                           onSubmitted: (_) => _verify(),
