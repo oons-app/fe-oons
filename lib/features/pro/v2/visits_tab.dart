@@ -15,8 +15,9 @@ import 'package:oons/features/pro/v2/t.dart';
 import 'package:oons/features/subscribe/ar_eg.dart' show visitTypeForName;
 import 'package:oons/features/subscribe/visit_ops.dart' show VisitCheckInScreen;
 
-/// الزيارات — three stats, then the next seven days as one strip with the
-/// selected day's visits under it; «اللي فاتت» is one card of rows.
+/// الزيارات — three stats, then a week strip she can page through the next
+/// two months, with the selected day's visits under it; «اللي فاتت» is one
+/// card of rows.
 class ProVisitsTab extends ConsumerStatefulWidget {
   const ProVisitsTab({super.key, this.now});
 
@@ -30,13 +31,18 @@ class ProVisitsTab extends ConsumerStatefulWidget {
 class _ProVisitsTabState extends ConsumerState<ProVisitsTab> {
   int seg = 0; // 0 upcoming, 1 past
   /// The day she tapped; null until she does.
-  int? pickedDay;
+  DateTime? pickedDate;
+  int weekOffset = 0;
   List<BookingBundle>? up;
   List<BookingBundle>? past;
   bool failed = false;
   Timer? poll;
 
+  /// Today through the rest of this month and the next (~nine weeks).
+  static const horizonDays = 63;
+
   DateTime get _today => dateOnlyOf((widget.now ?? DateTime.now)());
+  int get _maxWeek => (horizonDays - 1) ~/ 7;
 
   @override
   void initState() {
@@ -59,6 +65,7 @@ class _ProVisitsTabState extends ConsumerState<ProVisitsTab> {
         up = jobs.upcoming;
         past = jobs.past;
         failed = false;
+        if (!quiet) _syncWeekToNearestVisit();
       });
     } catch (_) {
       // Keep the last list when a refresh fails; only a first load shows the error.
@@ -67,17 +74,52 @@ class _ProVisitsTabState extends ConsumerState<ProVisitsTab> {
   }
 
   /// Until she picks a day, the strip opens on the nearest day that has a visit
-  /// (today first), not on an empty today. With nothing this week it stays on today.
+  /// (today first), not on an empty today. Later weeks are used when this week
+  /// is empty so a booking next month is not hidden.
   int get day {
-    if (pickedDay != null) return pickedDay!;
     final week = _week;
+    if (pickedDate != null) {
+      final i = week.indexWhere((d) => sameDay(d, pickedDate!));
+      if (i >= 0) return i;
+    }
     for (var i = 0; i < week.length; i++) {
       if (_on(week[i]).isNotEmpty) return i;
     }
     return 0;
   }
 
-  List<DateTime> get _week => [for (var i = 0; i < 7; i++) _today.add(Duration(days: i))];
+  List<DateTime> get _horizon => [for (var i = 0; i < horizonDays; i++) _today.add(Duration(days: i))];
+
+  List<DateTime> get _week {
+    final start = (weekOffset * 7).clamp(0, horizonDays - 7);
+    return _horizon.sublist(start, start + 7);
+  }
+
+  void _syncWeekToNearestVisit() {
+    if (pickedDate != null) {
+      final n = pickedDate!.difference(_today).inDays;
+      weekOffset = n < 0 ? 0 : (n ~/ 7).clamp(0, _maxWeek);
+      return;
+    }
+    if (_week.any((d) => _on(d).isNotEmpty)) return;
+    for (var w = 0; w <= _maxWeek; w++) {
+      final start = w * 7;
+      final slice = _horizon.sublist(start, start + 7);
+      if (slice.any((d) => _on(d).isNotEmpty)) {
+        weekOffset = w;
+        return;
+      }
+    }
+  }
+
+  void _shiftWeek(int delta) {
+    final next = (weekOffset + delta).clamp(0, _maxWeek);
+    if (next == weekOffset) return;
+    setState(() {
+      weekOffset = next;
+      pickedDate = null;
+    });
+  }
 
   List<BookingBundle> _on(DateTime d) {
     final rows = [for (final b in up ?? const <BookingBundle>[]) if (sameDay(b.booking.slotStart.toLocal(), d)) b];
@@ -114,8 +156,8 @@ class _ProVisitsTabState extends ConsumerState<ProVisitsTab> {
     final ar = lang == 'ar';
     final me = ref.watch(sessionProvider).provider;
     final loading = up == null && !failed;
-    final week = _week;
-    final inWeek = [for (final d in week) ..._on(d)];
+    final thisWeek = _horizon.sublist(0, 7);
+    final inWeek = [for (final d in thisWeek) ..._on(d)];
     final todayN = _on(_today).length;
     final expected = inWeek.fold<int>(0, (n, b) => n + b.booking.serviceEarning);
 
@@ -132,7 +174,7 @@ class _ProVisitsTabState extends ConsumerState<ProVisitsTab> {
       );
     } else if (seg == 1) {
       content = _pastList(t, lang, ar);
-    } else if (inWeek.isEmpty) {
+    } else if ((up ?? const <BookingBundle>[]).isEmpty) {
       content = DsEmptyState(
         icon: 'calendar',
         title: t('weekEmptyTitle'),
@@ -181,9 +223,25 @@ class _ProVisitsTabState extends ConsumerState<ProVisitsTab> {
     final selected = week[day.clamp(0, 6)];
     final visits = _on(selected);
     final off = me != null && me.workDays.isNotEmpty && !me.workDays.contains(selected.weekday);
+    final from = week.first;
+    final to = week.last;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        Row(
+          children: [
+            _WeekShift(label: t('prevWeek'), enabled: weekOffset > 0, forward: false, onTap: () => _shiftWeek(-1)),
+            Expanded(
+              child: Text(
+                '${dayMonth(from, ar: ar)} – ${dayMonth(to, ar: ar)}',
+                textAlign: TextAlign.center,
+                style: DsText.meta,
+              ),
+            ),
+            _WeekShift(label: t('nextWeek'), enabled: weekOffset < _maxWeek, forward: true, onTap: () => _shiftWeek(1)),
+          ],
+        ),
+        const SizedBox(height: Ds.s2),
         Container(
           decoration: Ds.card(),
           child: Row(children: [
@@ -196,7 +254,7 @@ class _ProVisitsTabState extends ConsumerState<ProVisitsTab> {
                   hasVisits: _on(week[i]).isNotEmpty,
                   closed: me != null && me.workDays.isNotEmpty && !me.workDays.contains(week[i].weekday),
                   first: i == 0,
-                  onTap: () => setState(() => pickedDay = i),
+                  onTap: () => setState(() => pickedDate = week[i]),
                 ),
               ),
           ]),
@@ -229,6 +287,32 @@ class _ProVisitsTabState extends ConsumerState<ProVisitsTab> {
       return DsCard(padding: EdgeInsets.zero, child: DsEmptyState(icon: 'clock', title: t('pastEmptyTitle'), body: t('pastEmptyWhy')));
     }
     return DsCard.rows(children: [for (final b in rows) _PastRow(bundle: b, ar: ar, lang: lang, t: t, onTap: () => context.push('/pro/job/${b.booking.id}'))]);
+  }
+}
+
+class _WeekShift extends StatelessWidget {
+  const _WeekShift({required this.label, required this.enabled, required this.forward, required this.onTap});
+  final String label;
+  final bool enabled, forward;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final icon = forward ? Icons.chevron_right : Icons.chevron_left;
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      label: label,
+      excludeSemantics: true,
+      child: InkWell(
+        onTap: enabled ? onTap : null,
+        child: SizedBox(
+          width: Ds.minTarget,
+          height: Ds.minTarget,
+          child: Icon(icon, color: enabled ? Ds.plum : Ds.textFaint, size: 28),
+        ),
+      ),
+    );
   }
 }
 

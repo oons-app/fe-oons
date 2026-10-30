@@ -111,6 +111,25 @@ void main() {
     expect(find.text('الجمعة مغلق في مواعيدك.'), findsOneWidget);
   });
 
+  testWidgets('a booking next week is visible; she can page the month', (t) async {
+    final r = repo();
+    r.upcomingJobs = [
+      jobBundle('d', '2026-10-12T10:00:00', client: 'هدى', service: 'تنظيف عادي', minutes: 60, earning: 90000),
+    ];
+    await open(t, r);
+    expect(find.text('لا زيارات هذا الأسبوع'), findsNothing, reason: 'next-week bookings must not look like an empty calendar');
+    expect(find.text('الاثنين ١٢ أكتوبر'), findsOneWidget);
+    expect(find.text('هدى'), findsOneWidget);
+    expect(find.text('١٠ أكتوبر – ١٦ أكتوبر'), findsOneWidget);
+    await t.tap(find.byIcon(Icons.chevron_left));
+    await t.pump();
+    expect(find.text('٣ أكتوبر – ٩ أكتوبر'), findsOneWidget);
+    expect(find.text('هدى'), findsNothing);
+    await t.tap(find.byIcon(Icons.chevron_right));
+    await t.pump();
+    expect(find.text('هدى'), findsOneWidget);
+  });
+
   testWidgets('a whole empty week offers areas first, hours second', (t) async {
     await open(t, repo(empty: true));
     expect(find.text('لا زيارات هذا الأسبوع'), findsOneWidget);

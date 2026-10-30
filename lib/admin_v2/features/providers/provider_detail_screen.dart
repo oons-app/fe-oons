@@ -1303,11 +1303,11 @@ class _ProviderDetailScreenState extends ConsumerState<ProviderDetailScreen> {
   // ---- Coverage --------------------------------------------------------
   Widget _coverage(Map prov, String lang, bool canVet) {
     final selected = asDynList(prov['areas']).map((e) => '$e').toSet();
-    // workDays is a list of weekday indices (0 = Sun). slotHours are "HH:mm" strings.
+    // workDays matches the API: 1 = Mon … 7 = Sun. slotHours are UTC "HH:mm".
     final workDays = asDynList(prov['workDays']).map((e) => asInt(e)).toSet();
     final slots = asDynList(prov['slotHours']).map((e) => '$e').toList()..sort();
     final hoursLabel = slots.length >= 2 ? '${slots.first} — ${slots.last}' : (slots.isNotEmpty ? slots.join(', ') : '09:00 — 21:00');
-    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const days = [(7, 'Sun'), (1, 'Mon'), (2, 'Tue'), (3, 'Wed'), (4, 'Thu'), (5, 'Fri'), (6, 'Sat')];
     return _twoCol(
       lang,
       left: [
@@ -1346,15 +1346,16 @@ class _ProviderDetailScreenState extends ConsumerState<ProviderDetailScreen> {
           title: lang == 'ar' ? 'الجدول الأسبوعي' : 'Weekly schedule',
           child: Column(
             children: [
-              for (var i = 0; i < days.length; i++)
+              for (final day in days)
                 Builder(builder: (_) {
-                  final on = workDays.isEmpty ? i != 5 : workDays.contains(i);
+                  final wd = day.$1;
+                  final on = workDays.isEmpty ? wd != 5 : workDays.contains(wd);
                   return Container(
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     decoration: const BoxDecoration(border: Border(top: BorderSide(color: Ops.rowBorder))),
                     child: Row(
                       children: [
-                        SizedBox(width: 48, child: Text(days[i], style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600))),
+                        SizedBox(width: 48, child: Text(day.$2, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600))),
                         const SizedBox(width: 11),
                         Expanded(
                           child: Text(on ? hoursLabel : (lang == 'ar' ? 'غير متاح' : 'Unavailable'),
