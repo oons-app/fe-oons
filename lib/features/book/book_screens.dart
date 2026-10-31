@@ -156,6 +156,7 @@ class _BookScreenState extends ConsumerState<BookScreen> {
         discount: couponOk ? couponDiscount : 0,
         trustFee: ref.read(sessionProvider).trustFee,
         clientServiceFeeBps: ref.read(sessionProvider).clientServiceFeeBps,
+        areaTravelFee: areaTravelFee(_selectedAddress()?.area),
       );
 
   int get inclusive => bookInclusiveTotal(
@@ -165,6 +166,7 @@ class _BookScreenState extends ConsumerState<BookScreen> {
         discount: couponOk ? couponDiscount : 0,
         trustFee: ref.read(sessionProvider).trustFee,
         clientServiceFeeBps: ref.read(sessionProvider).clientServiceFeeBps,
+        areaTravelFee: areaTravelFee(_selectedAddress()?.area),
       );
 
   Address? _selectedAddress() {
@@ -507,7 +509,13 @@ class _BookScreenState extends ConsumerState<BookScreen> {
   String? _step2Error() {
     final addr = _selectedAddress();
     if (addr == null || addr.id.isEmpty) return bf['needAddress'];
-    if (p!.areas.isNotEmpty && !p!.areas.contains(addr.area)) {
+    if (addr.area.isEmpty) {
+      return langOf(ref) == 'ar'
+          ? 'العنوان ده برّه المناطق اللي بنخدمها لسه. اختاري عنوان تاني أو حرّكي الدبوس.'
+          : 'This address is outside the areas we serve yet. Pick another address or move the pin.';
+    }
+    final verticals = {for (final l in lines) l.item.vertical ?? p!.service};
+    if (!p!.coversArea(addr.area, verticals)) {
       return langOf(ref) == 'ar'
           ? 'المتخصصة دي مش بتغطي منطقة عنوانك. غيّري العنوان لمنطقة تغطيتها.'
           : 'This professional doesn’t cover your address area. Pick a covered area or another pro.';
@@ -1071,7 +1079,7 @@ class _BookScreenState extends ConsumerState<BookScreen> {
   List<Widget> _step2(String lang, Map<String, String> copy) {
     final addrs = ref.watch(sessionProvider).user?.addresses ?? const <Address>[];
     final addr = _selectedAddress();
-    final travel = bookTravel(lines);
+    final travel = bookTravel(lines, areaFee: areaTravelFee(addr?.area));
     final ec = Copy.of(lang)['empty'] as Map;
     final daySlots = days.isEmpty ? const [] : ((days[day]['slots'] as List?) ?? const []);
     final dayTaken = days.isEmpty || daySlots.every((s) => (s as Map)['available'] == false);

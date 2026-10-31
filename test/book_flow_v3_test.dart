@@ -55,6 +55,38 @@ void main() {
     expect(inclusive, fees.charge(exclusive));
   });
 
+  test('with no provider travel fee the area fee applies, matching visitTravelFee', () {
+    final noFee = bookLines(
+      items: [_item(id: 'b1', price: 20000, vertical: 'beauty')],
+      qty: {'b1': 1},
+      guests: 1,
+      hair: 'medium',
+    );
+    expect(bookTravel(noFee), 0);
+    expect(bookTravel(noFee, areaFee: 12000), 12000);
+    expect(bookExclusiveTotal(lines: noFee, toolsFromProvider: false, areaTravelFee: 12000), 32000);
+    final ownFee = bookLines(
+      items: [_item(id: 'c1', price: 10000, kind: 'cleaning', travel: 4000, vertical: 'cleaning')],
+      qty: {'c1': 1},
+      guests: 1,
+      hair: 'medium',
+    );
+    expect(bookTravel(ownFee, areaFee: 12000), 4000, reason: 'her own fee wins');
+  });
+
+  test('provider coverage follows per-service overrides like the server', () {
+    final p = ProviderP.fromJson({
+      'id': 'p1', 'firstName': {'en': 'A', 'ar': 'A'}, 'lastName': {'en': 'B', 'ar': 'B'},
+      'initials': {'en': 'AB', 'ar': 'AB'}, 'service': 'beauty', 'specialty': {'en': '', 'ar': ''},
+      'areas': ['madinaty', 'rehab'], 'areasByService': {'cleaning': ['madinaty']},
+    });
+    expect(p.coversArea('rehab'), isTrue);
+    expect(p.coversArea('rehab', ['beauty']), isTrue);
+    expect(p.coversArea('rehab', ['cleaning']), isFalse);
+    expect(p.coversArea('madinaty', ['beauty', 'cleaning']), isTrue);
+    expect(p.coversArea('', []), isFalse);
+  });
+
   test('travel fee is per-item × line count, matching the API charge', () {
     final once = bookLines(
       items: [_item(id: 'c1', price: 10000, kind: 'cleaning', travel: 4000, vertical: 'cleaning')],

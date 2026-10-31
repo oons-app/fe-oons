@@ -302,7 +302,18 @@ class AddressesScreen extends ConsumerWidget {
                               Text(a.label.of(lang), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
                               const SizedBox(height: 4),
                               Text(a.line1.of(lang), style: const TextStyle(fontSize: 13, height: 1.4)),
-                              Text(a.city.of(lang), style: const TextStyle(fontSize: 12, color: Client.muted)),
+                              Text(
+                                  a.area.isEmpty
+                                      ? (lang == 'ar' ? 'برّه المناطق اللي بنخدمها لسه' : 'Outside the areas we serve yet')
+                                      : '${areaName(a.area, lang)} · ${a.city.of(lang)}',
+                                  style: const TextStyle(fontSize: 12, color: Client.muted)),
+                              if (a.pinApprox)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 6),
+                                  child: Text(
+                                      lang == 'ar' ? 'حطّي الدبوس على العمارة عشان المتخصصة توصل بسهولة ›' : 'Pin your building so she finds you easily ›',
+                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Client.plum)),
+                                ),
                               if (a.reachNotes.of(lang).trim().isNotEmpty)
                                 Padding(
                                   padding: const EdgeInsets.only(top: 6),

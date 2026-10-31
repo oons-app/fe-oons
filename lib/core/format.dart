@@ -154,14 +154,18 @@ String greet(DateTime now, String lang, String name) {
 /// One area from the live catalogue (GET /areas): names, centre and city as
 /// ops set them in the console.
 class AreaInfo {
-  const AreaInfo({required this.name, required this.cityId, required this.cityName, this.lat, this.lng, this.radiusM = 0});
+  const AreaInfo({required this.name, required this.cityId, required this.cityName, this.lat, this.lng, this.radiusM = 0, this.travelFee = 0});
   final Loc name;
   final String cityId;
   final Loc cityName;
   final double? lat;
   final double? lng;
   final int radiusM;
+  /// Piastres. What a visit here charges for travel when the provider set none.
+  final int travelFee;
 }
+
+int areaTravelFee(String? area) => liveAreas[area ?? '']?.travelFee ?? 0;
 
 /// Filled by refreshServiceCities. The const tables below are only the
 /// offline fallback for before the first /areas response.

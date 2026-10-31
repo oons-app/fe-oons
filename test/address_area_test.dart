@@ -11,7 +11,7 @@ void main() {
     expect(liveAreaForPin(30.06, 31.22, const []), 'capital');
   });
 
-  test('a blank saved area is the Administrative Capital', () {
+  test('a blank saved area stays blank (no silent Capital default)', () {
     final user = UserMe.fromJson({
       'id': 'u1',
       'phone': '01000000000',
@@ -20,7 +20,7 @@ void main() {
       'initials': {'en': 'SA', 'ar': 'سع'},
       'area': '',
     });
-    expect(user.area, 'capital');
+    expect(user.area, '');
   });
 
   group('live area catalogue', () {

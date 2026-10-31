@@ -146,5 +146,6 @@ void _rememberArea(String slug, Map<String, dynamic> m) {
     lat: (center?['lat'] as num?)?.toDouble(),
     lng: (center?['lng'] as num?)?.toDouble(),
     radiusM: (m['radiusM'] as num?)?.toInt() ?? 0,
+    travelFee: (m['travelFee'] as num?)?.toInt() ?? 0,
   );
 }

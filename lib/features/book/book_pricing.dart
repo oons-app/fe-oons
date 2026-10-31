@@ -100,17 +100,16 @@ List<BookLine> bookLines({
 
 int bookSubtotal(List<BookLine> lines) => lines.fold(0, (a, l) => a + l.amount);
 
-/// Matches the API: `ServiceItem.travelFee` is optional per-item travel in
-/// piastres, multiplied by the line count (`bookings.go` does the same).
-/// Area-level platform travel is a separate admin default and is not applied
-/// here. Do not collapse this to one trip-per-address — the receipt would
-/// disagree with the charge.
-int bookTravel(List<BookLine> lines) {
+/// Matches the API (`visitTravelFee`): her own per-item travel fees when she
+/// set any, multiplied by the line count; otherwise the area's travel fee
+/// from the console ([areaFee]). Do not collapse item fees to one
+/// trip-per-address — the receipt would disagree with the charge.
+int bookTravel(List<BookLine> lines, {int areaFee = 0}) {
   var t = 0;
   for (final l in lines) {
     if (l.item.travelFee > 0) t += l.item.travelFee * l.mult;
   }
-  return t;
+  return t > 0 ? t : areaFee;
 }
 
 int bookTools({required List<BookLine> lines, required bool toolsFromProvider}) {
@@ -138,9 +137,10 @@ int bookExclusiveTotal({
   int discount = 0,
   int trustFee = 0,
   int clientServiceFeeBps = 0,
+  int areaTravelFee = 0,
 }) {
   final fee = bookClientServiceFee(lines, clientServiceFeeBps);
-  final raw = bookSubtotal(lines) + bookTravel(lines) + bookTools(lines: lines, toolsFromProvider: toolsFromProvider) + trustFee + fee - discount;
+  final raw = bookSubtotal(lines) + bookTravel(lines, areaFee: areaTravelFee) + bookTools(lines: lines, toolsFromProvider: toolsFromProvider) + trustFee + fee - discount;
   return raw < 0 ? 0 : raw;
 }
 
@@ -151,6 +151,7 @@ int bookInclusiveTotal({
   int discount = 0,
   int trustFee = 0,
   int clientServiceFeeBps = 0,
+  int areaTravelFee = 0,
   String method = 'card',
 }) {
   final base = bookExclusiveTotal(
@@ -159,6 +160,7 @@ int bookInclusiveTotal({
     discount: discount,
     trustFee: trustFee,
     clientServiceFeeBps: clientServiceFeeBps,
+    areaTravelFee: areaTravelFee,
   );
   return fees.charge(base, method);
 }
