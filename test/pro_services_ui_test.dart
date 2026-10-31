@@ -351,6 +351,31 @@ void main() {
       await t.pump(const Duration(seconds: 2));
     });
 
+    testWidgets('two services: narrowing one to some areas saves only areasByService', (t) async {
+      final repo = repoWith(
+        profile: providerJson(items: [
+          {'id': 'b1', 'name': {'ar': 'سشوار', 'en': 'Blow-dry'}, 'duration': 60, 'price': 30000, 'kind': 'standard', 'vertical': 'beauty'},
+        ]),
+      );
+      await openView(t, const ProAreasView(), repo: repo);
+      expect(find.text('كل خدمة فين'), findsOneWidget);
+      // «الرحاب» chips: the city card, then the beauty card, then cleaning.
+      await t.tap(find.widgetWithText(DsChip, 'الرحاب').at(1));
+      await t.pump(const Duration(milliseconds: 300));
+      expect(repo.calls, ['patch areasByService']);
+      expect((repo.bodies['patch'] as Map)['areasByService'], {
+        'beauty': ['madinaty'],
+      });
+      final cleaningRehab = t.widget<DsChip>(find.widgetWithText(DsChip, 'الرحاب').at(2));
+      expect(cleaningRehab.on, isTrue, reason: 'cleaning keeps all her areas');
+      await t.pump(const Duration(seconds: 2));
+    });
+
+    testWidgets('one service: no per-service card', (t) async {
+      await openView(t, const ProAreasView());
+      expect(find.text('كل خدمة فين'), findsNothing);
+    });
+
     testWidgets('work days: Saturday first, saves workDays only', (t) async {
       final repo = await openView(t, const ProHoursView());
       final chips = t.widgetList<DsChip>(find.byType(DsChip)).take(7).map((c) => c.label).toList();

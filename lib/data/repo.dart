@@ -742,14 +742,17 @@ class Repo {
     bool isDefault = false,
     double? lat,
     double? lng,
+    bool pinConfirmed = false,
   }) async {
     final fallback = coordsForArea(area);
     final r = await api.post('/me/addresses', data: {
+      'pinConfirmed': pinConfirmed,
       'label': label,
       'line1': line1,
       if (reachNotes != null && reachNotes.trim().isNotEmpty) 'reachNotes': reachNotes.trim(),
       'area': area,
-      'city': city ?? areaName(area, 'en'),
+      // The server takes the city from the area unless one is given.
+      if (city != null && city.trim().isNotEmpty) 'city': city,
       'lat': lat ?? fallback.$1,
       'lng': lng ?? fallback.$2,
       'isDefault': isDefault,
@@ -770,6 +773,11 @@ class Repo {
   Future<List<GeoHit>> searchPlaces(String q) async {
     final r = await api.get('/geo/search', query: {'q': q});
     return ((r['places'] as List?) ?? []).map((e) => GeoHit.fromJson(e as Map)).toList();
+  }
+
+  Future<AreaCheck> resolveArea(double lat, double lng) async {
+    final r = await api.get('/areas/resolve', query: {'lat': lat, 'lng': lng});
+    return AreaCheck.fromJson(r);
   }
 
   Future<GeoHit?> reverseGeocode(double lat, double lng) async {

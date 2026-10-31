@@ -37,11 +37,23 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
   late final line1 = TextEditingController(text: widget.existing?.line1.of('ar') ?? widget.existing?.line1.en ?? '');
   late final reachNotes = TextEditingController(text: widget.existing?.reachNotes.of('ar') ?? widget.existing?.reachNotes.en ?? '');
   final search = TextEditingController();
-  late String area = widget.existing != null && widget.existing!.area.trim().isNotEmpty ? widget.existing!.area : 'capital';
-  late String city = areaIsGiza(area) ? 'giza' : 'cairo';
+  /// Set from where the pin is (the server decides); empty = outside our areas.
+  late String area = widget.existing?.area.trim() ?? '';
   late bool isDefault = widget.existing?.isDefault ?? false;
-  late double lat = (widget.existing?.lat ?? 0) != 0 ? widget.existing!.lat : coordsForArea(area).$1;
-  late double lng = (widget.existing?.lng ?? 0) != 0 ? widget.existing!.lng : coordsForArea(area).$2;
+  late double lat = (widget.existing?.lat ?? 0) != 0 ? widget.existing!.lat : _startPin.$1;
+  late double lng = (widget.existing?.lng ?? 0) != 0 ? widget.existing!.lng : _startPin.$2;
+  /// She placed the pin herself (drag, search, my location) — not a jump to
+  /// an area's centre from a chip. Only then does the pin decide the area.
+  late bool pinTouched = widget.existing != null && !widget.existing!.pinApprox && widget.existing!.lat != 0;
+  bool _chipMove = false;
+  AreaCheck? check;
+  Timer? checkWait;
+
+  /// A new address opens on the first live area, not the Capital.
+  static (double, double) get _startPin {
+    final ids = allCatalogAreaIds();
+    return ids.isEmpty ? (30.0444, 31.2357) : coordsForArea(ids.first);
+  }
   final mapKey = GlobalKey<DeliveryPinMapState>();
   List<GeoHit> hits = [];
   bool busy = false;
@@ -57,6 +69,26 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
     if (widget.existing == null && (ref.read(sessionProvider).user?.addresses.isEmpty ?? true)) {
       isDefault = true;
     }
+    if (pinTouched) _checkPin();
+  }
+
+  void _checkPin() {
+    checkWait?.cancel();
+    checkWait = Timer(const Duration(milliseconds: 350), () async {
+      final at = (lat, lng);
+      try {
+        final c = await ref.read(repoProvider).resolveArea(lat, lng);
+        if (!mounted || at != (lat, lng)) return;
+        setState(() {
+          check = c;
+          if (pinTouched) area = c.area;
+        });
+      } catch (_) {
+        // Offline: fall back to the nearest live area so the form still works;
+        // the server decides again on save.
+        if (mounted && pinTouched) setState(() => area = liveAreaForPin(lat, lng, allCatalogAreaIds()));
+      }
+    });
   }
 
   @override
@@ -67,17 +99,20 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
     line1.dispose();
     reachNotes.dispose();
     search.dispose();
+    checkWait?.cancel();
     super.dispose();
   }
 
   void _onMapMoved(LatLng p) {
     lat = p.latitude;
     lng = p.longitude;
-    final next = liveAreaForPin(lat, lng, allCatalogAreaIds());
-    setState(() {
-      area = next;
-      city = areaIsGiza(next) ? 'giza' : 'cairo';
-    });
+    if (_chipMove) {
+      _chipMove = false;
+    } else {
+      pinTouched = true;
+    }
+    setState(() {});
+    _checkPin();
     // A pin move must not replace a street the customer already typed. The
     // reverse lookup at the area centroid was saving "ميدان 4" over the
     // building address.
@@ -185,6 +220,10 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text('${p['pinHint']}', style: const TextStyle(fontSize: 12, color: Client.muted, height: 1.4)),
+                  if (check != null && pinTouched) ...[
+                    const SizedBox(height: 10),
+                    _CoverageNote(check: check!, lang: lang),
+                  ],
                   const SizedBox(height: 10),
                   Row(
                     children: [
@@ -230,7 +269,8 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
                           final c = coordsForArea(id);
                           setState(() {
                             area = id;
-                            city = areaIsGiza(id) ? 'giza' : 'cairo';
+                            pinTouched = false;
+                            _chipMove = true;
                           });
                           mapKey.currentState?.moveTo(c.$1, c.$2);
                           if (!areaHasNoProviders(id) || !mounted) return;
@@ -244,7 +284,8 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
                           final next = coordsForArea(pick);
                           setState(() {
                             area = pick;
-                            city = areaIsGiza(pick) ? 'giza' : 'cairo';
+                            pinTouched = false;
+                            _chipMove = true;
                           });
                           mapKey.currentState?.moveTo(next.$1, next.$2);
                         },
@@ -252,26 +293,6 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                           decoration: BoxDecoration(color: on ? Client.plum : Client.card, border: Border.all(color: Client.ink, width: Client.rule)),
                           child: Text(areaName(id, lang), style: TextStyle(fontWeight: FontWeight.w700, color: on ? Client.bg : Client.ink)),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 16),
-                  ClientKicker(lang == 'ar' ? 'المدينة' : 'City'),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    children: [
-                      ['cairo', lang == 'ar' ? 'القاهرة' : 'Cairo'],
-                      ['giza', lang == 'ar' ? 'الجيزة' : 'Giza'],
-                    ].map((row) {
-                      final on = city == row[0];
-                      return InkWell(
-                        onTap: () => setState(() => city = row[0]),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                          decoration: BoxDecoration(color: on ? Client.plum : Client.card, border: Border.all(color: Client.ink, width: Client.rule)),
-                          child: Text(row[1], style: TextStyle(fontWeight: FontWeight.w700, color: on ? Client.bg : Client.ink)),
                         ),
                       );
                     }).toList(),
@@ -300,6 +321,11 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
                         });
                         return;
                       }
+                      if (!pinTouched && area.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                            content: Text(lang == 'ar' ? 'حرّكي الدبوس على العمارة بالظبط.' : 'Drag the pin onto your building.')));
+                        return;
+                      }
                       if (label.text.trim().isEmpty) {
                         label.text = lang == 'ar' ? 'البيت' : 'Home';
                       }
@@ -310,7 +336,6 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
                       });
                       try {
                         final repo = ref.read(repoProvider);
-                        final cityName = city == 'giza' ? (lang == 'ar' ? 'الجيزة' : 'Giza') : (lang == 'ar' ? 'القاهرة' : 'Cairo');
                         final UserMe u;
                         if (widget.existing == null) {
                           u = await repo.createAddress(
@@ -318,10 +343,10 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
                             line1: line1.text.trim(),
                             reachNotes: reachNotes.text,
                             area: area,
-                            city: cityName,
                             isDefault: isDefault,
                             lat: lat,
                             lng: lng,
+                            pinConfirmed: pinTouched,
                           );
                         } else {
                           u = await repo.patchAddress(widget.existing!.id, {
@@ -329,10 +354,10 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
                             'line1': line1.text.trim(),
                             'reachNotes': reachNotes.text,
                             'area': area,
-                            'city': cityName,
                             'isDefault': isDefault,
                             'lat': lat,
                             'lng': lng,
+                            'pinConfirmed': pinTouched,
                           });
                         }
                         ref.read(sessionProvider.notifier).setUser(u);
@@ -806,5 +831,46 @@ class _ClientIdentityScreenState extends ConsumerState<ClientIdentityScreen> {
         ),
       ),
     );
+  }
+}
+
+/// Under the map: whether we serve where the pin is. Waitlist and outside
+/// still save — her request is counted so ops see where to open next.
+class _CoverageNote extends StatelessWidget {
+  const _CoverageNote({required this.check, required this.lang});
+  final AreaCheck check;
+  final String lang;
+
+  @override
+  Widget build(BuildContext context) {
+    final ar = lang == 'ar';
+    final (String text, Color tone) = switch (check.state) {
+      'covered' => (ar ? 'بنخدم ${areaName(check.area, lang)} ✓' : 'We serve ${areaName(check.area, lang)} ✓', Client.plum),
+      'waitlist' => (
+          ar
+              ? '${areaName(check.area, lang)} لسه مافتحتش. احفظي العنوان وهنبلغك أول ما نفتح.'
+              : '${areaName(check.area, lang)} isn\'t open yet. Save the address and we\'ll tell you when it opens.',
+          Client.muted
+        ),
+      _ => (
+          ar
+              ? 'المكان ده برّه المناطق اللي بنخدمها لسه${_nearest(ar)}. تقدري تحفظيه وهنبلغك لما نوصل.'
+              : 'We don\'t serve this spot yet${_nearest(ar)}. You can save it and we\'ll tell you when we get there.',
+          Client.muted
+        ),
+    };
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(border: Border.all(color: tone, width: Client.rule), color: Client.card),
+      child: Text(text, style: TextStyle(fontSize: 13, height: 1.4, color: tone, fontWeight: FontWeight.w600)),
+    );
+  }
+
+  String _nearest(bool ar) {
+    if (check.nearest.isEmpty) return '';
+    final km = (check.nearestM / 1000).toStringAsFixed(1);
+    final name = areaName(check.nearest, lang);
+    return ar ? ' — أقرب منطقة: $name (‎$km كم)' : ' — nearest: $name ($km km)';
   }
 }

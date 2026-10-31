@@ -95,7 +95,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           return const _HomeSkeleton();
         }
         final data = snap.data;
-        final area = '${data?['area'] ?? user?.area ?? 'zamalek'}';
+        final area = '${data?['area'] ?? user?.area ?? ''}';
         final name = user?.firstName.of(lang) ?? (lang == 'ar' ? 'نور' : 'Nour');
         final services = ((data?['services'] as List?) ?? []).cast<Map>();
         final rebooks = ((data?['rebooks'] as List?) ?? []).cast<Map>();
@@ -103,7 +103,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         final occasions = ((data?['occasions'] as List?) ?? ['wedding', 'engagement', 'eid', 'graduation']);
         final addr = user?.addresses.where((a) => a.isDefault).firstOrNull ?? user?.addresses.firstOrNull;
         final street = addr?.line1.of(lang).trim() ?? '';
-        final areaLabel = addr != null ? areaName(addr.area, lang) : areaName(area, lang);
+        final placed = addr?.area ?? area;
+        final areaLabel = placed.isEmpty
+            ? (lang == 'ar' ? 'برّه مناطقنا لسه' : 'Outside our areas yet')
+            : areaName(placed, lang);
         final addrLine = street.isEmpty
             ? areaLabel
             : (street.length > 28 ? '$areaLabel · ${street.substring(0, 28)}…' : '$areaLabel · $street');

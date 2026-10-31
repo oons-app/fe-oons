@@ -49,10 +49,8 @@ class UserMe {
         firstName: Loc.fromJson(j['firstName']),
         lastName: Loc.fromJson(j['lastName']),
         initials: Loc.fromJson(j['initials']),
-        area: () {
-          final raw = '${j['area'] ?? ''}'.trim();
-          return raw.isEmpty ? 'capital' : raw;
-        }(),
+        // Blank until she saves an address the server places in an area.
+        area: '${j['area'] ?? ''}'.trim(),
         addresses: ((j['addresses'] as List?) ?? []).map((e) => Address.fromJson(e)).toList(),
         instructions: ((j['instructions'] as List?) ?? []).map((e) => Instruction.fromJson(e as Map)).toList(),
         savedIds: ((j['savedIds'] as List?) ?? []).map((e) => '$e').toList(),
@@ -88,26 +86,31 @@ class Address {
     this.reachNotes = const Loc('', ''),
     this.lat = 0,
     this.lng = 0,
+    this.pinApprox = false,
   });
   final String id;
   final Loc label;
   final Loc line1;
   final Loc reachNotes;
+  /// Empty when the pin is outside every area we serve.
   final String area;
   final Loc city;
   final bool isDefault;
   final double lat;
   final double lng;
+  /// She never placed a pin: [lat]/[lng] is the area's centre.
+  final bool pinApprox;
   factory Address.fromJson(Map j) => Address(
         id: '${j['id']}',
         label: Loc.fromJson(j['label'] ?? j['Label'] ?? {'en': 'Home', 'ar': 'البيت'}),
         line1: Loc.fromJson(j['line1']),
         reachNotes: j['reachNotes'] is Map ? Loc.fromJson(j['reachNotes'] as Map) : const Loc('', ''),
-        area: '${j['area']}',
+        area: '${j['area'] ?? ''}',
         city: Loc.fromJson(j['city']),
         isDefault: j['isDefault'] == true,
         lat: (j['lat'] as num?)?.toDouble() ?? 0,
         lng: (j['lng'] as num?)?.toDouble() ?? 0,
+        pinApprox: j['pinApprox'] == true,
       );
 }
 
@@ -120,6 +123,7 @@ class ProviderP {
     required this.service,
     required this.specialty,
     required this.areas,
+    this.areasByService = const {},
     required this.years,
     required this.rating,
     required this.reviewCount,
@@ -163,6 +167,9 @@ class ProviderP {
   final Loc specialty;
   final String? photo;
   final List<String> areas;
+  /// Narrower coverage for one vertical (e.g. cleaning only in Madinaty).
+  /// A vertical with no entry uses [areas].
+  final Map<String, List<String>> areasByService;
   final int years;
   final double rating;
   final int reviewCount;
@@ -208,6 +215,14 @@ class ProviderP {
   final List<Map<String, String>> calendarBlocks;
   bool get hasPlan => planCount > 0 && planFromPiastres != null;
 
+  /// Same rule as the server's `Provider.CoversArea`: the area must be in
+  /// her list for every vertical being booked.
+  bool coversArea(String area, [Iterable<String> verticals = const []]) {
+    if (area.isEmpty) return false;
+    if (verticals.isEmpty) return areas.contains(area);
+    return verticals.every((v) => (areasByService[v] ?? areas).contains(area));
+  }
+
   /// Cleaning is the provider's vertical, or one of her services is a cleaning package.
   bool get offersCleaning => service == 'cleaning' || items.any((it) => it.isCleaning || it.vertical == 'cleaning');
 
@@ -229,6 +244,11 @@ class ProviderP {
         specialty: Loc.fromJson(j['specialty']),
         photo: j['photo'] as String?,
         areas: ((j['areas'] as List?) ?? []).map((e) => '$e').toList(),
+        areasByService: {
+          if (j['areasByService'] is Map)
+            for (final e in (j['areasByService'] as Map).entries)
+              '${e.key}': ((e.value as List?) ?? []).map((x) => '$x').toList(),
+        },
         years: (j['years'] as num?)?.toInt() ?? 0,
         rating: (j['rating'] as num?)?.toDouble() ?? 0,
         reviewCount: (j['reviewCount'] as num?)?.toInt() ?? 0,
@@ -906,4 +926,25 @@ class Txn {
         createdAt: DateTime.tryParse('${j['createdAt']}') ?? DateTime.now(),
         kind: '${j['kind']}',
       );
+}
+
+/// The server's answer to "which area is this pin in?" (GET /areas/resolve).
+class AreaCheck {
+  const AreaCheck({required this.state, this.area = '', this.nearest = '', this.nearestM = 0});
+  /// covered | waitlist | outside
+  final String state;
+  final String area;
+  final String nearest;
+  final int nearestM;
+  bool get covered => state == 'covered';
+  factory AreaCheck.fromJson(Map j) {
+    final a = j['area'] is Map ? j['area'] as Map : const {};
+    final n = j['nearest'] is Map ? j['nearest'] as Map : const {};
+    return AreaCheck(
+      state: '${j['state'] ?? 'outside'}',
+      area: '${a['slug'] ?? ''}',
+      nearest: '${n['slug'] ?? ''}',
+      nearestM: (n['distanceM'] as num?)?.toInt() ?? 0,
+    );
+  }
 }
