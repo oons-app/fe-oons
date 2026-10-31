@@ -9,6 +9,9 @@ import 'package:oons/admin_v2/data/permissions.dart';
 import 'package:oons/admin_v2/data/session.dart';
 import 'package:oons/admin_v2/data/staff_client.dart';
 import 'package:oons/admin_v2/data/ui_state.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:oons/admin_v2/features/areas/area_geometry.dart';
+import 'package:oons/admin_v2/features/areas/area_map_editor.dart';
 import 'package:oons/admin_v2/l10n/copy.dart';
 import 'package:oons/admin_v2/theme/tokens.dart';
 import 'package:oons/admin_v2/ui/atoms.dart';
@@ -76,7 +79,7 @@ class _AreasScreenState extends ConsumerState<AreasScreen> {
   bool _locked(Map a) => _status(a) == 'Locked';
   int _count(String f) => f == 'All' ? areas.length : areas.where((a) => _status(a) == f).length;
 
-  /// "Drawn" when ops pasted a boundary, else the circle the area matches with.
+  /// "Drawn" when the area has a boundary, else the circle it matches with.
   String _shape(Map a, String lang) {
     if (a['hasBoundary'] == true) return lang == 'ar' ? 'مرسومة' : 'Drawn';
     final km = asInt(a['radiusM']) / 1000;
@@ -113,7 +116,22 @@ class _AreasScreenState extends ConsumerState<AreasScreen> {
     final city = TextEditingController(text: '${a?['cityId'] ?? ''}');
     final pin = TextEditingController(text: center == null ? '' : '${center['lat']}, ${center['lng']}');
     final radius = TextEditingController(text: '${a == null ? 2500 : asInt(a['radiusM'])}');
+    // The map is the editor; the GeoJSON box is the paste fallback.
+    final loaded = ringFromGeoJson(a?['boundary']);
     final boundary = TextEditingController(text: a?['boundary'] is Map ? jsonEncode(a!['boundary']) : '');
+    final startCenter = _parseCenter(pin.text) ?? (30.0444, 31.2357);
+    var shape = AreaShape(
+      center: LatLng(startCenter.$1, startCenter.$2),
+      radiusM: int.tryParse(radius.text) ?? 2500,
+      ring: loaded?.ring ?? const [],
+    );
+    var showPaste = false;
+    void setShape(AreaShape next) {
+      shape = next;
+      pin.text = '${next.center.latitude.toStringAsFixed(6)}, ${next.center.longitude.toStringAsFixed(6)}';
+      final g = ringToGeoJson(next.ring);
+      boundary.text = g == null ? '' : jsonEncode(g);
+    }
     final fee = TextEditingController(
         text: a == null ? '0' : '${asInt(a['travelFee'] ?? a['travelFeeAmount']) / 100}');
     final cities = {for (final r in areas) '${r['cityId']}': r['cityName']};
@@ -121,7 +139,7 @@ class _AreasScreenState extends ConsumerState<AreasScreen> {
       final ok = await v2Form(
         context,
         title: isNew ? (lang == 'ar' ? 'منطقة جديدة' : 'New area') : (lang == 'ar' ? 'تعديل المنطقة' : 'Edit area'),
-        bodyBuilder: (ctx, _) => Column(
+        bodyBuilder: (ctx, setLocal) => Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             V2FormField(label: 'Name (EN)', child: TextField(controller: en)),
@@ -139,18 +157,77 @@ class _AreasScreenState extends ConsumerState<AreasScreen> {
                       : 'City id (${cities.keys.join(' · ')})',
                   child: TextField(controller: city)),
             ],
+            const SizedBox(height: 16),
+            AreaMapEditor(
+              shape: shape,
+              ar: lang == 'ar',
+              onChanged: (next) => setLocal(() => setShape(next)),
+            ),
             const SizedBox(height: 12),
-            V2FormField(
-                label: lang == 'ar' ? 'المركز: خط العرض، خط الطول (من خرائط جوجل)' : 'Centre: lat, lng (copy from Google Maps)',
-                child: TextField(controller: pin)),
-            const SizedBox(height: 12),
-            V2FormField(
-                label: lang == 'ar' ? 'نصف القطر بالمتر (لو مفيش حدود مرسومة)' : 'Radius in metres (used until a boundary is drawn)',
-                child: TextField(controller: radius, keyboardType: TextInputType.number)),
-            const SizedBox(height: 12),
-            V2FormField(
-                label: lang == 'ar' ? 'الحدود GeoJSON Polygon (اختياري — امسحيها للرجوع للدائرة)' : 'Boundary — GeoJSON Polygon (optional; clear it to go back to the circle)',
-                child: TextField(controller: boundary, minLines: 2, maxLines: 6, style: const TextStyle(fontFamily: Ops.mono, fontSize: 12))),
+            Row(children: [
+              Expanded(
+                child: V2FormField(
+                    label: lang == 'ar' ? 'المركز: خط العرض، خط الطول' : 'Centre: lat, lng',
+                    child: TextField(
+                      controller: pin,
+                      onSubmitted: (v) {
+                        final c = _parseCenter(v);
+                        if (c != null) setLocal(() => setShape(AreaShape(center: LatLng(c.$1, c.$2), radiusM: shape.radiusM, ring: shape.ring)));
+                      },
+                    )),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: V2FormField(
+                    label: lang == 'ar' ? 'نصف القطر بالمتر (لو مفيش حدود)' : 'Radius, metres (used with no boundary)',
+                    child: TextField(
+                      controller: radius,
+                      keyboardType: TextInputType.number,
+                      onChanged: (v) {
+                        final r = int.tryParse(v.trim());
+                        if (r != null && r >= 200) setLocal(() => shape = AreaShape(center: shape.center, radiusM: r, ring: shape.ring));
+                      },
+                    )),
+              ),
+            ]),
+            const SizedBox(height: 8),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: V2Btn.ghost(
+                showPaste
+                    ? (lang == 'ar' ? 'اخفي GeoJSON' : 'Hide GeoJSON')
+                    : (lang == 'ar' ? 'الصقي GeoJSON بدل الرسم' : 'Paste GeoJSON instead'),
+                onPressed: () => setLocal(() => showPaste = !showPaste),
+                size: V2BtnSize.sm,
+              ),
+            ),
+            if (showPaste) ...[
+              const SizedBox(height: 8),
+              V2FormField(
+                  label: lang == 'ar' ? 'الحدود — GeoJSON Polygon' : 'Boundary — GeoJSON Polygon',
+                  child: TextField(controller: boundary, minLines: 2, maxLines: 6, style: const TextStyle(fontFamily: Ops.mono, fontSize: 12))),
+              const SizedBox(height: 8),
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: V2Btn.ghost(lang == 'ar' ? 'حمّليها على الخريطة' : 'Load onto map', size: V2BtnSize.sm, onPressed: () {
+                  final raw = boundary.text.trim();
+                  if (raw.isEmpty) return setLocal(() => setShape(AreaShape(center: shape.center, radiusM: shape.radiusM)));
+                  Object? g;
+                  try {
+                    g = jsonDecode(raw);
+                  } catch (_) {}
+                  final parsed = ringFromGeoJson(g);
+                  if (parsed == null) {
+                    v2Toast(context, lang == 'ar' ? 'ده مش GeoJSON Polygon صالح' : 'That isn\'t a valid GeoJSON Polygon', error: true);
+                    return;
+                  }
+                  if (parsed.holes) {
+                    v2Toast(context, lang == 'ar' ? 'الفتحات الداخلية اتشالت — المحرر بيحفظ الحدود الخارجية بس' : 'Inner holes were dropped — the editor keeps the outer ring only');
+                  }
+                  setLocal(() => setShape(AreaShape(center: shape.center, radiusM: shape.radiusM, ring: parsed.ring)));
+                }),
+              ),
+            ],
             const SizedBox(height: 12),
             V2FormField(
                 label: lang == 'ar' ? 'رسوم الانتقال (ج.م)' : 'Travel fee (EGP)',
@@ -167,13 +244,8 @@ class _AreasScreenState extends ConsumerState<AreasScreen> {
             err = lang == 'ar' ? 'المركز لازم يبقى «خط عرض، خط طول»' : 'Centre must be "lat, lng"';
           } else if ((int.tryParse(radius.text.trim()) ?? 0) < 200) {
             err = lang == 'ar' ? 'نصف القطر ٢٠٠ متر على الأقل' : 'Radius must be at least 200 m';
-          } else if (boundary.text.trim().isNotEmpty) {
-            try {
-              final g = jsonDecode(boundary.text.trim());
-              if (g is! Map || g['type'] != 'Polygon') throw const FormatException();
-            } catch (_) {
-              err = lang == 'ar' ? 'الحدود لازم تبقى GeoJSON Polygon' : 'Boundary must be a GeoJSON Polygon';
-            }
+          } else if (shape.ring.isNotEmpty) {
+            err = ringProblem(shape.ring, ar: lang == 'ar');
           }
           if (err != null) v2Toast(context, err, error: true);
           return err == null;
@@ -181,14 +253,14 @@ class _AreasScreenState extends ConsumerState<AreasScreen> {
       );
       if (!ok) return;
       final c = _parseCenter(pin.text)!;
-      final shape = boundary.text.trim();
+      final drawn = ringToGeoJson(shape.ring);
       final hadBoundary = a?['hasBoundary'] == true;
       final cityId = city.text.trim();
       final payload = <String, dynamic>{
         'name': {'en': en.text.trim(), 'ar': ar.text.trim()},
         'center': {'lat': c.$1, 'lng': c.$2},
         'radiusM': int.parse(radius.text.trim()),
-        if (shape.isNotEmpty) 'boundary': jsonDecode(shape) else if (hadBoundary) 'boundary': null,
+        if (drawn != null) 'boundary': drawn else if (hadBoundary) 'boundary': null,
         'travelFee': ((double.tryParse(fee.text.trim()) ?? 0) * 100).round(),
         if (isNew) ...{
           'slug': slug.text.trim().toLowerCase(),
@@ -197,13 +269,16 @@ class _AreasScreenState extends ConsumerState<AreasScreen> {
         },
       };
       try {
+        var notified = 0;
         if (isNew) {
           await staffClient.post('/admin/areas', data: payload);
         } else {
-          await staffClient.patch('/admin/areas/${idOf(a)}', data: payload);
+          final r = await staffClient.patch('/admin/areas/${idOf(a)}', data: payload);
+          notified = asInt(r['notified']);
         }
         if (mounted) {
           v2Toast(context, isNew ? (lang == 'ar' ? 'تم الإنشاء' : 'Area created') : (lang == 'ar' ? 'تم التحديث' : 'Area updated'));
+          if (notified > 0) _toldToast(notified);
           _load();
         }
       } on ApiException catch (e) {
@@ -216,13 +291,20 @@ class _AreasScreenState extends ConsumerState<AreasScreen> {
     }
   }
 
+  /// After an area goes live: how many waiting customers were told.
+  void _toldToast(int n) {
+    final lang = ref.read(localeCodeProvider);
+    v2Toast(context, lang == 'ar' ? 'بلّغنا $n عميلة إن منطقتها اتفتحت' : 'Told $n customers their area is open');
+  }
+
   Future<void> _toggleLock(Map a) async {
     final lang = ref.read(localeCodeProvider);
     // Restoring an archived area brings it back locked, never straight to live.
     final willLock = !_locked(a);
     try {
-      await staffClient.patch('/admin/areas/${idOf(a)}', data: {'status': willLock ? 'locked_teaser' : 'active'});
+      final r = await staffClient.patch('/admin/areas/${idOf(a)}', data: {'status': willLock ? 'locked_teaser' : 'active'});
       _load();
+      if (mounted && asInt(r['notified']) > 0) _toldToast(asInt(r['notified']));
       if (mounted) {
         v2Toast(context, willLock
             ? (lang == 'ar' ? 'اتقفلت المنطقة' : 'Area locked')
@@ -289,6 +371,14 @@ class _AreasScreenState extends ConsumerState<AreasScreen> {
                   ? 'الصفوف المظلّلة: منطقة شغّالة ناقصها خدمة، أو منطقة مقفولة فيها طلب. «برّه» = عملاء برّه كل المناطق والمنطقة دي الأقرب ليهم (الإجمالي ${data['outsideTotal'] ?? 0}).'
                   : 'Shaded rows: a live area missing a service, or a locked one people are asking for. "Outside" = customers outside every area who are nearest this one (${data['outsideTotal'] ?? 0} in total).',
               style: const TextStyle(fontSize: 12, color: Ops.inkSoft, height: 1.4)),
+          if (asInt(data['providersWithNoAreas']) > 0) ...[
+            const SizedBox(height: 10),
+            Text(
+                ar
+                    ? '${asInt(data['providersWithNoAreas'])} متخصصة متوثّقة مالهاش مناطق — مش بتظهر لأي عميلة. حدّدي مناطقها من صفحتها.'
+                    : '${asInt(data['providersWithNoAreas'])} vetted providers have no areas, so no customer can find them. Set their areas on their profile.',
+                style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Ops.plum, height: 1.4)),
+          ],
           const SizedBox(height: 12),
           row([
             Text(ar ? 'المنطقة' : 'Area', style: head),
@@ -297,6 +387,7 @@ class _AreasScreenState extends ConsumerState<AreasScreen> {
             Text(ar ? 'زيارات جاية' : 'Upcoming', style: head),
             Text(ar ? 'مستنيين' : 'Waiting', style: head),
             Text(ar ? 'برّه' : 'Outside', style: head),
+            Text(ar ? 'رسوم الانتقال' : 'Travel fee', style: head),
           ]),
           for (final r in rows)
             row([
@@ -306,6 +397,9 @@ class _AreasScreenState extends ConsumerState<AreasScreen> {
               Text('${r['upcoming'] ?? 0}', style: cell),
               Text('${r['waiting'] ?? 0}', style: cell),
               Text('${r['outsideNearby'] ?? 0}', style: cell),
+              // No fee set: shown as "—" so ops can fill it in; never guessed.
+              Text(r['noTravelFee'] == true ? '—' : money(asInt(r['travelFee']), lang),
+                  style: cell.copyWith(color: r['noTravelFee'] == true ? Ops.plum : null)),
             ], gap: r['gap'] == true),
         ],
       ),
@@ -364,6 +458,47 @@ class _AreasScreenState extends ConsumerState<AreasScreen> {
     }
   }
 
+  /// Saved addresses we can't serve yet that have no coverage request (saved
+  /// before requests existed). Preview counts, then write on confirm.
+  Future<void> _backfillRequests() async {
+    final lang = ref.read(localeCodeProvider);
+    final ar = lang == 'ar';
+    Map<String, dynamic> counts;
+    try {
+      final r = await staffClient.get('/admin/areas/coverage-requests/backfill');
+      counts = asMap(r['counts']) ?? const {};
+    } on ApiException catch (e) {
+      if (mounted) v2Toast(context, e.message, error: true);
+      return;
+    }
+    if (!mounted) return;
+    final changes = asInt(counts['insert']) + asInt(counts['update']) + asInt(counts['delete']);
+    String line(Map c) => ar
+        ? 'جديد: ${asInt(c['insert'])} · متحدّث: ${asInt(c['update'])} · اتشال (بقى متغطّي): ${asInt(c['delete'])} · من غير تغيير: ${asInt(c['unchanged'])} · من غير دبوس ولا منطقة: ${asInt(c['skipped'])}'
+        : 'New: ${asInt(c['insert'])} · Updated: ${asInt(c['update'])} · Removed (now covered): ${asInt(c['delete'])} · Unchanged: ${asInt(c['unchanged'])} · No pin or area: ${asInt(c['skipped'])}';
+    final ok = await v2Form(
+      context,
+      title: ar ? 'طلبات التغطية القديمة' : 'Backfill coverage requests',
+      confirmLabel: changes == 0 ? (ar ? 'تمام' : 'Done') : (ar ? 'اكتبي $changes تغيير' : 'Write $changes changes'),
+      bodyBuilder: (ctx, _) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Text(
+            ar
+                ? 'بيراجع كل العناوين المحفوظة (${asInt(counts['checked'])}) وبيسجّل طلب لكل عنوان برّه أو في منطقة لسه مقفولة، عشان تظهر في «التغطية» وتتبلّغ لما المنطقة تفتح. مش بيغيّر العناوين نفسها.'
+                : 'Checks every saved address (${asInt(counts['checked'])}) and records a request for each one outside our areas or in a locked area, so it shows in Coverage gaps and is told when the area opens. It does not change the addresses themselves.',
+            style: const TextStyle(fontSize: 12, color: Ops.inkSoft, height: 1.4)),
+        const SizedBox(height: 10),
+        Text(line(counts), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+      ]),
+    );
+    if (!ok || changes == 0 || !mounted) return;
+    try {
+      final r = await staffClient.post('/admin/areas/coverage-requests/backfill', data: {'confirm': true});
+      if (mounted) v2Toast(context, line(asMap(r['counts']) ?? const {}));
+    } on ApiException catch (e) {
+      if (mounted) v2Toast(context, e.message, error: true);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final lang = ref.watch(localeCodeProvider);
@@ -381,6 +516,7 @@ class _AreasScreenState extends ConsumerState<AreasScreen> {
       trailingActions: [
         V2Btn.ghost(lang == 'ar' ? 'التغطية' : 'Coverage gaps', onPressed: _coverage, size: V2BtnSize.sm),
         V2Btn.ghost(lang == 'ar' ? 'مراجعة العناوين' : 'Check addresses', onPressed: _addressCheck, size: V2BtnSize.sm),
+        V2Btn.ghost(lang == 'ar' ? 'طلبات التغطية' : 'Backfill requests', onPressed: _backfillRequests, size: V2BtnSize.sm),
         V2Btn.primary(lang == 'ar' ? '+ منطقة' : '+ New Area', onPressed: () => _edit(null), size: V2BtnSize.sm),
       ],
       filters: [
