@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:oons/admin_v2/chrome/modal.dart';
@@ -30,7 +32,7 @@ class _AreasScreenState extends ConsumerState<AreasScreen> {
   String filter = 'All';
   String q = '';
 
-  static const _filters = ['All', 'Active', 'Locked'];
+  static const _filters = ['All', 'Active', 'Locked', 'Archived'];
 
   @override
   void initState() {
@@ -63,12 +65,28 @@ class _AreasScreenState extends ConsumerState<AreasScreen> {
     }
   }
 
-  bool _locked(Map a) => a['locked'] == true || '${a['status']}' == 'locked_teaser' || '${a['status']}' == 'locked';
-  int _count(String f) => f == 'All' ? areas.length : areas.where((a) => f == 'Locked' ? _locked(a) : !_locked(a)).length;
+  /// Active (bookable), Locked (shown as coming soon) or Archived (retired).
+  String _status(Map a) {
+    final st = '${a['status']}';
+    if (st == 'archived') return 'Archived';
+    if (a['locked'] == true || st == 'locked_teaser' || st == 'locked') return 'Locked';
+    return 'Active';
+  }
+
+  bool _locked(Map a) => _status(a) == 'Locked';
+  int _count(String f) => f == 'All' ? areas.length : areas.where((a) => _status(a) == f).length;
+
+  /// "Drawn" when ops pasted a boundary, else the circle the area matches with.
+  String _shape(Map a, String lang) {
+    if (a['hasBoundary'] == true) return lang == 'ar' ? 'مرسومة' : 'Drawn';
+    final km = asInt(a['radiusM']) / 1000;
+    if (km <= 0) return lang == 'ar' ? 'بلا مكان' : 'No pin';
+    return lang == 'ar' ? 'دائرة ${km.toStringAsFixed(1)} كم' : 'Circle ${km.toStringAsFixed(1)} km';
+  }
 
   List<Map<String, dynamic>> get _rows {
     var list = areas;
-    if (filter != 'All') list = list.where((a) => filter == 'Locked' ? _locked(a) : !_locked(a)).toList();
+    if (filter != 'All') list = list.where((a) => _status(a) == filter).toList();
     if (q.isNotEmpty) {
       final n = q.toLowerCase();
       list = list.where((a) => a.values.join(' ').toLowerCase().contains(n)).toList();
@@ -76,25 +94,63 @@ class _AreasScreenState extends ConsumerState<AreasScreen> {
     return list;
   }
 
+  /// "30.0917, 31.6306" — the format Google Maps copies when you click a spot.
+  static (double, double)? _parseCenter(String raw) {
+    final parts = raw.split(',').map((p) => double.tryParse(p.trim())).toList();
+    if (parts.length != 2 || parts.any((p) => p == null)) return null;
+    final (lat, lng) = (parts[0]!, parts[1]!);
+    if (lat.abs() > 90 || lng.abs() > 180 || (lat == 0 && lng == 0)) return null;
+    return (lat, lng);
+  }
+
   Future<void> _edit(Map? a) async {
     final lang = ref.read(localeCodeProvider);
+    final isNew = a == null;
+    final center = asMap(a?['center']);
     final en = TextEditingController(text: '${asMap(a?['name'])?['en'] ?? ''}');
     final ar = TextEditingController(text: '${asMap(a?['name'])?['ar'] ?? ''}');
-    final city = TextEditingController(text: '${asMap(a?['cityName'])?['en'] ?? a?['cityId'] ?? ''}');
+    final slug = TextEditingController(text: '${a?['slug'] ?? ''}');
+    final city = TextEditingController(text: '${a?['cityId'] ?? ''}');
+    final pin = TextEditingController(text: center == null ? '' : '${center['lat']}, ${center['lng']}');
+    final radius = TextEditingController(text: '${a == null ? 2500 : asInt(a['radiusM'])}');
+    final boundary = TextEditingController(text: a?['boundary'] is Map ? jsonEncode(a!['boundary']) : '');
     final fee = TextEditingController(
         text: a == null ? '0' : '${asInt(a['travelFee'] ?? a['travelFeeAmount']) / 100}');
+    final cities = {for (final r in areas) '${r['cityId']}': r['cityName']};
     try {
       final ok = await v2Form(
         context,
-        title: a == null ? (lang == 'ar' ? 'منطقة جديدة' : 'New area') : (lang == 'ar' ? 'تعديل المنطقة' : 'Edit area'),
+        title: isNew ? (lang == 'ar' ? 'منطقة جديدة' : 'New area') : (lang == 'ar' ? 'تعديل المنطقة' : 'Edit area'),
         bodyBuilder: (ctx, _) => Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             V2FormField(label: 'Name (EN)', child: TextField(controller: en)),
             const SizedBox(height: 12),
             V2FormField(label: 'الاسم (AR)', child: TextField(controller: ar)),
+            if (isNew) ...[
+              const SizedBox(height: 12),
+              V2FormField(
+                  label: lang == 'ar' ? 'المعرّف (بالإنجليزي، مثل shorouk)' : 'Slug (e.g. shorouk)',
+                  child: TextField(controller: slug)),
+              const SizedBox(height: 12),
+              V2FormField(
+                  label: lang == 'ar'
+                      ? 'معرّف المدينة (${cities.keys.join(' · ')})'
+                      : 'City id (${cities.keys.join(' · ')})',
+                  child: TextField(controller: city)),
+            ],
             const SizedBox(height: 12),
-            V2FormField(label: lang == 'ar' ? 'المدينة' : 'City', child: TextField(controller: city)),
+            V2FormField(
+                label: lang == 'ar' ? 'المركز: خط العرض، خط الطول (من خرائط جوجل)' : 'Centre: lat, lng (copy from Google Maps)',
+                child: TextField(controller: pin)),
+            const SizedBox(height: 12),
+            V2FormField(
+                label: lang == 'ar' ? 'نصف القطر بالمتر (لو مفيش حدود مرسومة)' : 'Radius in metres (used until a boundary is drawn)',
+                child: TextField(controller: radius, keyboardType: TextInputType.number)),
+            const SizedBox(height: 12),
+            V2FormField(
+                label: lang == 'ar' ? 'الحدود GeoJSON Polygon (اختياري — امسحيها للرجوع للدائرة)' : 'Boundary — GeoJSON Polygon (optional; clear it to go back to the circle)',
+                child: TextField(controller: boundary, minLines: 2, maxLines: 6, style: const TextStyle(fontFamily: Ops.mono, fontSize: 12))),
             const SizedBox(height: 12),
             V2FormField(
                 label: lang == 'ar' ? 'رسوم الانتقال (ج.م)' : 'Travel fee (EGP)',
@@ -102,42 +158,67 @@ class _AreasScreenState extends ConsumerState<AreasScreen> {
           ],
         ),
         onValidate: () {
+          String? err;
           if (en.text.trim().isEmpty) {
-            v2Toast(context, lang == 'ar' ? 'الاسم مطلوب' : 'Name is required', error: true);
-            return false;
+            err = lang == 'ar' ? 'الاسم مطلوب' : 'Name is required';
+          } else if (isNew && (slug.text.trim().isEmpty || city.text.trim().isEmpty)) {
+            err = lang == 'ar' ? 'المعرّف والمدينة مطلوبين' : 'Slug and city id are required';
+          } else if (_parseCenter(pin.text) == null) {
+            err = lang == 'ar' ? 'المركز لازم يبقى «خط عرض، خط طول»' : 'Centre must be "lat, lng"';
+          } else if ((int.tryParse(radius.text.trim()) ?? 0) < 200) {
+            err = lang == 'ar' ? 'نصف القطر ٢٠٠ متر على الأقل' : 'Radius must be at least 200 m';
+          } else if (boundary.text.trim().isNotEmpty) {
+            try {
+              final g = jsonDecode(boundary.text.trim());
+              if (g is! Map || g['type'] != 'Polygon') throw const FormatException();
+            } catch (_) {
+              err = lang == 'ar' ? 'الحدود لازم تبقى GeoJSON Polygon' : 'Boundary must be a GeoJSON Polygon';
+            }
           }
-          return true;
+          if (err != null) v2Toast(context, err, error: true);
+          return err == null;
         },
       );
       if (!ok) return;
-      final payload = {
+      final c = _parseCenter(pin.text)!;
+      final shape = boundary.text.trim();
+      final hadBoundary = a?['hasBoundary'] == true;
+      final cityId = city.text.trim();
+      final payload = <String, dynamic>{
         'name': {'en': en.text.trim(), 'ar': ar.text.trim()},
-        'city': city.text.trim(),
+        'center': {'lat': c.$1, 'lng': c.$2},
+        'radiusM': int.parse(radius.text.trim()),
+        if (shape.isNotEmpty) 'boundary': jsonDecode(shape) else if (hadBoundary) 'boundary': null,
         'travelFee': ((double.tryParse(fee.text.trim()) ?? 0) * 100).round(),
+        if (isNew) ...{
+          'slug': slug.text.trim().toLowerCase(),
+          'cityId': cityId,
+          'cityName': cities[cityId] ?? {'en': cityId, 'ar': cityId},
+        },
       };
       try {
-        if (a == null) {
+        if (isNew) {
           await staffClient.post('/admin/areas', data: payload);
         } else {
           await staffClient.patch('/admin/areas/${idOf(a)}', data: payload);
         }
         if (mounted) {
-          v2Toast(context, a == null ? (lang == 'ar' ? 'تم الإنشاء' : 'Area created') : (lang == 'ar' ? 'تم التحديث' : 'Area updated'));
+          v2Toast(context, isNew ? (lang == 'ar' ? 'تم الإنشاء' : 'Area created') : (lang == 'ar' ? 'تم التحديث' : 'Area updated'));
           _load();
         }
       } on ApiException catch (e) {
         if (mounted) v2Toast(context, e.message, error: true);
       }
     } finally {
-      en.dispose();
-      ar.dispose();
-      city.dispose();
-      fee.dispose();
+      for (final t in [en, ar, slug, city, pin, radius, boundary, fee]) {
+        t.dispose();
+      }
     }
   }
 
   Future<void> _toggleLock(Map a) async {
     final lang = ref.read(localeCodeProvider);
+    // Restoring an archived area brings it back locked, never straight to live.
     final willLock = !_locked(a);
     try {
       await staffClient.patch('/admin/areas/${idOf(a)}', data: {'status': willLock ? 'locked_teaser' : 'active'});
@@ -152,18 +233,18 @@ class _AreasScreenState extends ConsumerState<AreasScreen> {
     }
   }
 
-  Future<void> _delete(Map a) async {
+  Future<void> _archive(Map a) async {
     final lang = ref.read(localeCodeProvider);
     final ok = await v2Confirm(context,
-        title: lang == 'ar' ? 'حذف المنطقة؟' : 'Delete area?',
-        body: '"${locName(a['name'], lang)}" ${lang == 'ar' ? 'ستُحذف.' : 'is removed from the console.'}',
-        confirmLabel: t(V2Copy.delete, lang),
+        title: lang == 'ar' ? 'أرشفة المنطقة؟' : 'Archive area?',
+        body: '"${locName(a['name'], lang)}" ${lang == 'ar' ? 'هتختفي من الحجز والاختيار. العناوين والمتخصصات المرتبطة بيها بتفضل محفوظة، وتقدري ترجّعيها.' : 'stops matching addresses and disappears from pickers. Saved addresses and providers keep it, and you can restore it.'}',
+        confirmLabel: lang == 'ar' ? 'أرشفة' : 'Archive',
         danger: true);
     if (!ok) return;
     try {
       await staffClient.delete('/admin/areas/${idOf(a)}');
       if (mounted) {
-        v2Toast(context, lang == 'ar' ? 'تم الحذف' : 'Area deleted');
+        v2Toast(context, lang == 'ar' ? 'اتأرشفت' : 'Area archived');
         _load();
       }
     } on ApiException catch (e) {
@@ -195,6 +276,7 @@ class _AreasScreenState extends ConsumerState<AreasScreen> {
       columns: [
         V2Col(lang == 'ar' ? 'المنطقة' : 'Area', flex: 1),
         V2Col(lang == 'ar' ? 'المدينة' : 'City', flex: 1),
+        V2Col(lang == 'ar' ? 'المكان' : 'Shape', fixed: 120),
         V2Col(lang == 'ar' ? 'رسوم الانتقال' : 'Travel fee', fixed: 110),
         V2Col(lang == 'ar' ? 'الحالة' : 'Status', fixed: 110),
       ],
@@ -206,18 +288,23 @@ class _AreasScreenState extends ConsumerState<AreasScreen> {
                   maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
               Text(locName(a['cityName'], lang).isNotEmpty ? locName(a['cityName'], lang) : '${a['cityId'] ?? ''}',
                   maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, color: Ops.inkSoft)),
+              Text(_shape(a, lang), style: const TextStyle(fontSize: 12, fontFamily: Ops.mono, color: Ops.inkSoft)),
               GestureDetector(
                 onTap: () => _edit(a),
                 child: Text(money(asInt(a['travelFee'] ?? a['travelFeeAmount']), lang),
                     style: const TextStyle(fontSize: 13, fontFamily: Ops.mono, color: Ops.plum)),
               ),
-              Align(alignment: AlignmentDirectional.centerStart, child: V2StatusPill.forLabel(_locked(a) ? 'Locked' : 'Active')),
+              Align(alignment: AlignmentDirectional.centerStart, child: V2StatusPill.forLabel(_status(a))),
             ],
             actions: [
-              V2Btn(label: _locked(a) ? (lang == 'ar' ? 'فتح' : 'Unlock') : (lang == 'ar' ? 'قفل' : 'Lock'),
-                  onPressed: () => _toggleLock(a), size: V2BtnSize.row),
+              if (_status(a) == 'Archived')
+                V2Btn(label: lang == 'ar' ? 'استرجاع' : 'Restore', onPressed: () => _toggleLock(a), size: V2BtnSize.row)
+              else
+                V2Btn(label: _locked(a) ? (lang == 'ar' ? 'فتح' : 'Unlock') : (lang == 'ar' ? 'قفل' : 'Lock'),
+                    onPressed: () => _toggleLock(a), size: V2BtnSize.row),
               V2Btn.ghost(lang == 'ar' ? 'تعديل' : 'Edit', onPressed: () => _edit(a), size: V2BtnSize.row),
-              V2Btn.danger(lang == 'ar' ? 'حذف' : 'Delete', onPressed: () => _delete(a), size: V2BtnSize.row),
+              if (_status(a) != 'Archived')
+                V2Btn.danger(lang == 'ar' ? 'أرشفة' : 'Archive', onPressed: () => _archive(a), size: V2BtnSize.row),
             ],
           ),
       ],

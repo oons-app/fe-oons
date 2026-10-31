@@ -151,6 +151,22 @@ String greet(DateTime now, String lang, String name) {
   return 'Good evening, $name.';
 }
 
+/// One area from the live catalogue (GET /areas): names, centre and city as
+/// ops set them in the console.
+class AreaInfo {
+  const AreaInfo({required this.name, required this.cityId, required this.cityName, this.lat, this.lng, this.radiusM = 0});
+  final Loc name;
+  final String cityId;
+  final Loc cityName;
+  final double? lat;
+  final double? lng;
+  final int radiusM;
+}
+
+/// Filled by refreshServiceCities. The const tables below are only the
+/// offline fallback for before the first /areas response.
+final Map<String, AreaInfo> liveAreas = {};
+
 const areaEn = {
   'zamalek': 'Zamalek',
   'dokki': 'Dokki',
@@ -200,12 +216,23 @@ const areaAr = {
   'capital': 'العاصمة الإدارية',
 };
 
-String areaName(String id, String lang) => lang == 'ar' ? (areaAr[id] ?? id) : (areaEn[id] ?? id);
+String areaName(String id, String lang) {
+  final live = liveAreas[id]?.name.of(lang).trim() ?? '';
+  if (live.isNotEmpty) return live;
+  return lang == 'ar' ? (areaAr[id] ?? id) : (areaEn[id] ?? id);
+}
+
+/// The city an area belongs to, for addresses and labels.
+String areaCityName(String area, String lang) {
+  final live = liveAreas[area]?.cityName.of(lang).trim() ?? '';
+  if (live.isNotEmpty) return live;
+  return areaIsGiza(area) ? (lang == 'ar' ? 'الجيزة' : 'Giza') : (lang == 'ar' ? 'القاهرة' : 'Cairo');
+}
 
 /// Replace raw area slugs that were stored in older booking line items.
 String localizeAreaSlugs(String text, String lang) {
   var out = text;
-  for (final id in areaEn.keys) {
+  for (final id in {...areaEn.keys, ...liveAreas.keys}) {
     final name = areaName(id, lang);
     if (name == id) continue;
     out = out.replaceAll(id, name);
@@ -222,7 +249,7 @@ String weekdayLabel(DateTime date, String lang) {
   return lang == 'ar' ? weekdayAr[i] : weekdayEn[i];
 }
 
-/// Cairo area centroids used when a saved address has no pin.
+/// Offline fallback centres; [liveAreas] wins once /areas has loaded.
 const areaCoords = {
   'zamalek': (30.0626, 31.2194),
   'dokki': (30.0383, 31.2122),
@@ -243,12 +270,16 @@ const areaCoords = {
   'montaza': (31.2880, 30.0200),
   'miami': (31.2600, 29.9700),
   'roushdy': (31.2400, 29.9500),
-  'madinaty': (30.0750, 31.6700),
-  'rehab': (30.0600, 31.4900),
-  'capital': (30.0200, 31.7400),
+  'madinaty': (30.0917, 31.6306),
+  'rehab': (30.0663, 31.4856),
+  'capital': (30.0219, 31.7550),
 };
 
-(double, double) coordsForArea(String area) => areaCoords[area] ?? (30.0444, 31.2357);
+(double, double) coordsForArea(String area) {
+  final live = liveAreas[area];
+  if (live?.lat != null && live?.lng != null) return (live!.lat!, live.lng!);
+  return areaCoords[area] ?? (30.0444, 31.2357);
+}
 
 /// Closest live service area to a dropped pin. Falls back to the
 /// Administrative Capital when the catalog is empty or the pin matches none.
@@ -284,7 +315,12 @@ String areaFromCoords(double lat, double lng) {
   return best;
 }
 
-bool areaIsGiza(String area) => area == 'dokki' || area == 'mohandeseen';
+const _gizaAreas = {'dokki', 'mohandeseen', 'agouza', 'haram', 'faisal', '6th_october'};
+
+bool areaIsGiza(String area) {
+  final live = liveAreas[area];
+  return live != null ? live.cityId == 'giza' : _gizaAreas.contains(area);
+}
 
 String googleMapsUrl(double lat, double lng) =>
     'https://www.google.com/maps/search/?api=1&query=${lat.toStringAsFixed(6)},${lng.toStringAsFixed(6)}';

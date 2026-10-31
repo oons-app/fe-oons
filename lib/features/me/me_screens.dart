@@ -38,7 +38,6 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
   late final reachNotes = TextEditingController(text: widget.existing?.reachNotes.of('ar') ?? widget.existing?.reachNotes.en ?? '');
   final search = TextEditingController();
   late String area = widget.existing != null && widget.existing!.area.trim().isNotEmpty ? widget.existing!.area : 'capital';
-  late String city = areaIsGiza(area) ? 'giza' : 'cairo';
   late bool isDefault = widget.existing?.isDefault ?? false;
   late double lat = (widget.existing?.lat ?? 0) != 0 ? widget.existing!.lat : coordsForArea(area).$1;
   late double lng = (widget.existing?.lng ?? 0) != 0 ? widget.existing!.lng : coordsForArea(area).$2;
@@ -74,10 +73,7 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
     lat = p.latitude;
     lng = p.longitude;
     final next = liveAreaForPin(lat, lng, allCatalogAreaIds());
-    setState(() {
-      area = next;
-      city = areaIsGiza(next) ? 'giza' : 'cairo';
-    });
+    setState(() => area = next);
     // A pin move must not replace a street the customer already typed. The
     // reverse lookup at the area centroid was saving "ميدان 4" over the
     // building address.
@@ -228,10 +224,7 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
                       return InkWell(
                         onTap: () async {
                           final c = coordsForArea(id);
-                          setState(() {
-                            area = id;
-                            city = areaIsGiza(id) ? 'giza' : 'cairo';
-                          });
+                          setState(() => area = id);
                           mapKey.currentState?.moveTo(c.$1, c.$2);
                           if (!areaHasNoProviders(id) || !mounted) return;
                           final pick = await showUncoveredAreaSheet(
@@ -242,36 +235,13 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
                           );
                           if (!mounted || pick == null || pick.isEmpty) return;
                           final next = coordsForArea(pick);
-                          setState(() {
-                            area = pick;
-                            city = areaIsGiza(pick) ? 'giza' : 'cairo';
-                          });
+                          setState(() => area = pick);
                           mapKey.currentState?.moveTo(next.$1, next.$2);
                         },
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                           decoration: BoxDecoration(color: on ? Client.plum : Client.card, border: Border.all(color: Client.ink, width: Client.rule)),
                           child: Text(areaName(id, lang), style: TextStyle(fontWeight: FontWeight.w700, color: on ? Client.bg : Client.ink)),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 16),
-                  ClientKicker(lang == 'ar' ? 'المدينة' : 'City'),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    children: [
-                      ['cairo', lang == 'ar' ? 'القاهرة' : 'Cairo'],
-                      ['giza', lang == 'ar' ? 'الجيزة' : 'Giza'],
-                    ].map((row) {
-                      final on = city == row[0];
-                      return InkWell(
-                        onTap: () => setState(() => city = row[0]),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                          decoration: BoxDecoration(color: on ? Client.plum : Client.card, border: Border.all(color: Client.ink, width: Client.rule)),
-                          child: Text(row[1], style: TextStyle(fontWeight: FontWeight.w700, color: on ? Client.bg : Client.ink)),
                         ),
                       );
                     }).toList(),
@@ -310,7 +280,6 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
                       });
                       try {
                         final repo = ref.read(repoProvider);
-                        final cityName = city == 'giza' ? (lang == 'ar' ? 'الجيزة' : 'Giza') : (lang == 'ar' ? 'القاهرة' : 'Cairo');
                         final UserMe u;
                         if (widget.existing == null) {
                           u = await repo.createAddress(
@@ -318,7 +287,6 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
                             line1: line1.text.trim(),
                             reachNotes: reachNotes.text,
                             area: area,
-                            city: cityName,
                             isDefault: isDefault,
                             lat: lat,
                             lng: lng,
@@ -329,7 +297,6 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
                             'line1': line1.text.trim(),
                             'reachNotes': reachNotes.text,
                             'area': area,
-                            'city': cityName,
                             'isDefault': isDefault,
                             'lat': lat,
                             'lng': lng,

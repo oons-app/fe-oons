@@ -88,6 +88,7 @@ Future<void> refreshServiceCities({bool activeOnly = true, bool force = false}) 
       final m = Map<String, dynamic>.from(raw);
       final slug = '${m['slug'] ?? ''}'.trim();
       if (slug.isEmpty) continue;
+      _rememberArea(slug, m);
       // Public default is active-only; if teaser mode, skip locked for picker chips.
       final status = '${m['status'] ?? ''}';
       final active = m['active'] == true || status == 'active';
@@ -133,4 +134,17 @@ Future<void> refreshServiceCities({bool activeOnly = true, bool force = false}) 
   } finally {
     _areasLoading = false;
   }
+}
+
+void _rememberArea(String slug, Map<String, dynamic> m) {
+  final center = m['center'] is Map ? Map<String, dynamic>.from(m['center'] as Map) : null;
+  final cityId = '${m['cityId'] ?? ''}'.trim();
+  liveAreas[slug] = AreaInfo(
+    name: m['name'] is Map ? Loc.fromJson(m['name']) : Loc(slug, slug),
+    cityId: cityId,
+    cityName: m['cityName'] is Map ? Loc.fromJson(m['cityName']) : Loc(cityId, cityId),
+    lat: (center?['lat'] as num?)?.toDouble(),
+    lng: (center?['lng'] as num?)?.toDouble(),
+    radiusM: (m['radiusM'] as num?)?.toInt() ?? 0,
+  );
 }

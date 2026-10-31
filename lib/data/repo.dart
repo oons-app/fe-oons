@@ -749,7 +749,8 @@ class Repo {
       'line1': line1,
       if (reachNotes != null && reachNotes.trim().isNotEmpty) 'reachNotes': reachNotes.trim(),
       'area': area,
-      'city': city ?? areaName(area, 'en'),
+      // The server takes the city from the area unless one is given.
+      if (city != null && city.trim().isNotEmpty) 'city': city,
       'lat': lat ?? fallback.$1,
       'lng': lng ?? fallback.$2,
       'isDefault': isDefault,
