@@ -20,6 +20,11 @@ String friendlyError(Object e, String lang) {
         if (low.contains('expir')) return '${t['otpExpired']}';
         if (low.contains('match')) return '${t['otpBad']}';
         break;
+      case 409:
+        if (low.contains('already registered')) {
+          return '${t['phoneTaken']}';
+        }
+        break;
       case 400:
         if (low.contains('egyptian') || low.contains('mobile number') || low.contains('valid egyptian')) {
           return '${t['badPhone']}';
@@ -48,6 +53,7 @@ String friendlyError(Object e, String lang) {
     }
     const keys = {
       'Need a valid Egyptian number.': 'badPhone',
+      'This number is already registered.': 'phoneTaken',
       'Need a mobile number.': 'badPhone',
       'Wait a minute before requesting another code.': 'otpWait',
       'Wait a few minutes before requesting another code.': 'otpWait',
@@ -92,6 +98,7 @@ String friendlyError(Object e, String lang) {
             'الصورة كبيرة جدًا (٨ ميغابايت حدًا أقصى). حاولِي بصورة أصغر أو بجودة أقل.',
         'Need a photo.': 'اختاري صورة.',
         'This number is blocked.': 'الرقم ده متوقف عن استخدام أُنس.',
+        'This number is already registered.': 'الرقم ده مسجّل قبل كده. سجّلي الدخول بالرمز.',
       };
       final m = ar[msg];
       if (m != null) return m;

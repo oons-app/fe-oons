@@ -33,6 +33,7 @@ class Copy {
       'otpBad': 'That code doesn\'t match.',
       'otpExpired': 'That code has expired. Request a new one.',
       'tooMany': 'Too many attempts. Request a new code.',
+      'phoneTaken': 'This number is already registered. Sign in with the code instead.',
     },
     'forceUpdate': {
       'title': 'Update required',
@@ -1377,6 +1378,7 @@ class Copy {
       'otpBad': 'الرمز غير مطابق.',
       'otpExpired': 'انتهت صلاحية الرمز. اطلبي رمزًا جديدًا.',
       'tooMany': 'محاولات كثيرة. اطلبي رمزًا جديدًا.',
+      'phoneTaken': 'الرقم ده مسجّل قبل كده. سجّلي الدخول بالرمز.',
     },
     'forceUpdate': {
       'title': 'تحديث مطلوب',
