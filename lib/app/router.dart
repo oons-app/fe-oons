@@ -59,6 +59,51 @@ String routePath(GoRouterState st) => routePathFromUri(st.uri);
 bool isAuthGate(String loc) =>
     loc == '/auth' || loc == '/login' || loc == '/otp' || loc == '/register' || loc == '/pro/register' || loc.startsWith('/onboard');
 
+/// Pay / booking URLs from WhatsApp and Universal Links. Skip onboarding; keep the path after login.
+@visibleForTesting
+bool isPayDeepLink(String loc) {
+  const prefixes = [
+    '/checkout/',
+    '/booking/',
+    '/confirmed/',
+    '/pay/',
+    '/fawry/',
+    '/visit/',
+    '/share/',
+    '/cancel/',
+    '/reschedule/',
+  ];
+  for (final p in prefixes) {
+    if (loc.startsWith(p)) return true;
+  }
+  return false;
+}
+
+@visibleForTesting
+String? pathFromDeepLink(Uri uri) {
+  if (uri.scheme == 'oons') {
+    final segs = [
+      if (uri.host.isNotEmpty) uri.host,
+      ...uri.pathSegments,
+    ];
+    if (segs.isEmpty) return null;
+    return '/${segs.join('/')}';
+  }
+  if (uri.scheme == 'http' || uri.scheme == 'https') {
+    final host = uri.host.toLowerCase();
+    if (host == 'lady.oons.app' || host == 'oons.app' || host == 'www.oons.app') {
+      final path = routePathFromUri(uri);
+      return path == '/' ? null : path;
+    }
+  }
+  return null;
+}
+
+void rememberPayDeepLink(String loc) {
+  if (!isPayDeepLink(loc)) return;
+  Hive.box('prefs').put('pending_path', loc);
+}
+
 @visibleForTesting
 bool prefsOnboarded() {
   final v = Hive.box('prefs').get('onboarded');
@@ -83,6 +128,10 @@ String? gateRedirect({
   if (loc.startsWith('/p/') || loc.startsWith('/legal')) return null;
   // The design-system gallery is a developer tool: reachable signed-out, never in release.
   if (!kReleaseMode && loc == '/ds') return null;
+  if (!authed && isPayDeepLink(loc)) {
+    rememberPayDeepLink(loc);
+    return '/auth';
+  }
   if (authed && isAuthGate(loc)) {
     final pending = Hive.box('prefs').get('pending_path');
     if (pending is String && pending.isNotEmpty) {
@@ -116,9 +165,11 @@ final routerProvider = Provider<GoRouter>((ref) {
     refreshListenable: refresh,
     redirect: (ctx, st) {
       persistBroughtFromUri(st.uri);
+      final loc = routePath(st);
+      rememberPayDeepLink(loc);
       final sess = ref.read(sessionProvider);
       return gateRedirect(
-        loc: routePath(st),
+        loc: loc,
         onboarded: prefsOnboarded(),
         authed: sess.authed,
         provider: sess.isProvider,

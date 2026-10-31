@@ -104,6 +104,18 @@ void main() {
     expect((Copy.of('ar')['profile'] as Map)['notifEmpty'], contains('تنبيهات'));
   });
 
+  test('checkout deep link skips onboard and returns after login', () {
+    expect(pathFromDeepLink(Uri.parse('https://lady.oons.app/checkout/6ae61a711c1c4303db16bebf')),
+        '/checkout/6ae61a711c1c4303db16bebf');
+    expect(pathFromDeepLink(Uri.parse('oons://checkout/6ae61a711c1c4303db16bebf')), '/checkout/6ae61a711c1c4303db16bebf');
+    expect(isPayDeepLink('/checkout/abc'), isTrue);
+    expect(isPayDeepLink('/home'), isFalse);
+    expect(gateRedirect(loc: '/checkout/6ae61a711c1c4303db16bebf', onboarded: false, authed: false, provider: false), '/auth');
+    expect(Hive.box('prefs').get('pending_path'), '/checkout/6ae61a711c1c4303db16bebf');
+    expect(gateRedirect(loc: '/checkout/6ae61a711c1c4303db16bebf', onboarded: true, authed: true, provider: false), isNull);
+    expect(gateRedirect(loc: '/otp', onboarded: true, authed: true, provider: false), '/checkout/6ae61a711c1c4303db16bebf');
+  });
+
   test('alert inbox merge keeps newest and reports unseen ids', () {
     final older = InboxAlert(id: 'a', title: 'On the way', body: 'x', at: DateTime(2026, 8, 21, 12));
     final newer = InboxAlert(id: 'b', title: 'At the door', body: 'y', at: DateTime(2026, 8, 21, 13));

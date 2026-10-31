@@ -5,6 +5,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:oons/app/deep_links.dart';
 import 'package:oons/app/router.dart';
 import 'package:oons/core/alert_sound.dart';
 import 'package:oons/core/alert_toast_banner.dart';
@@ -33,6 +34,7 @@ class _OonsAppState extends ConsumerState<OonsApp> {
       _applyConnectivity(r);
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      attachAppLinks(ref.read(routerProvider));
       if (ref.read(sessionProvider).authed) {
         ref.read(pushControllerProvider).start();
         unawaited(ref.read(sessionProvider.notifier).syncLocale());

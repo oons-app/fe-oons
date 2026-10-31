@@ -394,7 +394,7 @@
   function remountStoreBanner(force) {
     var el = document.getElementById('oons-ios-store');
     var L = lang();
-    var shouldShow = isIOS() && !isStandalone() && !inAppInfo() && !document.getElementById('splash') && !storeDismissed();
+    var shouldShow = isIOS() && !isStandalone() && !inAppInfo() && !isPayDeepLink() && !document.getElementById('splash') && !storeDismissed();
     if (!shouldShow) {
       if (el) el.remove();
       var st = document.getElementById('oons-ios-store-style');
@@ -473,9 +473,14 @@
     } catch (_) {}
   }
 
+  function isPayDeepLink() {
+    return /^\/(checkout|booking|confirmed|pay|fawry|visit)\//.test(location.pathname || '');
+  }
+
   function mount() {
     if (document.getElementById('oons-a2hs')) return;
     if (isStandalone()) return;
+    if (isPayDeepLink() && !forceShow()) return;
     if (!isMobile() && !forceShow()) return;
     if (dismissed() && !forceShow()) return;
     if (!document.body) return;

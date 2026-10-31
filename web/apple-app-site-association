@@ -1,0 +1,35 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "FZ94BLAMX5.com.oons.oons",
+        "appIDs": ["FZ94BLAMX5.com.oons.oons"],
+        "paths": [
+          "/checkout/*",
+          "/booking/*",
+          "/confirmed/*",
+          "/pay/*",
+          "/fawry/*",
+          "/visit/*",
+          "/book/*",
+          "/p/*",
+          "/invite",
+          "/invite/*"
+        ],
+        "components": [
+          { "/": "/checkout/*" },
+          { "/": "/booking/*" },
+          { "/": "/confirmed/*" },
+          { "/": "/pay/*" },
+          { "/": "/fawry/*" },
+          { "/": "/visit/*" },
+          { "/": "/book/*" },
+          { "/": "/p/*" },
+          { "/": "/invite" },
+          { "/": "/invite/*" }
+        ]
+      }
+    ]
+  }
+}
