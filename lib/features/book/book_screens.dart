@@ -1203,7 +1203,11 @@ class _BookScreenState extends ConsumerState<BookScreen> {
                               style: TextStyle(fontFamily: T.mono, fontSize: 12, fontWeight: FontWeight.w600, color: on ? Client.bg : (avail ? Client.ink : Client.muted2)),
                             ),
                             Text(
-                              on ? (copy['slotPicked'] ?? '') : (avail ? (copy['slotFree'] ?? '') : (copy['slotBusy'] ?? '')),
+                              on
+                                  ? (copy['slotPicked'] ?? '')
+                                  : (avail
+                                      ? (copy['slotFree'] ?? '')
+                                      : (s['state'] == 'blocked' ? (copy['slotClosed'] ?? copy['slotBusy'] ?? '') : (copy['slotBusy'] ?? 'Booked'))),
                               style: TextStyle(fontSize: 10, color: on ? Client.bg : Client.muted2),
                             ),
                           ],

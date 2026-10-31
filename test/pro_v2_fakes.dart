@@ -204,6 +204,22 @@ class FakeProRepo extends Repo {
   }
 
   @override
+  Future<Map<String, dynamic>> addProBlock({required String date, String? slot}) async {
+    calls.add('block $date');
+    final blocks = [...((profile['calendarBlocks'] as List?) ?? [])];
+    blocks.add({'date': date, 'slot': slot ?? ''});
+    profile['calendarBlocks'] = blocks;
+    return {'blocks': blocks};
+  }
+
+  @override
+  Future<Map<String, dynamic>> removeProBlock({required String date, String? slot}) async {
+    calls.add('unblock $date');
+    profile['calendarBlocks'] = ((profile['calendarBlocks'] as List?) ?? []).where((e) => e is! Map || e['date'] != date).toList();
+    return {'blocks': profile['calendarBlocks']};
+  }
+
+  @override
   Future<Map<String, dynamic>> patchPro(Map<String, dynamic> data) async {
     calls.add('patch ${data.keys.join(',')}');
     bodies['patch'] = data;
@@ -256,7 +272,7 @@ ApiException apiError(String msg, [int status = 409]) => ApiException(status, ms
 
 
 /// One job as GET /pro/jobs returns it. [slot] is local (no zone), earning in piastres.
-BookingBundle jobBundle(String id, String slot, {String client = 'منى', String area = 'madinaty', String service = 'تنظيف مميز', int minutes = 360, int earning = 120000, String status = 'paid', String? planTag, String? subscriptionVisitId}) {
+BookingBundle jobBundle(String id, String slot, {String client = 'منى', String area = 'madinaty', String service = 'تنظيف مميز', int minutes = 360, int earning = 120000, String status = 'paid', String? planTag, String? subscriptionVisitId, String? phone}) {
   return BookingBundle.fromJson({
     'booking': {
       'id': id,
@@ -274,7 +290,7 @@ BookingBundle jobBundle(String id, String slot, {String client = 'منى', Strin
       'introFeeAmount': 0,
       if (subscriptionVisitId != null) 'subscriptionVisitId': subscriptionVisitId,
     },
-    'client': {'firstName': {'ar': client, 'en': client}, 'area': area},
+    'client': {'firstName': {'ar': client, 'en': client}, 'area': area, if (phone != null) 'phone': phone},
     if (planTag != null) 'planTag': planTag,
     'cancelPreview': {},
   });

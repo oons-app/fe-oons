@@ -190,6 +190,8 @@ class Copy {
     'prov': {
       'vetTitle': 'Verified by Oons',
       'vetNote': 'Vetting completed 4 March 2026. Re-verified every 12 months. Interview conducted at our Cairo office.',
+      'vetLastCheck': 'Last ID + فيش check: {date}',
+      'slotClosed': 'Closed',
       'portfolio': 'Her work',
       'portfolioNote': '6 photo slots — provider-uploaded, moderated',
       'services': 'Services and prices',
@@ -1532,6 +1534,8 @@ class Copy {
     'prov': {
       'vetTitle': 'موثّقة في أنس',
       'vetNote': 'اكتمل التوثيق في ٤ مارس ٢٠٢٦، ويُراجع كل ١٢ شهرًا. أُجريت المقابلة في مكتبنا بالقاهرة.',
+      'vetLastCheck': 'آخر فحص بطاقة + فيش: {date}',
+      'slotClosed': 'مغلق',
       'portfolio': 'من أعمالها',
       'portfolioNote': '٦ صور — ترفعها هي، ونراجعها نحن',
       'services': 'الخدمات والأسعار',

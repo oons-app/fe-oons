@@ -761,6 +761,14 @@ class ProviderScreen extends ConsumerWidget {
                         reviewCount: p.reviewCount,
                         ini: p.initials.of(lang),
                         photo: p.photo,
+                        verified: p.verified || p.vetted,
+                        lastCheck: verifiedLastCheckLine('${pcopy['vetLastCheck']}', p.verifiedCheckedAt, lang == 'ar'),
+                        onVerified: () => showClientVerifiedSheet(
+                          context,
+                          title: '${pcopy['vetTitle']}',
+                          body: verifiedSheetBody('${pcopy['vetNote']}', '${pcopy['vetLastCheck']}', p.verifiedCheckedAt, lang == 'ar'),
+                          lang: lang,
+                        ),
                         onReviews: () => context.push('/reviews/${p.id}'),
                       ),
                       ClientTrustBanner(
@@ -769,7 +777,7 @@ class ProviderScreen extends ConsumerWidget {
                         onTap: () => showClientVerifiedSheet(
                           context,
                           title: '${pcopy['vetTitle']}',
-                          body: '${pcopy['vetNote']}',
+                          body: verifiedSheetBody('${pcopy['vetNote']}', '${pcopy['vetLastCheck']}', p.verifiedCheckedAt, lang == 'ar'),
                           lang: lang,
                         ),
                       ),

@@ -125,5 +125,7 @@ const _en = <String, (String, String)>{
   'payout': ('Your money', 'An amount is available to withdraw.'),
   'payout_held': ('Payout held', 'This withdrawal is paused for review.'),
   'vetted': ('Verified', 'Your profile is live for clients.'),
+  'review_reminder': ('Review the visit', 'Write your review of the visit.'),
+  'review_reminder.client': ('Review the visit', 'Write your review of the visit.'),
   'rejected': ('ID review', 'We could not verify the account yet. We will reach you if we need anything.'),
 };

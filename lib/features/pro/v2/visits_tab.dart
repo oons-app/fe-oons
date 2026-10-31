@@ -38,11 +38,11 @@ class _ProVisitsTabState extends ConsumerState<ProVisitsTab> {
   bool failed = false;
   Timer? poll;
 
-  /// Today through the rest of this month and the next (~nine weeks).
-  static const horizonDays = 63;
+  /// Today through the next 30 Cairo days (four week pages).
+  static const horizonDays = 30;
 
   DateTime get _today => dateOnlyOf((widget.now ?? DateTime.now)());
-  int get _maxWeek => (horizonDays - 1) ~/ 7;
+  int get _maxWeek => ((horizonDays - 7) ~/ 7).clamp(0, 99);
 
   @override
   void initState() {
@@ -103,7 +103,7 @@ class _ProVisitsTabState extends ConsumerState<ProVisitsTab> {
     }
     if (_week.any((d) => _on(d).isNotEmpty)) return;
     for (var w = 0; w <= _maxWeek; w++) {
-      final start = w * 7;
+      final start = (w * 7).clamp(0, horizonDays - 7);
       final slice = _horizon.sublist(start, start + 7);
       if (slice.any((d) => _on(d).isNotEmpty)) {
         weekOffset = w;
@@ -141,7 +141,7 @@ class _ProVisitsTabState extends ConsumerState<ProVisitsTab> {
           time: '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}',
           firstName: b.clientName?.of('ar') ?? '',
           address: b.clientLocked ? '' : (bk.address?.line1.of('ar') ?? ''),
-          phone: b.clientPhone ?? '',
+          phone: '',
         ),
       ));
     } else {
@@ -370,7 +370,6 @@ class _VisitCard extends StatelessWidget {
     final name = bundle.clientName?.of(lang) ?? '';
     final area = bundle.clientArea == null || bundle.clientArea!.isEmpty ? '' : areaName(bundle.clientArea!, lang);
     final street = bundle.clientLocked ? '' : (b.address?.line1.of(lang) ?? '');
-    final phone = bundle.clientPhone ?? '';
     final price = DsFormat.pricePiastres(b.serviceEarning, ar: ar);
     final isPlan = b.isPlanVisit || (bundle.planTag ?? '').isNotEmpty;
     return Semantics(
@@ -417,10 +416,6 @@ class _VisitCard extends StatelessWidget {
                       if (street.isNotEmpty) ...[
                         const SizedBox(height: 6),
                         Text(street, style: DsText.body),
-                      ],
-                      if (phone.isNotEmpty) ...[
-                        const SizedBox(height: 2),
-                        Text(phone, style: DsText.meta),
                       ],
                     ]),
                   ),

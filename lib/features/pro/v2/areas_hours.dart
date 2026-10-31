@@ -145,6 +145,7 @@ const proWorkDayOrder = weekOrderSatFirst;
 class _ProHoursViewState extends ConsumerState<ProHoursView> {
   final days = <int>{};
   final hours = <String>{};
+  final blockedDays = <String>{};
   String? primedFor;
 
   void _prime(ProviderP? me) {
@@ -156,6 +157,9 @@ class _ProHoursViewState extends ConsumerState<ProHoursView> {
     hours
       ..clear()
       ..addAll((me.slotHours.isEmpty ? defaultLocalSlotHours : me.slotHours.map(utcHourToLocal)));
+    blockedDays
+      ..clear()
+      ..addAll(me.calendarBlocks.where((b) => (b['slot'] ?? '').isEmpty).map((b) => b['date'] ?? '').where((d) => d.isNotEmpty));
   }
 
   void _error(String msg) => DsToast.show(context, msg, error: true);
@@ -278,7 +282,60 @@ class _ProHoursViewState extends ConsumerState<ProHoursView> {
             ],
           ),
         ),
+        const SizedBox(height: Ds.s3),
+        DsCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(t('blockDays'), style: DsText.itemName),
+              const SizedBox(height: Ds.s2),
+              Text(t('blockDaysHint'), style: DsText.meta),
+              const SizedBox(height: Ds.s3),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  for (var i = 0; i < 14; i++)
+                    Builder(builder: (ctx) {
+                      final d = DateTime.now().add(Duration(days: i));
+                      final key = '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+                      final on = blockedDays.contains(key);
+                      return DsChip(
+                        compact: true,
+                        label: on ? '${d.day} · ${t('dayBlocked')}' : '${d.day}',
+                        on: on,
+                        onTap: () => _toggleBlock(key, on),
+                      );
+                    }),
+                ],
+              ),
+            ],
+          ),
+        ),
       ],
     );
+  }
+
+  Future<void> _toggleBlock(String date, bool currentlyBlocked) async {
+    final t = pv2(ref);
+    final before = Set<String>.of(blockedDays);
+    setState(() {
+      currentlyBlocked ? blockedDays.remove(date) : blockedDays.add(date);
+    });
+    try {
+      currentlyBlocked
+          ? await ref.read(repoProvider).removeProBlock(date: date)
+          : await ref.read(repoProvider).addProBlock(date: date);
+      if (mounted) DsToast.show(context, t('saved'));
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          blockedDays
+            ..clear()
+            ..addAll(before);
+        });
+        DsToast.show(context, t('saveFailed'), error: true);
+      }
+    }
   }
 }

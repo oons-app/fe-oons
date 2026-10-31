@@ -129,6 +129,21 @@ class _PublicBookScreenState extends ConsumerState<PublicBookScreen> {
                     reviewCount: p.reviewCount,
                     ini: p.initials.of(lang),
                     photo: p.photo,
+                    verified: p.verified || p.vetted,
+                    lastCheck: verifiedLastCheckLine(lang == 'ar' ? 'آخر فحص بطاقة + فيش: {date}' : 'Last ID + فيش check: {date}', p.verifiedCheckedAt, lang == 'ar'),
+                    onVerified: () => showClientVerifiedSheet(
+                      context,
+                      title: lang == 'ar' ? 'موثّقة في أنس' : 'Verified by Oons',
+                      body: verifiedSheetBody(
+                        lang == 'ar'
+                            ? 'كل متخصصة على أُنس متأكدين من هويتها وفيشها، واتقابلت وش لوش. فلوسك واقفة لحد ما الزيارة تخلص.'
+                            : 'Every Oons professional is ID-verified, background-checked, and interviewed in person. Payment stays held until the visit ends.',
+                        lang == 'ar' ? 'آخر فحص بطاقة + فيش: {date}' : 'Last ID + فيش check: {date}',
+                        p.verifiedCheckedAt,
+                        lang == 'ar',
+                      ),
+                      lang: lang,
+                    ),
                   ),
                   ClientTrustBanner(
                     text: lang == 'ar' ? 'متخصصة متأكدين منها — بطاقة، فيش، ومقابلة وش لوش.' : 'Vetted professional — ID, background check, in-person interview.',

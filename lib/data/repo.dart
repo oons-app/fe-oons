@@ -816,6 +816,15 @@ class Repo {
 
   Future<Map<String, dynamic>> patchPro(Map<String, dynamic> data) => api.patch('/pro/me', data: data);
 
+  Future<Map<String, dynamic>> addProBlock({required String date, String? slot}) =>
+      api.post('/pro/blocks', data: {'date': date, if (slot != null && slot.isNotEmpty) 'slot': slot});
+
+  Future<Map<String, dynamic>> removeProBlock({required String date, String? slot}) {
+    final q = StringBuffer('/pro/blocks?date=${Uri.encodeComponent(date)}');
+    if (slot != null && slot.isNotEmpty) q.write('&slot=${Uri.encodeComponent(slot)}');
+    return api.delete(q.toString());
+  }
+
   Future<Map<String, dynamic>> addProDomain(String host) =>
       api.post('/pro/me/domains', data: {'host': host});
 

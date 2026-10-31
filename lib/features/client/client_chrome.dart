@@ -915,7 +915,7 @@ class ClientNumpad extends StatelessWidget {
 }
 
 class ClientProviderHero extends StatelessWidget {
-  const ClientProviderHero({super.key, required this.name, required this.subtitle, required this.rating, required this.reviewCount, required this.ini, this.photo, this.onReviews});
+  const ClientProviderHero({super.key, required this.name, required this.subtitle, required this.rating, required this.reviewCount, required this.ini, this.photo, this.onReviews, this.verified = true, this.lastCheck, this.onVerified});
 
   final String name;
   final String subtitle;
@@ -924,6 +924,9 @@ class ClientProviderHero extends StatelessWidget {
   final String ini;
   final String? photo;
   final VoidCallback? onReviews;
+  final bool verified;
+  final String? lastCheck;
+  final VoidCallback? onVerified;
 
   @override
   Widget build(BuildContext context) {
@@ -941,9 +944,17 @@ class ClientProviderHero extends StatelessWidget {
                 Row(
                   children: [
                     Expanded(child: Text(name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Client.ink))),
-                    const ClientStatusChip('Verified', olive: true),
+                    if (verified)
+                      GestureDetector(
+                        onTap: onVerified,
+                        child: const ClientStatusChip('Verified', olive: true),
+                      ),
                   ],
                 ),
+                if (lastCheck != null && lastCheck!.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(lastCheck!, style: const TextStyle(fontSize: 11.5, color: Client.oliveInk, height: 1.35)),
+                ],
                 const SizedBox(height: 4),
                 Text(subtitle, style: const TextStyle(fontSize: 12.5, color: Client.muted, height: 1.4)),
                 const SizedBox(height: 10),
@@ -1060,6 +1071,19 @@ class ClientEmptyState extends StatelessWidget {
       ),
     );
   }
+}
+
+String verifiedLastCheckLine(String template, DateTime? at, bool ar) {
+  if (at == null) return '';
+  final d = at.toLocal();
+  final date = '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+  return template.replaceAll('{date}', date);
+}
+
+String verifiedSheetBody(String note, String lastCheckTemplate, DateTime? at, bool ar) {
+  final line = verifiedLastCheckLine(lastCheckTemplate, at, ar);
+  if (line.isEmpty) return note;
+  return '$line\n\n$note';
 }
 
 void showClientVerifiedSheet(BuildContext context, {required String title, required String body, required String lang}) {

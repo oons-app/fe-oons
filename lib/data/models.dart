@@ -151,6 +151,9 @@ class ProviderP {
     this.linkClosed = false,
     this.idDocStatus = '',
     this.fishDocStatus = '',
+    this.verified = false,
+    this.verifiedCheckedAt,
+    this.calendarBlocks = const [],
   });
   final String id;
   final Loc firstName;
@@ -200,6 +203,9 @@ class ProviderP {
   /// Staff decision on her uploaded papers: pending | accepted | rejected | ''.
   final String idDocStatus;
   final String fishDocStatus;
+  final bool verified;
+  final DateTime? verifiedCheckedAt;
+  final List<Map<String, String>> calendarBlocks;
   bool get hasPlan => planCount > 0 && planFromPiastres != null;
 
   /// Cleaning is the provider's vertical, or one of her services is a cleaning package.
@@ -259,6 +265,12 @@ class ProviderP {
         linkClosed: j['linkClosed'] == true,
         idDocStatus: '${j['idDocStatus'] ?? ''}',
         fishDocStatus: '${j['fishDocStatus'] ?? ''}',
+        verified: j['verified'] == true,
+        verifiedCheckedAt: DateTime.tryParse('${j['verifiedCheckedAt'] ?? ''}'),
+        calendarBlocks: ((j['calendarBlocks'] as List?) ?? [])
+            .whereType<Map>()
+            .map((e) => {'date': '${e['date'] ?? ''}', 'slot': '${e['slot'] ?? ''}'})
+            .toList(),
       );
 }
 

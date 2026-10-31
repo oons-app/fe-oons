@@ -170,6 +170,16 @@ void main() {
     expect(find.text('JOB a'), findsOneWidget);
   });
 
+  testWidgets('visit card never shows the client phone', (t) async {
+    final r = repo();
+    r.upcomingJobs = [
+      jobBundle('a', '2026-10-03T16:00:00', client: 'سارة', phone: '01011111111', minutes: 180, earning: 130000),
+    ];
+    await open(t, r);
+    expect(find.text('سارة'), findsOneWidget);
+    expect(find.text('01011111111'), findsNothing);
+  });
+
   testWidgets('first load fails → retry state, not a spinner; retry loads', (t) async {
     final r = repo()..jobsFail = true;
     await open(t, r);
