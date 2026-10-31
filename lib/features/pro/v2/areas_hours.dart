@@ -8,6 +8,7 @@ import 'package:oons/data/service_catalog.dart';
 import 'package:oons/ds/ds.dart';
 import 'package:oons/features/pro/v2/autosave.dart';
 import 'package:oons/features/pro/v2/date_labels.dart';
+import 'package:oons/features/pro/v2/services_model.dart';
 import 'package:oons/features/pro/v2/t.dart';
 
 /// المناطق — one card per city. Every tap saves by itself («اتحفظ»); a refused
@@ -20,7 +21,12 @@ class ProAreasView extends ConsumerStatefulWidget {
 
 class _ProAreasViewState extends ConsumerState<ProAreasView> {
   final areas = <String>{};
+  /// Per-service narrowing (vertical → areas). No entry = all of [areas].
+  final byService = <String, Set<String>>{};
+  List<String> verticals = const [];
   String? primedFor;
+
+  static const _knownVerticals = ['beauty', 'cleaning'];
 
   void _prime(ProviderP? me) {
     if (me == null || primedFor == me.id) return;
@@ -28,6 +34,41 @@ class _ProAreasViewState extends ConsumerState<ProAreasView> {
     areas
       ..clear()
       ..addAll(me.areas);
+    byService
+      ..clear()
+      ..addAll({for (final e in me.areasByService.entries) e.key: e.value.toSet()});
+    verticals = [
+      for (final v in _knownVerticals)
+        if (me.service == v || me.items.any((it) => it.vertical == v || (v == 'cleaning' && it.isCleaning))) v,
+    ];
+  }
+
+  /// Same pruning the server does: overrides stay inside her areas, and an
+  /// override that covers all of them is no override.
+  Map<String, List<String>> _byServicePayload() => {
+        for (final e in byService.entries)
+          if (e.value.intersection(areas).isNotEmpty && !areas.every(e.value.contains))
+            e.key: e.value.intersection(areas).toList(),
+      };
+
+  void _toggleForService(String vertical, String area) {
+    final t = pv2(ref);
+    final before = {for (final e in byService.entries) e.key: Set<String>.of(e.value)};
+    final cur = Set<String>.of(byService[vertical] ?? areas);
+    cur.contains(area) ? cur.remove(area) : cur.add(area);
+    if (cur.intersection(areas).isEmpty) return _error(t('needOneServiceArea'));
+    ProAutosave(context, ref).patchMe(
+      'areasByService',
+      () => {'areasByService': _byServicePayload()},
+      apply: () => setState(() => byService[vertical] = cur),
+      rollback: () {
+        if (mounted) {
+          setState(() => byService
+            ..clear()
+            ..addAll(before));
+        }
+      },
+    );
   }
 
   void _error(String msg) => DsToast.show(context, msg, error: true);
@@ -127,6 +168,37 @@ class _ProAreasViewState extends ConsumerState<ProAreasView> {
           const SizedBox(height: Ds.s3),
         ],
         DsButton(label: t('addCity'), kind: DsButtonKind.secondary, icon: 'plus', onTap: () => _addCity(others)),
+        if (verticals.length > 1 && areas.length > 1) ...[
+          const SizedBox(height: Ds.s5),
+          Text(t('perServiceTitle'), style: DsText.itemName),
+          const SizedBox(height: Ds.s1),
+          Text(t('perServiceHint'), style: DsText.body),
+          const SizedBox(height: Ds.s3),
+          for (final v in verticals) ...[
+            DsCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(children: [
+                    Expanded(child: Text(verticalName(v, ar: ar), style: DsText.itemName)),
+                    if (!byService.containsKey(v) || areas.every(byService[v]!.contains))
+                      Text(t('perServiceAll'), style: DsText.num(size: 12)),
+                  ]),
+                  const SizedBox(height: Ds.s3),
+                  Wrap(spacing: Ds.s2, runSpacing: Ds.s2, children: [
+                    for (final a in areas)
+                      DsChip(
+                        label: areaName(a, lang),
+                        on: (byService[v] ?? areas).contains(a),
+                        onTap: () => _toggleForService(v, a),
+                      ),
+                  ]),
+                ],
+              ),
+            ),
+            const SizedBox(height: Ds.s3),
+          ],
+        ],
       ],
     );
   }

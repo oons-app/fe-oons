@@ -252,6 +252,118 @@ class _AreasScreenState extends ConsumerState<AreasScreen> {
     }
   }
 
+  /// Where we're thin: bookable providers per service, upcoming visits, and
+  /// customers who pinned a place we don't serve yet.
+  Future<void> _coverage() async {
+    final lang = ref.read(localeCodeProvider);
+    final ar = lang == 'ar';
+    Map<String, dynamic> data;
+    try {
+      data = Map<String, dynamic>.from(await staffClient.get('/admin/areas/coverage') as Map);
+    } on ApiException catch (e) {
+      if (mounted) v2Toast(context, e.message, error: true);
+      return;
+    }
+    if (!mounted) return;
+    final rows = asMapList(data['areas'])
+      ..sort((a, b) => (b['gap'] == true ? 1 : 0).compareTo(a['gap'] == true ? 1 : 0));
+    const head = TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Ops.inkSoft);
+    const cell = TextStyle(fontSize: 12.5, fontFamily: Ops.mono);
+    Widget row(List<Widget> cells, {bool gap = false}) => Container(
+          padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 6),
+          color: gap ? Ops.plum.withValues(alpha: 0.07) : null,
+          child: Row(children: [
+            Expanded(flex: 3, child: cells[0]),
+            for (final c in cells.skip(1)) Expanded(flex: 2, child: c),
+          ]),
+        );
+    await v2Form(
+      context,
+      title: ar ? 'التغطية' : 'Coverage gaps',
+      confirmLabel: ar ? 'تمام' : 'Done',
+      bodyBuilder: (ctx, _) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+              ar
+                  ? 'الصفوف المظلّلة: منطقة شغّالة ناقصها خدمة، أو منطقة مقفولة فيها طلب. «برّه» = عملاء برّه كل المناطق والمنطقة دي الأقرب ليهم (الإجمالي ${data['outsideTotal'] ?? 0}).'
+                  : 'Shaded rows: a live area missing a service, or a locked one people are asking for. "Outside" = customers outside every area who are nearest this one (${data['outsideTotal'] ?? 0} in total).',
+              style: const TextStyle(fontSize: 12, color: Ops.inkSoft, height: 1.4)),
+          const SizedBox(height: 12),
+          row([
+            Text(ar ? 'المنطقة' : 'Area', style: head),
+            Text(ar ? 'تجميل' : 'Beauty', style: head),
+            Text(ar ? 'تنظيف' : 'Cleaning', style: head),
+            Text(ar ? 'زيارات جاية' : 'Upcoming', style: head),
+            Text(ar ? 'مستنيين' : 'Waiting', style: head),
+            Text(ar ? 'برّه' : 'Outside', style: head),
+          ]),
+          for (final r in rows)
+            row([
+              Text('${locName(r['name'], lang)} · ${_status({'status': r['status']})}', style: const TextStyle(fontSize: 12.5)),
+              Text('${asMap(r['providers'])?['beauty'] ?? 0}', style: cell),
+              Text('${asMap(r['providers'])?['cleaning'] ?? 0}', style: cell),
+              Text('${r['upcoming'] ?? 0}', style: cell),
+              Text('${r['waiting'] ?? 0}', style: cell),
+              Text('${r['outsideNearby'] ?? 0}', style: cell),
+            ], gap: r['gap'] == true),
+        ],
+      ),
+    );
+  }
+
+  /// Saved addresses whose pin sits in a different area than the one stored
+  /// (most were silently set to the Capital). Read first, then fix on confirm.
+  Future<void> _addressCheck() async {
+    final lang = ref.read(localeCodeProvider);
+    final ar = lang == 'ar';
+    Map<String, dynamic> data;
+    try {
+      data = Map<String, dynamic>.from(await staffClient.get('/admin/areas/address-audit') as Map);
+    } on ApiException catch (e) {
+      if (mounted) v2Toast(context, e.message, error: true);
+      return;
+    }
+    if (!mounted) return;
+    final counts = asMap(data['counts']) ?? const {};
+    final moves = asMap(data['moves']) ?? const {};
+    final mismatch = asInt(counts['mismatch']);
+    final lines = [
+      for (final e in moves.entries.toList()..sort((a, b) => asInt(b.value).compareTo(asInt(a.value))))
+        '${e.key.replaceAll('→', ' → ').replaceFirst(RegExp(r' → $'), ' → ${ar ? 'برّه' : 'outside'}')}: ${e.value}',
+    ];
+    final ok = await v2Form(
+      context,
+      title: ar ? 'مراجعة العناوين' : 'Check saved addresses',
+      confirmLabel: mismatch == 0 ? (ar ? 'تمام' : 'Done') : (ar ? 'صحّحي $mismatch عنوان' : 'Fix $mismatch addresses'),
+      bodyBuilder: (ctx, _) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+              ar
+                  ? 'مطابقة: ${asInt(counts['match'])} · منطقة غلط: $mismatch · برّه كل المناطق: ${asInt(counts['outside'])} · من غير دبوس حقيقي: ${asInt(counts['no_pin'])}'
+                  : 'Match: ${asInt(counts['match'])} · Wrong area: $mismatch · Outside every area: ${asInt(counts['outside'])} · No real pin: ${asInt(counts['no_pin'])}',
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 10),
+          Text(
+              ar
+                  ? 'التصحيح بيغيّر بس العناوين اللي دبوسها جوّه منطقة تانية معروفة. اللي برّه أو من غير دبوس بيفضل زي ما هو.'
+                  : 'Fixing only changes addresses whose pin is inside a different known area. Outside and unpinned addresses are left alone.',
+              style: const TextStyle(fontSize: 12, color: Ops.inkSoft, height: 1.4)),
+          const SizedBox(height: 10),
+          for (final l in lines.take(20)) Text(l, style: const TextStyle(fontSize: 12, fontFamily: Ops.mono)),
+        ],
+      ),
+    );
+    if (!ok || mismatch == 0 || !mounted) return;
+    try {
+      final r = await staffClient.post('/admin/areas/address-audit/apply', data: {'confirm': true});
+      if (mounted) v2Toast(context, ar ? 'اتصحّح ${asInt((r as Map)['updated'])} عنوان' : 'Fixed ${asInt((r as Map)['updated'])} addresses');
+    } on ApiException catch (e) {
+      if (mounted) v2Toast(context, e.message, error: true);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final lang = ref.watch(localeCodeProvider);
@@ -267,6 +379,8 @@ class _AreasScreenState extends ConsumerState<AreasScreen> {
       emptyText: lang == 'ar' ? 'لا مناطق' : 'Nothing here yet',
       actionsWidth: 170,
       trailingActions: [
+        V2Btn.ghost(lang == 'ar' ? 'التغطية' : 'Coverage gaps', onPressed: _coverage, size: V2BtnSize.sm),
+        V2Btn.ghost(lang == 'ar' ? 'مراجعة العناوين' : 'Check addresses', onPressed: _addressCheck, size: V2BtnSize.sm),
         V2Btn.primary(lang == 'ar' ? '+ منطقة' : '+ New Area', onPressed: () => _edit(null), size: V2BtnSize.sm),
       ],
       filters: [
