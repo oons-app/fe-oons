@@ -184,6 +184,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
   List<Map<String, dynamic>> customers = [];
   int total = 0;
   bool loading = true;
+  bool _pagesInFlight = false;
   String? error;
   String q = '';
   String visits = ''; // '', any, none, live, done, dispute
@@ -219,6 +220,8 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
   }
 
   Future<void> _load({bool silent = false}) async {
+    if (_pagesInFlight) return;
+    _pagesInFlight = true;
     try {
       if (!silent) {
         setState(() {
@@ -237,15 +240,20 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
         counted = asInt(data['total']);
         final batch = asMapList(data['users'] ?? data['customers']);
         rows.addAll(batch);
-        if (batch.length < _pageSize || (counted > 0 && rows.length >= counted)) {
+        skip += batch.length;
+        final unique = uniqueById(rows).length;
+        if (batch.isEmpty ||
+            batch.length < _pageSize ||
+            (counted > 0 && unique >= counted) ||
+            skip > counted + _pageSize) {
           break;
         }
-        skip = rows.length;
       }
+      final uniqueRows = uniqueById(rows);
       if (!mounted) return;
       setState(() {
-        customers = rows;
-        total = counted > 0 ? counted : rows.length;
+        customers = uniqueRows;
+        total = counted > 0 ? counted : uniqueRows.length;
         _applySort(lang: ref.read(localeCodeProvider));
         loading = false;
         error = null;
@@ -256,6 +264,8 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
         error = e.message;
         loading = false;
       });
+    } finally {
+      _pagesInFlight = false;
     }
   }
 

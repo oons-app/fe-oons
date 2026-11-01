@@ -34,6 +34,18 @@ String idOf(dynamic row, [List<String> keys = const ['id', '_id']]) {
   return '';
 }
 
+/// First occurrence of each id wins. Rows with no id are kept.
+List<Map<String, dynamic>> uniqueById(Iterable<Map<String, dynamic>> rows) {
+  final seen = <String>{};
+  final out = <Map<String, dynamic>>[];
+  for (final row in rows) {
+    final id = idOf(row);
+    if (id.isNotEmpty && !seen.add(id)) continue;
+    out.add(row);
+  }
+  return out;
+}
+
 String shortId(String id, {int keep = 8}) {
   if (id.isEmpty) return '';
   if (id.length <= keep) return id;
