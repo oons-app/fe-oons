@@ -164,6 +164,16 @@ void main() {
     expect(customerResultLabel(76, 0, 'en'), '76 registered');
   });
 
+  test('uniqueById keeps the first row of a repeated customer', () {
+    final a = {'id': 'u1', 'phone': '01092152505', 'firstName': 'Amira'};
+    final b = {'id': 'u1', 'phone': '01092152505', 'firstName': 'Amira'};
+    final c = {'id': 'u2', 'phone': '01000000001', 'firstName': 'Heba'};
+    final out = uniqueById([a, b, c, a]);
+    expect(out.length, 2);
+    expect(out[0]['id'], 'u1');
+    expect(out[1]['id'], 'u2');
+  });
+
   test('personName reads first and last from loc maps', () {
     final row = {
       'firstName': {'en': 'Amany', 'ar': 'Amany'},
