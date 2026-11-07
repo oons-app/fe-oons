@@ -722,7 +722,6 @@ class Booking {
   bool get providerAccepted => providerAcceptedAt != null;
 
   int amountDue({int processingFee = 0}) {
-    if (chargedAmount > 0) return chargedAmount;
     return total + processingFee;
   }
 
