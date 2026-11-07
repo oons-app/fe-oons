@@ -2,9 +2,8 @@ import 'package:oons/core/format.dart';
 import 'package:oons/core/pro_format.dart';
 import 'package:oons/data/models.dart';
 
-/// Paymob pass-through schedule. Card and wallet are numerically identical
-/// today (250 bps + 350 piastres), so an inclusive total before a method is
-/// chosen is exact under current config — not just an estimate.
+/// Paymob pass-through schedule. Card keeps ~2.5% + 3.50 EGP. InstaPay,
+/// wallet, Fawry and kiosk add nothing.
 class ProcessingFeeSchedule {
   const ProcessingFeeSchedule({
     this.cardBps = 250,
@@ -41,11 +40,7 @@ class ProcessingFeeSchedule {
     var bps = cardBps;
     var fixed = cardFixed;
     final m = method.toLowerCase().trim();
-    if (m == 'instapay' || m == 'wallet') {
-      bps = walletBps;
-      fixed = walletFixed;
-    }
-    if (m == 'manual' || m == 'instapay_manual' || m == 'instapay_transfer' || m == 'fawry' || m == 'kiosk') {
+    if (m == 'instapay' || m == 'wallet' || m == 'manual' || m == 'instapay_manual' || m == 'instapay_transfer' || m == 'fawry' || m == 'kiosk') {
       return 0;
     }
     return (basePiastres * bps) ~/ 10000 + fixed;

@@ -108,7 +108,7 @@ void main() {
     const fees = ProcessingFeeSchedule();
     expect(fees.feeFor(80000), 2350);
     expect(fees.charge(80000), 82350);
-    expect(fees.charge(80000, 'instapay'), 82350);
+    expect(fees.charge(80000, 'instapay'), 80000);
     expect(fees.feeFor(80000, 'manual'), 0);
     expect(fees.charge(80000, 'instapay_manual'), 80000);
     expect(money(82350, 'en').contains('824'), isTrue);
@@ -130,7 +130,7 @@ void main() {
     expect(b.mult, 6);
   });
 
-  test('Booking.amountDue prefers chargedAmount', () {
+  test('Booking.amountDue is total plus the selected method fee', () {
     final b = Booking(
       id: '1',
       ref: 'ONS',
@@ -144,7 +144,8 @@ void main() {
       chargedAmount: 82350,
       paymentFeeAmount: 2350,
     );
-    expect(b.amountDue(processingFee: 9999), 82350);
+    expect(b.amountDue(processingFee: 0), 80000);
+    expect(b.amountDue(processingFee: 2350), 82350);
   });
 
   testWidgets('category tabs hide for 0–1 verticals and render two', (tester) async {

@@ -76,7 +76,6 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   int _fee() {
     final b = data?.booking;
     if (b == null) return 0;
-    if (b.paymentFeeAmount > 0) return b.paymentFeeAmount;
     return data!.processingFeeFor(method);
   }
 
