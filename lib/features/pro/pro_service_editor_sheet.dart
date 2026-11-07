@@ -428,7 +428,7 @@ class _ProServiceEditorSheetState extends State<_ProServiceEditorSheet> {
   /// Mirrors models.MaxServiceBenefits — the server silently drops anything
   /// past this, so stop offering "+ add" rather than letting her type a line
   /// that quietly disappears on save.
-  static const _maxBenefits = 12;
+  static const _maxBenefits = 20;
 
   List<Widget> _benefitsSection(Map m) {
     return [
